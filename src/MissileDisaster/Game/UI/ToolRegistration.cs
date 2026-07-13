@@ -37,9 +37,12 @@ namespace MissileDisaster.Game.UI
             if (tool == null)
             {
                 tool = controller.gameObject.AddComponent<T>();
-                AppendToControllerTools(controller, tool);
             }
 
+            // レベル再ロード時は ToolController が作り直され Awake で m_tools が張り直されるため、
+            // コンポーネントが既存だった場合でも配列・辞書への登録を毎回再確認する
+            // (AppendToControllerTools は重複ガード付きで冪等なので毎回呼んでも安全)。
+            AppendToControllerTools(controller, tool);
             RegisterInModifierDictionary(tool);
             ModConfig.Log("ToolRegistration: " + typeof(T).Name + " を登録しました");
             return tool;
