@@ -1,15 +1,18 @@
 using MissileDisaster.Core;
+using MissileDisaster.Game.Models;
 using UnityEngine;
 
 namespace MissileDisaster.Game
 {
     /// <summary>
-    /// 飛翔中の 1 発。位置補間はすべてメインスレッドで行う（sim スレッドはこのオブジェクトに触れない）。
-    /// 可視表現は Phase 1 では簡易プリミティブ（球）。後続 Phase でトレイル/モデルに差し替え。
+    /// 飛翔中の 1 発。固定方位・高高度の apex(頂点)から着弾までの「降下枝のみ」を、
+    /// すべてメインスレッドで直線補間する（sim スレッドはこのオブジェクトに触れない）。
+    /// 可視表現は弾頭モデル（Models/IncomingWarhead.obj）。読込不可時は球へフォールバックする。
+    /// 機首（モデルの +Z）は進行方向へ向ける。
     /// </summary>
     public class Missile
     {
-        private readonly Vector3 _start;
+        private readonly Vector3 _apex;
         private readonly Vector3 _target;
         private readonly float _groundDistance;
         private readonly WarheadSpec _spec;
@@ -23,37 +26,54 @@ namespace MissileDisaster.Game
         {
             _target = target;
             _spec = WarheadSpec.For(type);
-            // 発射点はターゲットから水平にオフセットした高所にする。
-            // 真上（オフセット0）だと地表投影距離が0になり、AdvanceT のゼロ距離ガードで
-            // t が初フレームに即1へ跳ね、ミサイルが飛ばず即着弾してしまう。
-            // 水平オフセットを与えることで斜めに飛来する放物線の弧になり、迎撃(後続Phase)の
-            // 飛行フェーズも成立する。方向はメインスレッドセーフな UnityEngine.Random で毎回ランダム。
-            float ang = Random.Range(0f, 2f * Mathf.PI);
-            float ox = Mathf.Cos(ang) * ModConfig.MissileLaunchOffset;
-            float oz = Mathf.Sin(ang) * ModConfig.MissileLaunchOffset;
-            _start = new Vector3(target.x + ox, target.y + ModConfig.MissileStartAltitude, target.z + oz);
-            float dx = target.x - _start.x;
-            float dz = target.z - _start.z;
-            _groundDistance = Mathf.Sqrt(dx * dx + dz * dz); // = MissileLaunchOffset (>0)
+
+            // 固定方位・高高度の apex から降下する。上昇枝は存在しない(= 終端のみ描画)。
+            Offset2 off = LaunchGeometry.BearingOffset(ModConfig.IncomingBearingDegrees, ModConfig.ApexHorizontalOffset);
+            _apex = new Vector3(target.x + off.X, target.y + ModConfig.ApexAltitude, target.z + off.Z);
+            float dx = target.x - _apex.x;
+            float dz = target.z - _apex.z;
+            _groundDistance = Mathf.Sqrt(dx * dx + dz * dz); // = ApexHorizontalOffset (>0)
             _t = 0f;
 
-            _go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            _go.transform.localScale = new Vector3(12f, 12f, 12f);
-            var col = _go.GetComponent<Collider>();
+            _go = CreateVisual();
+            _go.transform.position = _apex;
+            // 直線降下なので進行方向は一定。機首(+Z)を進行方向へ一度だけ向ける。
+            Vector3 velocity = _target - _apex;
+            if (velocity.sqrMagnitude > 1e-6f)
+            {
+                _go.transform.rotation = Quaternion.LookRotation(velocity);
+            }
+        }
+
+        /// <summary>弾頭モデルを生成。読込不可なら球へフォールバック。Collider は不要なので破棄。</summary>
+        private static GameObject CreateVisual()
+        {
+            GameObject go = MissileModelProvider.CreateInstance(ModConfig.IncomingMissileModelName);
+            if (go != null)
+            {
+                go.transform.localScale = new Vector3(
+                    ModConfig.IncomingMissileScale, ModConfig.IncomingMissileScale, ModConfig.IncomingMissileScale);
+                return go;
+            }
+
+            // フォールバック（Phase 1 と同じ球）。
+            GameObject sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            sphere.transform.localScale = new Vector3(12f, 12f, 12f);
+            Collider col = sphere.GetComponent<Collider>();
             if (col != null) Object.Destroy(col);
-            _go.transform.position = _start;
+            return sphere;
         }
 
         /// <summary>
-        /// メインスレッド。位置を進める。戻り値 true = このフレームで着弾（t&gt;=1 到達）。
-        /// 着弾後の処理（ダメージの enqueue と GameObject 破棄）は MissileManager 側が行う。
+        /// メインスレッド。apex→着弾を直線降下で補間する。戻り値 true = このフレームで着弾(t&gt;=1)。
+        /// 着弾後の処理(ダメージ enqueue と破棄)は MissileManager 側が行う。
         /// </summary>
         public bool UpdateVisual(float simTimeDelta)
         {
             _t = BallisticMath.AdvanceT(_t, _groundDistance, ModConfig.MissileSpeed, simTimeDelta);
-            float x = BallisticMath.Lerp(_start.x, _target.x, _t);
-            float z = BallisticMath.Lerp(_start.z, _target.z, _t);
-            float y = BallisticMath.Lerp(_start.y, _target.y, _t) + BallisticMath.ArcHeightAt(_t, ModConfig.MissileArcHeight);
+            float x = BallisticMath.Lerp(_apex.x, _target.x, _t);
+            float y = BallisticMath.Lerp(_apex.y, _target.y, _t);
+            float z = BallisticMath.Lerp(_apex.z, _target.z, _t);
             if (_go != null) _go.transform.position = new Vector3(x, y, z);
             return _t >= 1f;
         }

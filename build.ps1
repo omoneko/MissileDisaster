@@ -10,4 +10,14 @@ $dll = "src\MissileDisaster\bin\Release\MissileDisaster.dll"
 $modDir = Join-Path $env:LOCALAPPDATA "Colossal Order\Cities_Skylines\Addons\Mods\MissileDisaster"
 New-Item -ItemType Directory -Force -Path $modDir | Out-Null
 Copy-Item $dll $modDir -Force
+
+# モデル資産(Models/*.obj,*.mtl)を配布する。実行時に MissileModelProvider が読み込む。
+$modelsSrc = "src\MissileDisaster\Models"
+if (Test-Path $modelsSrc) {
+    $modelsDst = Join-Path $modDir "Models"
+    New-Item -ItemType Directory -Force -Path $modelsDst | Out-Null
+    Copy-Item (Join-Path $modelsSrc "*") $modelsDst -Include *.obj, *.mtl -Force
+    Write-Host "モデル配置完了: $modelsDst"
+}
+
 Write-Host "配置完了: $modDir"
