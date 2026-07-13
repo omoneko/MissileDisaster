@@ -22,7 +22,7 @@
 | 弾頭表示 | `弾道ミサイル弾頭` モデル（OBJ）。機首を進行方向へ向ける |
 | 迎撃機構 | 高度帯レイヤー防衛（自動・確率）。ARROW最上→SAM→PAC終端の順に、担当高度帯∩水平射程で確率ロール。すり抜けたら着弾 |
 | 迎撃演出 | 成功時、迎撃弾（ARROW/SAM/PACモデル）が建物→会合点へ飛翔→爆発フラッシュで両者消滅 |
-| 建物 | コスト・電力ありの本格建物3種（バニラの電力消費建物を複製し `InterceptorAI` で挙動差し替え） |
+| 建物 | コスト・電力ありの**新規建物**3種（バニラ複製ではなく独立作成。メッシュ/AI/名前/コスト/電力は独自。エンジン配管の最小テンプレートのみ流用）。専用建物メッシュは model.blend で作成中（ユーザー提供予定） |
 | 迎撃判定スレッド | メインスレッド（飛来ミサイル位置が主管の側）で判定・解決。建物はレジストリに自己登録 |
 
 ## 3. model.blend のモデル在庫
@@ -34,7 +34,7 @@
 | `SAM` | 高高度迎撃弾 | 1121 |
 | `PAC` | 終端迎撃弾 | 1569 |
 
-建物メッシュは含まれない → 迎撃建物はバニラ建物を複製し、ARROW/SAM/PAC モデルは**迎撃弾（飛翔体）**として使う。
+現時点で建物メッシュは含まれない。ARROW/SAM/PAC モデルは**迎撃弾（飛翔体）**として使う。迎撃建物用の**専用メッシュ3種はユーザーが model.blend に作成中**（完成後に追記・エクスポート）。
 
 ## 4. アーキテクチャ（追加・変更ファイル）
 
@@ -80,7 +80,7 @@ Alien Invasion からの流用: `ObjParser` / `MtlParser` / `ObjMeshBuilder`（O
 
 ### B. 3層迎撃防衛（ARROW / SAM / PAC）
 
-- **建物3種**: `CustomBuildingFactory` がバニラの電力消費サービス建物を複製し、建設費・電力・維持費を継承。AI を `InterceptorAI` に差し替え、ARROW/SAM/PAC の3プレファブを登録。
+- **建物3種（新規作成）**: `CustomBuildingFactory` が **新規 BuildingInfo** を構築（エンジン配管の最小テンプレートのみ流用し、メッシュ・AI・名前・コスト・電力・維持費は独自設定）。建物メッシュは model.blend の専用モデル（作成中・提供待ち）を使用。バニラ建物の appearance/behavior は流用しない。
 - **`InterceptorAI : PlayerBuildingAI`**: バニラの電力/維持挙動は基底に委譲。稼働中（電力供給あり）は自身を `InterceptorRegistry` に登録、非稼働/破棄で解除。
 - **`InterceptorTier`**（Core 定数）: 各層の `AltitudeMin/Max`・`HorizontalRange`・`InterceptChance`・`CooldownSeconds`。
   - ARROW=最上帯・広射程・低〜中確率、SAM=中帯・中確率、PAC=終端帯・高確率・狭め。バランスは定数で調整。
@@ -112,10 +112,15 @@ Core 純粋ロジックを xUnit でテスト:
 
 ## 8. 実装順（各段が実機で確認できる単位＝別プランに分割）
 
+**モデル依存性で2グループに分ける。** 建物メッシュ（model.blend で作成中）と OBJ エクスポートの完成を待つ必要があるのは 2B/2D/2E。2A/2C はモデル非依存で先行実装する。
+
+先行（モデル非依存・いま実装）:
 - **Plan 2A（飛来刷新）**: 固定方位＋apex降下＋高高度化（モデルは球のまま）。実機で「同方向・高高度から降下枝のみ」を確認。
-- **Plan 2B（モデル）**: model.blend 4メッシュを OBJ 化＋読込。飛来弾を実モデル化＋機首向き。
-- **Plan 2C（迎撃Core）**: `LaunchGeometry`/`InterceptDecision`/`InterceptorTier`（TDD）。
-- **Plan 2D（建物＋AI）**: `CustomBuildingFactory`＋`InterceptorAI`＋`InterceptorRegistry`。3建物設置→高度帯∩射程で被迎撃（演出は簡易フラッシュ）。
+- **Plan 2C（迎撃Core）**: `LaunchGeometry`/`InterceptDecision`/`InterceptorTier`（TDD、純粋ロジックのみ）。
+
+モデル確定後（ユーザーが model.blend 完成を連絡後）:
+- **Plan 2B（モデル）**: model.blend の弾頭＋ARROW/SAM/PAC＋建物メッシュを OBJ 化＋読込。飛来弾を実モデル化＋機首向き。
+- **Plan 2D（建物＋AI）**: `CustomBuildingFactory`（新規建物）＋`InterceptorAI`＋`InterceptorRegistry`。3建物設置→高度帯∩射程で被迎撃（演出は簡易フラッシュ）。
 - **Plan 2E（迎撃演出）**: `InterceptorShot`（会合飛翔）＋`InterceptFx`（爆発）＋各モデル。
 
 ## 9. 未決事項・リスク
