@@ -26,16 +26,17 @@ namespace MissileDisaster.Game
         public static readonly Color ObjFallbackColor = new Color(0.25f, 0.25f, 0.25f, 1f); // MTL 欠落時の既定色
 
         // 燃焼トレイル（隕石風。飛来ミサイルに付与。メインスレッドで生成）。
+        // 尾は引かせない方針: 寿命を短くして弾体近くで消し、航跡を残さない。煙は薄め・少なめ。
         public const float TrailFireRate = 70f;       // 火の粉の毎秒放出数
-        public const float TrailFireLifetime = 0.9f;  // 火の粉の寿命(秒)
+        public const float TrailFireLifetime = 0.3f;  // 火の粉の寿命(秒)。短く=尾を引かない
         public const float TrailFireSize = 10f;       // 火の粉の基準サイズ(m)
-        public const float TrailFireSpeed = 3f;       // 火の粉の初速(拡散・m/秒)
-        public const float TrailSmokeRate = 32f;      // 煙の毎秒放出数
-        public const float TrailSmokeLifetime = 1.7f; // 煙の寿命(秒)
-        public const float TrailSmokeSize = 22f;      // 煙の基準サイズ(m)
+        public const float TrailFireSpeed = 1.5f;     // 火の粉の初速(拡散・m/秒)。小さく=弾体近くに留める
+        public const float TrailSmokeRate = 14f;      // 煙の毎秒放出数。少なめ
+        public const float TrailSmokeLifetime = 0.45f;// 煙の寿命(秒)。短く=尾を残さない
+        public const float TrailSmokeSize = 18f;      // 煙の基準サイズ(m)
         public static readonly Color TrailFireCoreColor = new Color(1f, 0.85f, 0.35f, 1f);  // 明るい黄橙(コア)
         public static readonly Color TrailFireEdgeColor = new Color(0.9f, 0.28f, 0.06f, 1f); // 赤橙(縁)
-        public static readonly Color TrailSmokeColor = new Color(0.16f, 0.15f, 0.14f, 0.5f); // 暗い煙
+        public static readonly Color TrailSmokeColor = new Color(0.16f, 0.15f, 0.14f, 0.2f); // 暗い煙・薄く
 
         // 着弾（通常弾頭・sim スレッドで DisasterHelpers を呼ぶ）。
         public const float SinkholeRadius = 60f;
