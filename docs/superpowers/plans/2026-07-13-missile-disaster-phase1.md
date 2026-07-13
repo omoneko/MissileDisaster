@@ -558,16 +558,24 @@ git commit -m "feat: 着弾クレーター+範囲破壊 ImpactResolver (simス�
 ## Task 5: Missile / MissileManager（飛翔＝メイン、着弾＝sim）
 
 **Files:**
+- Modify: `src/MissileDisaster/Game/ModConfig.cs`（`MissileLaunchOffset` 定数を追加）
 - Create: `src/MissileDisaster/Game/Missile.cs`
 - Create: `src/MissileDisaster/Game/MissileManager.cs`
 
 **Interfaces:**
 - Consumes: `BallisticMath`、`WarheadType`、`WarheadSpec.For`、`ImpactResolver.Resolve`、`ModConfig`
 - Produces:
-  - `MissileManager.Launch(Vector3 target, WarheadType type)` — メインスレッド。発射点を target 真上 `MissileStartAltitude` から生成。
+  - `MissileManager.Launch(Vector3 target, WarheadType type)` — メインスレッド。発射点を target から水平 `MissileLaunchOffset`・高さ `MissileStartAltitude` オフセットした位置に生成。
   - `MissileManager.UpdateVisual(float simTimeDelta)` — メインスレッド。飛翔体の位置を進める。
   - `MissileManager.UpdateSimulation()` — sim スレッド。着弾保留中のミサイルのダメージを解決。
   - `bool MissileManager.HasActive { get; }`
+
+- [ ] **Step 0: ModConfig に発射オフセット定数を追加**
+
+`src/MissileDisaster/Game/ModConfig.cs` の飛翔ブロック（`MissileStartAltitude` の行の直後）に 1 行追加する:
+```csharp
+        public const float MissileLaunchOffset = 1500f; // 発射点をターゲットから水平にずらす距離(m)。放物線の弧を成立させる
+```
 
 - [ ] **Step 1: Missile を実装**
 
@@ -579,7 +587,7 @@ using UnityEngine;
 namespace MissileDisaster.Game
 {
     /// <summary>
-    /// 飛翔中の 1 発。位置補間（メインスレッド）と着弾フラグ（sim スレッドが読む）を持つ。
+    /// 飛翔中の 1 発。位置補間はすべてメインスレッドで行う（sim スレッドはこのオブジェクトに触れない）。
     /// 可視表現は Phase 1 では簡易プリミティブ（球）。後続 Phase でトレイル/モデルに差し替え。
     /// </summary>
     public class Missile
@@ -591,20 +599,25 @@ namespace MissileDisaster.Game
         private readonly GameObject _go;
         private float _t;
 
-        // sim スレッドが読む着弾保留フラグ（単一書込み=メイン、単一読取り=sim の良性レース）。
-        public bool ImpactPending { get; private set; }
-        public bool Resolved { get; set; }
         public Vector3 Target => _target;
         public WarheadSpec Spec => _spec;
 
         public Missile(Vector3 target, WarheadType type)
         {
             _target = target;
-            _start = new Vector3(target.x, target.y + ModConfig.MissileStartAltitude, target.z);
             _spec = WarheadSpec.For(type);
+            // 発射点はターゲットから水平にオフセットした高所にする。
+            // 真上（オフセット0）だと地表投影距離が0になり、AdvanceT のゼロ距離ガードで
+            // t が初フレームに即1へ跳ね、ミサイルが飛ばず即着弾してしまう。
+            // 水平オフセットを与えることで斜めに飛来する放物線の弧になり、迎撃(後続Phase)の
+            // 飛行フェーズも成立する。方向はメインスレッドセーフな UnityEngine.Random で毎回ランダム。
+            float ang = Random.Range(0f, 2f * Mathf.PI);
+            float ox = Mathf.Cos(ang) * ModConfig.MissileLaunchOffset;
+            float oz = Mathf.Sin(ang) * ModConfig.MissileLaunchOffset;
+            _start = new Vector3(target.x + ox, target.y + ModConfig.MissileStartAltitude, target.z + oz);
             float dx = target.x - _start.x;
             float dz = target.z - _start.z;
-            _groundDistance = Mathf.Sqrt(dx * dx + dz * dz);
+            _groundDistance = Mathf.Sqrt(dx * dx + dz * dz); // = MissileLaunchOffset (>0)
             _t = 0f;
 
             _go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
@@ -614,25 +627,21 @@ namespace MissileDisaster.Game
             _go.transform.position = _start;
         }
 
-        /// <summary>メインスレッド。位置を進め、t>=1 で着弾保留にする。戻り値 false=飛翔終了。</summary>
+        /// <summary>
+        /// メインスレッド。位置を進める。戻り値 true = このフレームで着弾（t&gt;=1 到達）。
+        /// 着弾後の処理（ダメージの enqueue と GameObject 破棄）は MissileManager 側が行う。
+        /// </summary>
         public bool UpdateVisual(float simTimeDelta)
         {
-            if (ImpactPending) return !Resolved; // 着弾後は sim の解決待ち
-
             _t = BallisticMath.AdvanceT(_t, _groundDistance, ModConfig.MissileSpeed, simTimeDelta);
             float x = BallisticMath.Lerp(_start.x, _target.x, _t);
             float z = BallisticMath.Lerp(_start.z, _target.z, _t);
             float y = BallisticMath.Lerp(_start.y, _target.y, _t) + BallisticMath.ArcHeightAt(_t, ModConfig.MissileArcHeight);
             if (_go != null) _go.transform.position = new Vector3(x, y, z);
-
-            if (_t >= 1f)
-            {
-                ImpactPending = true; // sim スレッドが UpdateSimulation で解決する
-            }
-            return true;
+            return _t >= 1f;
         }
 
-        /// <summary>メインスレッド。飛翔体 GameObject を破棄する（sim 解決後に呼ぶ）。</summary>
+        /// <summary>メインスレッド。飛翔体 GameObject を破棄する。</summary>
         public void DestroyVisual()
         {
             if (_go != null) Object.Destroy(_go);
@@ -653,14 +662,27 @@ namespace MissileDisaster.Game
 {
     /// <summary>
     /// 発射・追跡の静的コーディネータ。
-    /// UpdateVisual（メイン）＝飛翔と GameObject 破棄、UpdateSimulation（sim）＝着弾ダメージ解決。
-    /// スレッド境界: リストの構造変更はメインスレッド側のみ。sim は保留フラグを見て
-    /// ImpactResolver.Resolve を呼び Resolved=true にするだけ（要素の追加/削除はしない）。
+    /// スレッド境界（重要）:
+    ///  - _missiles（飛翔中リスト）はメインスレッドのみが触る（Launch/UpdateVisual/Reset）。
+    ///    sim スレッドはこのリストに一切アクセスしない。
+    ///  - 着弾ダメージは DisasterHelpers を使うため sim スレッドで実行が必要。そこでメインスレッドは
+    ///    着弾時に ImpactJob（座標＋弾頭スペックの値）を _impactQueue に積み、sim スレッド
+    ///    （UpdateSimulation）はロック下でキューを排出して解決する。
+    ///  これにより List&lt;Missile&gt; をスレッド跨ぎで共有せず、境界はロック保護した小さな値キューのみになる。
     /// </summary>
     public static class MissileManager
     {
-        private static readonly List<Missile> _missiles = new List<Missile>();
+        private struct ImpactJob
+        {
+            public Vector3 Target;
+            public WarheadSpec Spec;
+        }
 
+        private static readonly List<Missile> _missiles = new List<Missile>();        // メインスレッド専用
+        private static readonly List<ImpactJob> _impactQueue = new List<ImpactJob>();  // 受け渡し(ロック保護)
+        private static readonly object _impactLock = new object();
+
+        /// <summary>メインスレッドから読む。</summary>
         public static bool HasActive => _missiles.Count > 0;
 
         /// <summary>メインスレッド専用。</summary>
@@ -670,39 +692,50 @@ namespace MissileDisaster.Game
             ModConfig.Log("Missile launched at " + target + " (" + type + ")");
         }
 
-        /// <summary>メインスレッド専用。飛翔を進め、sim 解決済みのものを破棄・除去。</summary>
+        /// <summary>メインスレッド専用。飛翔を進め、着弾したものはダメージを enqueue して破棄・除去。</summary>
         public static void UpdateVisual(float simTimeDelta)
         {
             for (int i = _missiles.Count - 1; i >= 0; i--)
             {
                 Missile m = _missiles[i];
-                m.UpdateVisual(simTimeDelta);
-                if (m.ImpactPending && m.Resolved)
+                bool impacted = m.UpdateVisual(simTimeDelta);
+                if (impacted)
                 {
+                    lock (_impactLock)
+                    {
+                        _impactQueue.Add(new ImpactJob { Target = m.Target, Spec = m.Spec });
+                    }
                     m.DestroyVisual();
                     _missiles.RemoveAt(i);
                 }
             }
         }
 
-        /// <summary>シミュレーションスレッド専用。着弾保留を DisasterHelpers で解決する。</summary>
+        /// <summary>シミュレーションスレッド専用。着弾キューを排出し DisasterHelpers で解決する。</summary>
         public static void UpdateSimulation()
         {
-            for (int i = 0; i < _missiles.Count; i++)
+            List<ImpactJob> jobs = null;
+            lock (_impactLock)
             {
-                Missile m = _missiles[i];
-                if (m.ImpactPending && !m.Resolved)
+                if (_impactQueue.Count > 0)
                 {
-                    ImpactResolver.Resolve(m.Target, m.Spec);
-                    m.Resolved = true; // メインスレッドが次フレームで破棄・除去
+                    jobs = new List<ImpactJob>(_impactQueue);
+                    _impactQueue.Clear();
                 }
+            }
+            if (jobs == null) return;
+            for (int i = 0; i < jobs.Count; i++)
+            {
+                ImpactResolver.Resolve(jobs[i].Target, jobs[i].Spec);
             }
         }
 
+        /// <summary>メインスレッド専用。全飛翔体を破棄し、キューも空にする。</summary>
         public static void Reset()
         {
             for (int i = 0; i < _missiles.Count; i++) _missiles[i].DestroyVisual();
             _missiles.Clear();
+            lock (_impactLock) { _impactQueue.Clear(); }
         }
     }
 }
