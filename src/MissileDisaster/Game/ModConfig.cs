@@ -14,6 +14,7 @@ namespace MissileDisaster.Game
         public const float MissileSpeed = 900f;   // 地表投影距離に対する m/秒 相当
         public const float MissileArcHeight = 700f; // 放物線の頂点高さ（m）
         public const float MissileStartAltitude = 1200f; // 発射点の高さ
+        public const float MissileLaunchOffset = 1500f; // 発射点をターゲットから水平にずらす距離(m)。放物線の弧を成立させる
 
         // 着弾（通常弾頭・sim スレッドで DisasterHelpers を呼ぶ）。
         public const float SinkholeRadius = 60f;
