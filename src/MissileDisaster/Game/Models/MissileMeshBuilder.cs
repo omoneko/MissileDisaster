@@ -63,6 +63,54 @@ namespace MissileDisaster.Game.Models
             }
         }
 
+        /// <summary>
+        /// 全サブメッシュの三角形を単一サブメッシュへ統合した Mesh を構築する（マテリアル1枚運用）。
+        /// CS の建物レンダラは m_mesh + 単一 m_material を素直に描くため、建物用途に使う。
+        /// </summary>
+        public static bool TryBuildMergedMesh(ObjData obj, out Mesh mesh)
+        {
+            mesh = null;
+            try
+            {
+                if (obj == null || obj.Positions == null || obj.Submeshes == null) return false;
+                int vertexCount = obj.VertexCount;
+                if (vertexCount <= 0) return false;
+
+                var vertices = new Vector3[vertexCount];
+                for (int i = 0; i < vertexCount; i++)
+                {
+                    vertices[i] = new Vector3(
+                        obj.Positions[i * 3],
+                        obj.Positions[i * 3 + 1],
+                        obj.Positions[i * 3 + 2]);
+                }
+
+                var allTris = new List<int>();
+                for (int s = 0; s < obj.Submeshes.Count; s++)
+                {
+                    ObjSubmesh sub = obj.Submeshes[s];
+                    allTris.AddRange(FilterValidTriangles(sub != null ? sub.Triangles : null, vertexCount));
+                }
+                if (allTris.Count == 0) return false;
+
+                var built = new Mesh();
+                built.vertices = vertices;
+                built.subMeshCount = 1;
+                built.SetTriangles(allTris, 0);
+                built.RecalculateNormals();
+                built.RecalculateBounds();
+
+                mesh = built;
+                return true;
+            }
+            catch (Exception e)
+            {
+                ModConfig.LogError("MissileMeshBuilder.TryBuildMergedMesh error: " + e);
+                mesh = null;
+                return false;
+            }
+        }
+
         /// <summary>破損/範囲外インデックスの三角形を除去する。Unity の SetTriangles は範囲外
         /// インデックスがあると例外を投げるため、必ずこのフィルタを通してから渡す。</summary>
         private static List<int> FilterValidTriangles(List<int> triangles, int vertexCount)

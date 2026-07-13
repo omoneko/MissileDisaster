@@ -16,6 +16,10 @@ namespace MissileDisaster.Game.Loading
             {
                 MissileDisaster.Game.MissileManager.Reset();
                 UI.ToolRegistration.Register<UI.MissileTool>();
+                if (mode == LoadMode.NewGame || mode == LoadMode.LoadGame || mode == LoadMode.NewGameFromScenario)
+                {
+                    Defense.CustomBuildingFactory.EnsureRegistered();
+                }
             }
             catch (System.Exception e)
             {

@@ -38,6 +38,12 @@ namespace MissileDisaster.Game
         public static readonly Color TrailFireEdgeColor = new Color(0.9f, 0.28f, 0.06f, 1f); // 赤橙(縁)
         public static readonly Color TrailSmokeColor = new Color(0.16f, 0.15f, 0.14f, 0.2f); // 暗い煙・薄く
 
+        // 迎撃施設（正規建物・実行時クローン。S1 歩く骨格）。
+        // 小型・電力/維持ありのバニラ建物をテンプレとしてクローンし、メッシュ/名前/AI を差し替える。
+        public const string BuildingTemplateName = "Wind Turbine"; // クローン元テンプレ（見つからなければ列挙フォールバック）
+        public const string PacBuildingName = "MissileDisaster_PAC3"; // 一意・セーブ間不変
+        public const string PacBuildingModelName = "Building_PAC3";    // Models/Building_PAC3.obj
+
         // 着弾（通常弾頭・sim スレッドで DisasterHelpers を呼ぶ）。
         public const float SinkholeRadius = 60f;
         public const float SinkholeDepth = 16f;

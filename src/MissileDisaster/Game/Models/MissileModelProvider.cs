@@ -23,12 +23,56 @@ namespace MissileDisaster.Game.Models
         private static string _modDirectory;
         private static bool _initialized;
         private static readonly Dictionary<string, BuiltModel> _cache = new Dictionary<string, BuiltModel>();
+        private static readonly Dictionary<string, Mesh> _meshCache = new Dictionary<string, Mesh>();
 
         public static void Initialize(string modDirectory)
         {
             if (_initialized) return;
             _initialized = true;
             _modDirectory = modDirectory;
+        }
+
+        /// <summary>Models/&lt;name&gt;.obj を単一サブメッシュ Mesh として読み込む（建物 m_mesh 用）。失敗時 null。キャッシュ有り。</summary>
+        public static Mesh LoadMergedMesh(string name)
+        {
+            try
+            {
+                Mesh cached;
+                if (_meshCache.TryGetValue(name, out cached)) return cached;
+
+                ObjData data = LoadObjData(name);
+                if (data == null) return null;
+
+                Mesh mesh;
+                if (!MissileMeshBuilder.TryBuildMergedMesh(data, out mesh))
+                {
+                    ModConfig.LogError("MissileModelProvider.LoadMergedMesh: メッシュ構築失敗 name=" + name);
+                    return null;
+                }
+                _meshCache[name] = mesh;
+                return mesh;
+            }
+            catch (Exception e)
+            {
+                ModConfig.LogError("MissileModelProvider.LoadMergedMesh(" + name + ") error: " + e);
+                return null;
+            }
+        }
+
+        private static ObjData LoadObjData(string name)
+        {
+            if (string.IsNullOrEmpty(_modDirectory))
+            {
+                ModConfig.LogError("MissileModelProvider.LoadObjData: modDirectory 未初期化");
+                return null;
+            }
+            string objPath = Path.Combine(Path.Combine(_modDirectory, ModConfig.ModelsFolderName), name + ".obj");
+            if (!File.Exists(objPath))
+            {
+                ModConfig.LogError("MissileModelProvider.LoadObjData: OBJ が見つかりません path=" + objPath);
+                return null;
+            }
+            return ObjParser.Parse(File.ReadAllText(objPath));
         }
 
         /// <summary>指定名モデルの新しいインスタンスを返す。生成できなければ null（呼び出し側でフォールバック）。</summary>
