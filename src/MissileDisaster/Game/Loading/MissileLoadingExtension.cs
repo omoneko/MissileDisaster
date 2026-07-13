@@ -14,11 +14,25 @@ namespace MissileDisaster.Game.Loading
             base.OnLevelLoaded(mode);
             try
             {
+                MissileDisaster.Game.MissileManager.Reset();
                 UI.ToolRegistration.Register<UI.MissileTool>();
             }
             catch (System.Exception e)
             {
                 ModConfig.LogError("MissileLoadingExtension.OnLevelLoaded error: " + e);
+            }
+        }
+
+        public override void OnLevelUnloading()
+        {
+            base.OnLevelUnloading();
+            try
+            {
+                MissileDisaster.Game.MissileManager.Reset();
+            }
+            catch (System.Exception e)
+            {
+                ModConfig.LogError("MissileLoadingExtension.OnLevelUnloading error: " + e);
             }
         }
     }
