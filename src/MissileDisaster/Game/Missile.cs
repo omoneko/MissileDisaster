@@ -1,4 +1,5 @@
 using MissileDisaster.Core;
+using MissileDisaster.Game.Effects;
 using MissileDisaster.Game.Models;
 using UnityEngine;
 
@@ -43,6 +44,8 @@ namespace MissileDisaster.Game
             {
                 _go.transform.rotation = Quaternion.LookRotation(velocity);
             }
+            // 隕石風の燃焼トレイル（火の粉＋煙）を付与。ワールド空間なので後方に航跡を残す。
+            MissileTrail.Attach(_go);
         }
 
         /// <summary>弾頭モデルを生成。読込不可なら球へフォールバック。Collider は不要なので破棄。</summary>
@@ -78,10 +81,30 @@ namespace MissileDisaster.Game
             return _t >= 1f;
         }
 
-        /// <summary>メインスレッド。飛翔体 GameObject を破棄する。</summary>
+        /// <summary>メインスレッド。飛翔体 GameObject を破棄する。トレイルは切り離して残り寿命まで燃やし切る。</summary>
         public void DestroyVisual()
         {
-            if (_go != null) Object.Destroy(_go);
+            if (_go == null) return;
+            DetachAndFadeTrail(_go);
+            Object.Destroy(_go);
+        }
+
+        /// <summary>
+        /// 着弾時、トレイルの ParticleSystem を弾体から切り離し（ワールド位置維持）、新規放出だけ止めて
+        /// 既存の火の粉/煙は残り寿命まで漂わせてから破棄する。弾体ごと即破棄すると航跡が一瞬で消えるため。
+        /// </summary>
+        private static void DetachAndFadeTrail(GameObject missile)
+        {
+            ParticleSystem[] systems = missile.GetComponentsInChildren<ParticleSystem>();
+            float life = Mathf.Max(ModConfig.TrailFireLifetime, ModConfig.TrailSmokeLifetime);
+            for (int i = 0; i < systems.Length; i++)
+            {
+                ParticleSystem ps = systems[i];
+                if (ps == null) continue;
+                ps.transform.SetParent(null, true); // 親破棄に巻き込まれないよう独立させる(ワールド位置維持)
+                ps.Stop(true, ParticleSystemStopBehavior.StopEmitting); // 放出停止・既存粒子は継続シミュレート
+                Object.Destroy(ps.gameObject, life + 0.1f);
+            }
         }
     }
 }
