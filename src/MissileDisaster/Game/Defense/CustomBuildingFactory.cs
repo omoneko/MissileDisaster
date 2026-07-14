@@ -50,15 +50,19 @@ namespace MissileDisaster.Game.Defense
         private static readonly Dictionary<string, BuildingInfo> _infos = new Dictionary<string, BuildingInfo>();
         private static BuildingInfo _template;
 
-        /// <summary>迎撃施設3種をビルドメニューへ登録する（冪等）。</summary>
+        /// <summary>迎撃施設をビルドメニュー(災害タブ)へ登録する（冪等）。</summary>
         public static void EnsureRegistered()
         {
             try
             {
+                bool anyNew = false;
                 for (int i = 0; i < Specs.Length; i++)
                 {
-                    EnsureOne(Specs[i]);
+                    if (EnsureOne(Specs[i])) anyNew = true;
                 }
+                // OnLevelLoaded は toolbar 生成より後なので、登録しただけではボタンが出ない。
+                // 災害タブのパネルを再生成してボタンを反映させる。
+                if (anyNew) RefreshDisasterPanels();
             }
             catch (Exception e)
             {
@@ -66,7 +70,27 @@ namespace MissileDisaster.Game.Defense
             }
         }
 
-        private static void EnsureOne(BuildingSpec spec)
+        /// <summary>災害タブ(DisastersGroupPanel)を再生成し、新規登録した建物ボタンを反映させる。</summary>
+        private static void RefreshDisasterPanels()
+        {
+            try
+            {
+                DisastersGroupPanel[] panels = Resources.FindObjectsOfTypeAll<DisastersGroupPanel>();
+                ModConfig.Log("CustomBuildingFactory: DisastersGroupPanel 数=" + (panels == null ? 0 : panels.Length));
+                if (panels == null) return;
+                for (int i = 0; i < panels.Length; i++)
+                {
+                    if (panels[i] != null) panels[i].RefreshPanel();
+                }
+            }
+            catch (Exception e)
+            {
+                ModConfig.LogError("CustomBuildingFactory.RefreshDisasterPanels error: " + e);
+            }
+        }
+
+        /// <summary>1施設を確保・登録する。今回のセッションで新規登録したら true。</summary>
+        private static bool EnsureOne(BuildingSpec spec)
         {
             BuildingInfo info;
             if (!_infos.TryGetValue(spec.Name, out info) || info == null)
@@ -75,10 +99,10 @@ namespace MissileDisaster.Game.Defense
                 if (template == null)
                 {
                     ModConfig.LogError("CustomBuildingFactory: クローン元テンプレが見つかりません spec=" + spec.Name);
-                    return;
+                    return false;
                 }
                 info = CloneBuilding(template, spec);
-                if (info == null) return;
+                if (info == null) return false;
                 _infos[spec.Name] = info;
                 ModConfig.Log("CustomBuildingFactory: クローン生成 name=" + info.name + " template=" + template.name);
             }
@@ -88,21 +112,23 @@ namespace MissileDisaster.Game.Defense
             {
                 RegisterPrefab(info);
                 ModConfig.Log("CustomBuildingFactory: 登録 name=" + info.name);
+                return true;
             }
+            return false;
         }
 
         /// <summary>
-        /// テンプレ取得。まず災害サービスの設置建物（→災害タブ）を探す。無ければ既定名、
-        /// それも無ければ最小の PowerPlantAI 建物へフォールバック（DLC 無しなど）。
+        /// テンプレ取得。災害サービスかつ「地上設置(OnGround/OnTerrain)」の最小建物を優先する
+        /// （水上ブイ=Tsunami Warning Buoy 等は地上建物に不適なので除外）。無ければ地上不問の災害建物、
+        /// 既定名、最後に最小の PowerPlantAI へフォールバック。
         /// </summary>
         private static BuildingInfo ResolveTemplate()
         {
             if (_template != null) return _template;
 
-            BuildingInfo disaster = null;
-            BuildingInfo smallestPower = null;
-            int disasterCells = int.MaxValue;
-            int powerCells = int.MaxValue;
+            BuildingInfo groundDisaster = null; int groundCells = int.MaxValue;
+            BuildingInfo anyDisaster = null; int anyCells = int.MaxValue;
+            BuildingInfo smallestPower = null; int powerCells = int.MaxValue;
 
             int count = PrefabCollection<BuildingInfo>.LoadedCount();
             for (int i = 0; i < count; i++)
@@ -112,23 +138,25 @@ namespace MissileDisaster.Game.Defense
                 if (b.m_placementStyle != ItemClass.Placement.Manual) continue;
                 int cells = Mathf.Max(1, b.m_cellWidth) * Mathf.Max(1, b.m_cellLength);
 
-                if (b.m_class.m_service == ItemClass.Service.Disaster && cells < disasterCells)
+                if (b.m_class.m_service == ItemClass.Service.Disaster)
                 {
-                    disasterCells = cells; disaster = b;
+                    if (cells < anyCells) { anyCells = cells; anyDisaster = b; }
+                    bool ground = b.m_placementMode == BuildingInfo.PlacementMode.OnGround
+                        || b.m_placementMode == BuildingInfo.PlacementMode.OnTerrain;
+                    if (ground && cells < groundCells) { groundCells = cells; groundDisaster = b; }
                 }
-                if (b.m_buildingAI is PowerPlantAI && cells < powerCells)
-                {
-                    powerCells = cells; smallestPower = b;
-                }
+                if (b.m_buildingAI is PowerPlantAI && cells < powerCells) { powerCells = cells; smallestPower = b; }
             }
 
-            if (disaster != null) { _template = disaster; ModConfig.Log("CustomBuildingFactory: 災害テンプレ=" + disaster.name); return _template; }
+            _template = groundDisaster ?? anyDisaster
+                ?? PrefabCollection<BuildingInfo>.FindLoaded(ModConfig.FallbackBuildingTemplateName)
+                ?? smallestPower;
 
-            BuildingInfo byName = PrefabCollection<BuildingInfo>.FindLoaded(ModConfig.FallbackBuildingTemplateName);
-            if (byName != null) { _template = byName; ModConfig.Log("CustomBuildingFactory: 既定テンプレ=" + byName.name + "（災害建物が見つからず）"); return _template; }
-
-            _template = smallestPower;
-            if (_template != null) ModConfig.Log("CustomBuildingFactory: フォールバックテンプレ=" + _template.name);
+            if (_template != null)
+                ModConfig.Log("CustomBuildingFactory: テンプレ=" + _template.name + " placement=" + _template.m_placementMode +
+                    " service=" + (_template.m_class != null ? _template.m_class.m_service.ToString() : "?"));
+            else
+                ModConfig.LogError("CustomBuildingFactory: テンプレ候補が見つかりません");
             return _template;
         }
 
@@ -165,6 +193,9 @@ namespace MissileDisaster.Game.Defense
             info.m_cellWidth = spec.CellW;
             info.m_cellLength = spec.CellL;
             info.m_placementStyle = ItemClass.Placement.Manual;
+            info.m_placementMode = BuildingInfo.PlacementMode.OnGround; // 地上設置(テンプレが水上でも上書き)
+            info.m_UnlockMilestone = null;   // マイルストーンロックでボタンが隠れないように常時解放
+            info.m_availableIn = ItemClass.Availability.Game;
             // m_generatedInfo / atlas / thumbnail / m_class(=災害タブ) はテンプレ継承。
 
             // --- AI 差し替え（存在・電力・維持・コストは PlayerBuildingAI に設定） ---
