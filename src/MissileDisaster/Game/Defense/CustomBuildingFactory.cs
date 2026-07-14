@@ -50,6 +50,21 @@ namespace MissileDisaster.Game.Defense
         private static readonly Dictionary<string, BuildingInfo> _infos = new Dictionary<string, BuildingInfo>();
         private static BuildingInfo _template;
 
+        /// <summary>登録済み建物 BuildingInfo を名前で取得（設置ツール用）。未登録なら null。</summary>
+        public static BuildingInfo Get(string name)
+        {
+            BuildingInfo info;
+            return _infos.TryGetValue(name, out info) ? info : null;
+        }
+
+        /// <summary>仕様の建物名（設置ホットキー割当用、順序は PAC3/THAAD/Aegis/Radar）。</summary>
+        public static string[] BuildingNames()
+        {
+            var names = new string[Specs.Length];
+            for (int i = 0; i < Specs.Length; i++) names[i] = Specs[i].Name;
+            return names;
+        }
+
         /// <summary>迎撃施設をビルドメニュー(災害タブ)へ登録する（冪等）。</summary>
         public static void EnsureRegistered()
         {
