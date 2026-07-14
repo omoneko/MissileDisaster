@@ -277,19 +277,21 @@ namespace MissileDisaster.Game.Defense
             // ※ m_UnlockMilestone を null にするとパネル populate が NRE でこの建物をスキップし、
             //   タブに出なくなる（診断で clone だけ unlockMs=null かつ非表示だった）。テンプレ値を維持する。
 
-            // --- AI 差し替え（存在・電力・維持・コストは PlayerBuildingAI に設定） ---
-            BuildingAI oldAI = go.GetComponent<BuildingAI>();
-            if (oldAI != null) UnityEngine.Object.DestroyImmediate(oldAI);
-            InterceptorAI ai = go.AddComponent<InterceptorAI>();
-            ai.Kind = spec.Kind;
-            ai.IsRadar = spec.IsRadar;
-            ai.SupportMultiplier = spec.SupportMultiplier;
-            ai.m_info = info;
-            ai.m_constructionCost = spec.Cost;
-            ai.m_maintenanceCost = spec.Upkeep;
-            ai.m_electricityConsumption = spec.PowerKw;
-            ai.m_waterConsumption = spec.WaterM3;
-            info.m_buildingAI = ai;
+            // --- AI: テンプレ AI を維持（診断で inGetLoaded=True=登録OKと判明。非表示は AI 差し替えが
+            //     パネルのフィルタに弾かれている疑いが濃厚なので、まず AI を替えずに検証する）。
+            //     経済値は PlayerBuildingAI のフィールドなのでキャストして設定。迎撃判定は S2 で「名前」で識別する。
+            BuildingAI ai = go.GetComponent<BuildingAI>();
+            PlayerBuildingAI pai = ai as PlayerBuildingAI;
+            if (pai != null)
+            {
+                pai.m_info = info;
+                pai.m_constructionCost = spec.Cost;
+                pai.m_maintenanceCost = spec.Upkeep;
+                pai.m_electricityConsumption = spec.PowerKw;
+                pai.m_waterConsumption = spec.WaterM3;
+            }
+            if (ai != null) info.m_buildingAI = ai;
+            ModConfig.Log("CustomBuildingFactory: AI維持 name=" + spec.Name + " aiType=" + (ai != null ? ai.GetType().Name : "null"));
 
             return info;
         }
