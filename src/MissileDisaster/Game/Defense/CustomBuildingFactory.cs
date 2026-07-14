@@ -134,9 +134,32 @@ namespace MissileDisaster.Game.Defense
             {
                 RegisterPrefab(info);
                 ModConfig.Log("CustomBuildingFactory: 登録 name=" + info.name + " | " + Diag(info));
+                LogRegistrationState(info); // 一覧に本当に載っているかの決定的確認
                 return true;
             }
             return false;
+        }
+
+        /// <summary>登録後、ツールバーが走査する GetLoaded 集合に本当に入っているかを確認する（登録 vs フィルタの切り分け）。</summary>
+        private static void LogRegistrationState(BuildingInfo info)
+        {
+            try
+            {
+                bool found = PrefabCollection<BuildingInfo>.FindLoaded(info.name) != null;
+                bool inLoaded = false; int idx = -1;
+                int count = PrefabCollection<BuildingInfo>.LoadedCount();
+                for (int i = 0; i < count; i++)
+                {
+                    if (PrefabCollection<BuildingInfo>.GetLoaded((uint)i) == info) { inLoaded = true; idx = i; break; }
+                }
+                ModConfig.Log("  postReg name=" + info.name + " FindLoaded=" + found +
+                    " inGetLoaded=" + inLoaded + " idx=" + idx + " prefabDataIndex=" + info.m_prefabDataIndex +
+                    " loadedCount=" + count);
+            }
+            catch (Exception e)
+            {
+                ModConfig.LogError("LogRegistrationState error: " + e);
+            }
         }
 
         /// <summary>トグルバー表示フィルタに効くフィールドを1行で出す診断。</summary>
@@ -157,13 +180,32 @@ namespace MissileDisaster.Game.Defense
         /// （水上ブイ=Tsunami Warning Buoy 等は地上建物に不適なので除外）。無ければ地上不問の災害建物、
         /// 既定名、最後に最小の PowerPlantAI へフォールバック。
         /// </summary>
+        // タブに確実に写っている（メニュー表示が確実な）災害建物を優先テンプレにする。名前はパッチ差異があるため列挙も併用。
+        private static readonly string[] PreferredTemplates =
+        {
+            "Radar Tower", "Space Radar", "Weather Radar", "Doppler Radar", "Earthquake Sensor",
+        };
+
         private static BuildingInfo ResolveTemplate()
         {
             if (_template != null) return _template;
 
+            // 0) 既知の「メニューに写る」災害建物を名前で優先取得。
+            for (int i = 0; i < PreferredTemplates.Length; i++)
+            {
+                BuildingInfo pref = PrefabCollection<BuildingInfo>.FindLoaded(PreferredTemplates[i]);
+                if (pref != null && pref.m_class != null && pref.m_class.m_service == ItemClass.Service.Disaster)
+                {
+                    _template = pref;
+                    ModConfig.Log("CustomBuildingFactory: 優先テンプレ=" + pref.name + " | " + Diag(pref));
+                    return _template;
+                }
+            }
+
             BuildingInfo groundDisaster = null; int groundCells = int.MaxValue;
             BuildingInfo anyDisaster = null; int anyCells = int.MaxValue;
             BuildingInfo smallestPower = null; int powerCells = int.MaxValue;
+            var disasterNames = new System.Text.StringBuilder();
 
             int count = PrefabCollection<BuildingInfo>.LoadedCount();
             for (int i = 0; i < count; i++)
@@ -175,6 +217,7 @@ namespace MissileDisaster.Game.Defense
 
                 if (b.m_class.m_service == ItemClass.Service.Disaster)
                 {
+                    disasterNames.Append('[').Append(b.name).Append(":").Append(b.category).Append(']');
                     if (cells < anyCells) { anyCells = cells; anyDisaster = b; }
                     bool ground = b.m_placementMode == BuildingInfo.PlacementMode.OnGround
                         || b.m_placementMode == BuildingInfo.PlacementMode.OnTerrain;
@@ -182,6 +225,8 @@ namespace MissileDisaster.Game.Defense
                 }
                 if (b.m_buildingAI is PowerPlantAI && cells < powerCells) { powerCells = cells; smallestPower = b; }
             }
+
+            ModConfig.Log("CustomBuildingFactory: 災害建物候補=" + disasterNames);
 
             _template = groundDisaster ?? anyDisaster
                 ?? PrefabCollection<BuildingInfo>.FindLoaded(ModConfig.FallbackBuildingTemplateName)
