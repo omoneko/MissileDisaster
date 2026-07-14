@@ -60,9 +60,9 @@ namespace MissileDisaster.Game.Defense
                 {
                     if (EnsureOne(Specs[i])) anyNew = true;
                 }
-                // OnLevelLoaded は toolbar 生成より後なので、登録しただけではボタンが出ない。
-                // 災害タブのパネルを再生成してボタンを反映させる。
-                if (anyNew) RefreshDisasterPanels();
+                // OnLevelLoaded 時点では toolbar パネルが未生成(実測 DisastersGroupPanel 数=0)なので、
+                // 即時 refresh では反映できない。パネル生成後に PumpPanelRefresh() で反映する。
+                if (anyNew) { _needPanelRefresh = true; _refreshTick = 0; _refreshScans = 0; }
             }
             catch (Exception e)
             {
@@ -70,22 +70,44 @@ namespace MissileDisaster.Game.Defense
             }
         }
 
-        /// <summary>災害タブ(DisastersGroupPanel)を再生成し、新規登録した建物ボタンを反映させる。</summary>
-        private static void RefreshDisasterPanels()
+        private static bool _needPanelRefresh;
+        private static int _refreshTick;
+        private static int _refreshScans;
+
+        /// <summary>
+        /// メインスレッドから毎フレーム呼ぶ。災害タブのパネルが生成されたら RefreshPanel して新規建物
+        /// ボタンを反映する（OnLevelLoaded では未生成のため遅延実行）。約0.5秒毎に走査し、見つかれば1回で終了。
+        /// </summary>
+        public static void PumpPanelRefresh()
         {
+            if (!_needPanelRefresh) return;
+            _refreshTick++;
+            if (_refreshTick % 30 != 0) return; // 走査は間引く（FindObjectsOfTypeAll は重い）
+
             try
             {
                 DisastersGroupPanel[] panels = Resources.FindObjectsOfTypeAll<DisastersGroupPanel>();
-                ModConfig.Log("CustomBuildingFactory: DisastersGroupPanel 数=" + (panels == null ? 0 : panels.Length));
-                if (panels == null) return;
-                for (int i = 0; i < panels.Length; i++)
+                if (panels != null && panels.Length > 0)
                 {
-                    if (panels[i] != null) panels[i].RefreshPanel();
+                    for (int i = 0; i < panels.Length; i++)
+                    {
+                        if (panels[i] != null) panels[i].RefreshPanel();
+                    }
+                    _needPanelRefresh = false;
+                    ModConfig.Log("CustomBuildingFactory: 災害パネル再生成 panels=" + panels.Length + " scans=" + _refreshScans);
+                    return;
+                }
+
+                if (++_refreshScans > 120) // ~60秒探して諦める
+                {
+                    _needPanelRefresh = false;
+                    ModConfig.LogError("CustomBuildingFactory: DisastersGroupPanel が生成されず、パネル反映を断念");
                 }
             }
             catch (Exception e)
             {
-                ModConfig.LogError("CustomBuildingFactory.RefreshDisasterPanels error: " + e);
+                _needPanelRefresh = false;
+                ModConfig.LogError("CustomBuildingFactory.PumpPanelRefresh error: " + e);
             }
         }
 

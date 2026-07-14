@@ -19,6 +19,9 @@ namespace MissileDisaster.Game.Simulation
                     ToolsModifierControl.SetTool<MissileDisaster.Game.UI.MissileTool>();
                 }
 
+                // 迎撃施設ボタンを災害タブへ反映（パネル生成後に一度だけ実行される）。
+                MissileDisaster.Game.Defense.CustomBuildingFactory.PumpPanelRefresh();
+
                 bool paused = SimulationManager.instance.SimulationPaused;
                 if (!paused)
                 {
