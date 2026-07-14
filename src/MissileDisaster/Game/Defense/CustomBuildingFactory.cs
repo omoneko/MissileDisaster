@@ -228,8 +228,9 @@ namespace MissileDisaster.Game.Defense
             info.m_cellLength = spec.CellL;
             info.m_placementStyle = ItemClass.Placement.Manual;
             info.m_placementMode = BuildingInfo.PlacementMode.OnGround; // 地上設置(テンプレが水上でも上書き)
-            info.m_UnlockMilestone = null;   // マイルストーンロックでボタンが隠れないように常時解放
-            // m_availableIn / m_UICategory / m_class / atlas / thumbnail はテンプレ継承（タブに出る建物と同一に保つ）。
+            // m_UnlockMilestone/availableIn/UICategory/class/atlas/thumbnail はテンプレ継承。
+            // ※ m_UnlockMilestone を null にするとパネル populate が NRE でこの建物をスキップし、
+            //   タブに出なくなる（診断で clone だけ unlockMs=null かつ非表示だった）。テンプレ値を維持する。
 
             // --- AI 差し替え（存在・電力・維持・コストは PlayerBuildingAI に設定） ---
             BuildingAI oldAI = go.GetComponent<BuildingAI>();
