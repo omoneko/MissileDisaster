@@ -133,10 +133,23 @@ namespace MissileDisaster.Game.Defense
             if (PrefabCollection<BuildingInfo>.FindLoaded(info.name) == null)
             {
                 RegisterPrefab(info);
-                ModConfig.Log("CustomBuildingFactory: 登録 name=" + info.name);
+                ModConfig.Log("CustomBuildingFactory: 登録 name=" + info.name + " | " + Diag(info));
                 return true;
             }
             return false;
+        }
+
+        /// <summary>トグルバー表示フィルタに効くフィールドを1行で出す診断。</summary>
+        private static string Diag(BuildingInfo b)
+        {
+            if (b == null) return "null";
+            string cls = b.m_class != null
+                ? b.m_class.m_service + "/" + b.m_class.m_subService + "/L" + (int)b.m_class.m_level
+                : "?";
+            return "UICat='" + b.category + "' avail=" + b.m_availableIn +
+                " place=" + b.m_placementStyle + "/" + b.m_placementMode +
+                " class=" + cls + " thumb='" + b.m_Thumbnail + "' atlas=" + (b.m_Atlas != null ? "set" : "null") +
+                " cells=" + b.m_cellWidth + "x" + b.m_cellLength + " unlockMs=" + (b.m_UnlockMilestone != null ? "set" : "null");
         }
 
         /// <summary>
@@ -175,8 +188,7 @@ namespace MissileDisaster.Game.Defense
                 ?? smallestPower;
 
             if (_template != null)
-                ModConfig.Log("CustomBuildingFactory: テンプレ=" + _template.name + " placement=" + _template.m_placementMode +
-                    " service=" + (_template.m_class != null ? _template.m_class.m_service.ToString() : "?"));
+                ModConfig.Log("CustomBuildingFactory: テンプレ=" + _template.name + " | " + Diag(_template));
             else
                 ModConfig.LogError("CustomBuildingFactory: テンプレ候補が見つかりません");
             return _template;
@@ -217,8 +229,7 @@ namespace MissileDisaster.Game.Defense
             info.m_placementStyle = ItemClass.Placement.Manual;
             info.m_placementMode = BuildingInfo.PlacementMode.OnGround; // 地上設置(テンプレが水上でも上書き)
             info.m_UnlockMilestone = null;   // マイルストーンロックでボタンが隠れないように常時解放
-            info.m_availableIn = ItemClass.Availability.Game;
-            // m_generatedInfo / atlas / thumbnail / m_class(=災害タブ) はテンプレ継承。
+            // m_availableIn / m_UICategory / m_class / atlas / thumbnail はテンプレ継承（タブに出る建物と同一に保つ）。
 
             // --- AI 差し替え（存在・電力・維持・コストは PlayerBuildingAI に設定） ---
             BuildingAI oldAI = go.GetComponent<BuildingAI>();
