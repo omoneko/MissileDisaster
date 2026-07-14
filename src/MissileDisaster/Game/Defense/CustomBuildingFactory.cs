@@ -17,7 +17,10 @@ namespace MissileDisaster.Game.Defense
     /// </summary>
     public static class CustomBuildingFactory
     {
-        /// <summary>1施設ぶんの仕様。迎撃高度: Aegis(Arrow帯)>THAAD(Sam帯)>PAC3(Pac帯)。</summary>
+        /// <summary>
+        /// 1施設ぶんの仕様。迎撃高度: Aegis(Arrow帯)>THAAD(Sam帯)>PAC3(Pac帯)。
+        /// レーダーサイトは迎撃せず、稼働中に迎撃確率へ SupportMultiplier を掛ける支援施設。
+        /// </summary>
         private struct BuildingSpec
         {
             public string Name;     // 一意・セーブ間不変の prefab 名
@@ -28,21 +31,18 @@ namespace MissileDisaster.Game.Defense
             public int PowerKw;     // 電力消費(kW)
             public int WaterM3;     // 水消費(m^3)
             public int Upkeep;      // 維持費
-            public InterceptorKind Kind; // 迎撃層(高度帯)
-
-            public BuildingSpec(string name, string model, int cw, int cl, int cost, int power, int water, int upkeep, InterceptorKind kind)
-            {
-                Name = name; Model = model; CellW = cw; CellL = cl;
-                Cost = cost; PowerKw = power; WaterM3 = water; Upkeep = upkeep; Kind = kind;
-            }
+            public InterceptorKind Kind; // 迎撃層(高度帯)。IsRadar=true のときは未使用。
+            public bool IsRadar;    // 支援(レーダー)施設か
+            public float SupportMultiplier; // レーダーの迎撃確率倍率(既定 1)
         }
 
         // Kind の高度帯: Arrow=最高(超高高度), Sam=中(高高度), Pac=終端。
         private static readonly BuildingSpec[] Specs =
         {
-            new BuildingSpec("MissileDisaster_PAC3",       "Building_PAC3",  3, 4, 320000, 100,   0,  800, InterceptorKind.Pac),
-            new BuildingSpec("MissileDisaster_THAAD",      "Building_THAAD", 5, 5, 400000, 480, 240, 2000, InterceptorKind.Sam),
-            new BuildingSpec("MissileDisaster_AegisAshore","Building_Aegis", 6, 6, 600000, 480, 240, 3000, InterceptorKind.Arrow),
+            new BuildingSpec { Name = "MissileDisaster_PAC3",        Model = "Building_PAC3",      CellW = 3, CellL = 4, Cost = 320000, PowerKw = 100, WaterM3 =   0, Upkeep =  800, Kind = InterceptorKind.Pac,   IsRadar = false, SupportMultiplier = 1f },
+            new BuildingSpec { Name = "MissileDisaster_THAAD",       Model = "Building_THAAD",     CellW = 5, CellL = 5, Cost = 400000, PowerKw = 480, WaterM3 = 240, Upkeep = 2000, Kind = InterceptorKind.Sam,   IsRadar = false, SupportMultiplier = 1f },
+            new BuildingSpec { Name = "MissileDisaster_AegisAshore", Model = "Building_Aegis",     CellW = 6, CellL = 6, Cost = 600000, PowerKw = 480, WaterM3 = 240, Upkeep = 3000, Kind = InterceptorKind.Arrow, IsRadar = false, SupportMultiplier = 1f },
+            new BuildingSpec { Name = "MissileDisaster_RadarSite",   Model = "Building_RadarSite", CellW = 6, CellL = 6, Cost = 500000, PowerKw = 600, WaterM3 = 240, Upkeep = 2500, Kind = InterceptorKind.Pac,   IsRadar = true,  SupportMultiplier = 1.5f },
         };
 
         // クローンした BuildingInfo（GameObject は DontDestroyOnLoad で存続）。PrefabCollection は
@@ -172,6 +172,8 @@ namespace MissileDisaster.Game.Defense
             if (oldAI != null) UnityEngine.Object.DestroyImmediate(oldAI);
             InterceptorAI ai = go.AddComponent<InterceptorAI>();
             ai.Kind = spec.Kind;
+            ai.IsRadar = spec.IsRadar;
+            ai.SupportMultiplier = spec.SupportMultiplier;
             ai.m_info = info;
             ai.m_constructionCost = spec.Cost;
             ai.m_maintenanceCost = spec.Upkeep;
