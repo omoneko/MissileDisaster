@@ -80,8 +80,18 @@ namespace MissileDisaster.Game
         public const float SinkholeDepth = 16f;
         public const float DestructionRadius = 120f;
 
-        // 放射能汚染（核のみ・sim スレッドで NaturalResourceManager へ書込み）。中心の最大濃度(0-255)。
-        public const byte ContaminationMaxIntensity = 255;
+        // 放射能汚染（核のみ・sim スレッドで NaturalResourceManager へ書込み）。基本設定は NuclearMeltdown 準拠。
+        public const byte ContaminationMaxIntensity = 255;   // 中心の最大濃度(0-255)
+        public const int ContaminationExpiryYears = 50;      // ゾーンの寿命（ゲーム内50年で自然消滅）
+        // 汚染ゾーンの維持（自然減衰を打ち消す reassert）の間引き間隔（tick）。大きな汚染半径でも重くならないよう間引く。
+        public const int ContaminationMaintainInterval = 128;
+        // 注: 汚水処理場による除染は NuclearMeltdown と異なり無効（ユーザー指定で「除染されない」仕様）。
+        // 専用の「Decontamination facility」建物だけが除染する。名称に下記キーワードを含む稼働中の建物が
+        // ゾーン付近にあると、そのゾーンの濃度をゲーム内1か月あたり DecontaminationMonthlyFraction 相対除去する。
+        public const string DecontaminationKeyword = "Decontamination";
+        public const float DecontaminationMonthlyFraction = 0.05f; // 1か月で5%除去（相対）
+        public const float DecontaminationFacilityRange = 1000f;    // ゾーン半径＋この範囲内に施設があれば除染
+        public const byte DecontaminationMinIntensity = 5;          // これ以下まで下がったゾーンは消滅
 
         // 破壊の同心円モデル: 内側 DestructionCoreFraction までは全壊、そこから破壊半径へ向け破壊確率が低下する。
         // Nukemap の「ほぼ全壊/民家破壊」半径比 ≈ 0.2 に倣う。

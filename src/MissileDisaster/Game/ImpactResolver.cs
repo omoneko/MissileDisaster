@@ -29,8 +29,10 @@ namespace MissileDisaster.Game
 
             if (spec.Contaminates)
             {
-                // 放射能汚染を土壌汚染グリッドへ書き込む（sim スレッド）。
-                Contamination.ContaminationManager.Apply(target.x, target.z, spec.ContaminationRadius);
+                // 放射能汚染ゾーンを追加（台帳管理・50年で消滅・除染なし。sim スレッド）。
+                long nowTicks = SimulationManager.instance.m_currentGameTime.Ticks;
+                Contamination.ContaminationManager.AddZone(
+                    new MissileDisaster.Core.ContaminationZone(target.x, target.z, spec.ContaminationRadius, nowTicks));
             }
 
             ModConfig.Log("Impact resolved: " + spec.Type + " x" + spec.SubmunitionCount + " at " + target);

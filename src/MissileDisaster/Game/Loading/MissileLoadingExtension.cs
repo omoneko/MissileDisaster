@@ -32,6 +32,7 @@ namespace MissileDisaster.Game.Loading
             {
                 MissileDisaster.Game.MissileManager.Reset();
                 Defense.InterceptorRegistry.Reset();
+                Contamination.ContaminationManager.Reset(); // メモリ台帳を破棄（ロード時は OnLoadData が再投入）
                 UI.MissilePanel.Destroy();
             }
             catch (System.Exception e)

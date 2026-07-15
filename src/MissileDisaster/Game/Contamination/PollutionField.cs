@@ -20,6 +20,22 @@ namespace MissileDisaster.Game.Contamination
             }
         }
 
+        /// <summary>セルの汚染を dose.Intensity に上書き設定する（除染で濃度を下げる用）。</summary>
+        public static void SetDose(CellDose dose)
+        {
+            var arr = NaturalResourceManager.instance.m_naturalResources;
+            if (dose.Index < 0 || dose.Index >= arr.Length) return;
+            arr[dose.Index].m_pollution = dose.Intensity;
+        }
+
+        /// <summary>セルの汚染を0にする（ゾーン期限切れのクリア用）。</summary>
+        public static void ClearCell(int index)
+        {
+            var arr = NaturalResourceManager.instance.m_naturalResources;
+            if (index < 0 || index >= arr.Length) return;
+            arr[index].m_pollution = 0;
+        }
+
         /// <summary>指定セル範囲の汚染テクスチャを更新する。</summary>
         public static void Refresh(int minX, int minZ, int maxX, int maxZ)
         {

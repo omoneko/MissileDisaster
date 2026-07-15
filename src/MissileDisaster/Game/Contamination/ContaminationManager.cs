@@ -1,40 +1,183 @@
+using System;
 using System.Collections.Generic;
 using MissileDisaster.Core;
+using UnityEngine;
 
 namespace MissileDisaster.Game.Contamination
 {
     /// <summary>
-    /// 核着弾時に円形の放射能汚染を土壌汚染グリッドへ書き込む（sim スレッド）。
-    /// v1 は減衰/独自セーブ台帳を持たない（土壌汚染はゲームのセーブに含まれ永続、汚染オーバーレイに表示）。
-    /// 時間減衰・除染は後続フェーズで検討（NuclearMeltdown の除染ロジック移植候補）。
+    /// 放射能汚染ゾーンの台帳と、土壌汚染グリッド(NaturalResourceManager.m_pollution)への適用/維持/除去。
+    /// 基本設定は NuclearMeltdown 準拠（濃度255・50年で期限切れ・自然減衰対策の reassert・セーブ永続）。
+    /// <b>汚水処理場では除染されない</b>。専用の「Decontamination facility」建物がゾーン付近で稼働している場合のみ、
+    /// そのゾーンの濃度をゲーム内1か月あたり DecontaminationMonthlyFraction 相対除去し、恒久的に軽減する。
+    /// すべて sim スレッドから呼ぶこと。
     /// </summary>
     public static class ContaminationManager
     {
-        /// <summary>中心(worldX,worldZ)・半径radiusMetersの放射能汚染を適用する（sim スレッド専用）。</summary>
-        public static void Apply(float worldX, float worldZ, float radiusMeters)
+        private static List<ContaminationZone> _zones = new List<ContaminationZone>();
+        private static int _maintainCounter;
+        private static long _lastMaintainTicks;
+        private static readonly List<Vector3> _facilities = new List<Vector3>(); // 稼働中の除染施設の位置
+
+        /// <summary>ゾーン台帳のスナップショット（セーブ用）。</summary>
+        public static List<ContaminationZone> Zones
         {
-            if (radiusMeters <= 0f) return;
-            // グリッド範囲を超える半径はマップ全域を覆うため、走査の無駄を省く安全上限で丸める。
-            if (radiusMeters > ModConfig.MaxContaminationRadius) radiusMeters = ModConfig.MaxContaminationRadius;
-
-            List<CellDose> doses = PollutionGrid.CellsInRadius(
-                worldX, worldZ, radiusMeters, ModConfig.ContaminationMaxIntensity);
-            for (int i = 0; i < doses.Count; i++)
-            {
-                PollutionField.ApplyDose(doses[i]);
-            }
-            RefreshArea(worldX, worldZ, radiusMeters);
-
-            ModConfig.Log("Contamination applied: r=" + radiusMeters + "m cells=" + doses.Count
-                + " at (" + worldX + "," + worldZ + ")");
+            get { return new List<ContaminationZone>(_zones); }
         }
 
-        /// <summary>汚染円を含むセル範囲のテクスチャを更新する。</summary>
-        private static void RefreshArea(float worldX, float worldZ, float radiusMeters)
+        /// <summary>レベル切替時に呼ぶ（メモリ上の台帳を破棄。土壌汚染自体はゲームのセーブに含まれる）。</summary>
+        public static void Reset()
         {
-            int cellRadius = (int)(radiusMeters / PollutionGrid.CellSize) + 1;
-            int cx = PollutionGrid.WorldToCell(worldX);
-            int cz = PollutionGrid.WorldToCell(worldZ);
+            _zones = new List<ContaminationZone>();
+            _maintainCounter = 0;
+            _lastMaintainTicks = 0;
+            _facilities.Clear();
+        }
+
+        /// <summary>ロード時に台帳を差し替え、各ゾーンをグリッドへ再適用する。</summary>
+        public static void ReplaceAll(List<ContaminationZone> zones)
+        {
+            _zones = zones ?? new List<ContaminationZone>();
+            for (int i = 0; i < _zones.Count; i++) ReassertZone(_zones[i]);
+        }
+
+        /// <summary>着弾時に汚染ゾーンを追加してグリッドへ書き込む。radius&lt;=0 は無視（空中爆発など）。</summary>
+        public static void AddZone(ContaminationZone zone)
+        {
+            if (zone.Radius <= 0f) return;
+            if (zone.Radius > ModConfig.MaxContaminationRadius)
+            {
+                zone = new ContaminationZone(zone.CenterX, zone.CenterZ,
+                    ModConfig.MaxContaminationRadius, zone.StartTicks, zone.Intensity);
+            }
+            _zones.Add(zone);
+            ReassertZone(zone);
+            ModConfig.Log("Contamination zone added: r=" + zone.Radius + "m at ("
+                + zone.CenterX + "," + zone.CenterZ + "), total=" + _zones.Count);
+        }
+
+        /// <summary>
+        /// sim スレッドから毎tick呼ぶ（内部で間引き）。期限切れ消去、除染施設付近は濃度を相対除去、
+        /// それ以外は reassert で維持する。汚水処理場では除染しない。
+        /// </summary>
+        public static void Maintain(long nowTicks)
+        {
+            if (_zones.Count == 0) return;
+            if (++_maintainCounter < ModConfig.ContaminationMaintainInterval) return;
+            _maintainCounter = 0;
+
+            double deltaMonths = _lastMaintainTicks == 0
+                ? 0.0
+                : ContaminationDecay.MonthsBetween(_lastMaintainTicks, nowTicks);
+            _lastMaintainTicks = nowTicks;
+
+            ScanFacilities();
+
+            for (int i = _zones.Count - 1; i >= 0; i--)
+            {
+                ContaminationZone zone = _zones[i];
+
+                if (ContaminationClock.HasExpired(zone.StartTicks, nowTicks, ModConfig.ContaminationExpiryYears))
+                {
+                    ClearZone(zone);
+                    _zones.RemoveAt(i);
+                    ModConfig.Log("Contamination zone expired (" + ModConfig.ContaminationExpiryYears + "y) and cleared");
+                    continue;
+                }
+
+                if (deltaMonths > 0.0 && IsDecontaminated(zone))
+                {
+                    byte reduced = ContaminationDecay.ReducedIntensity(
+                        zone.Intensity, deltaMonths, ModConfig.DecontaminationMonthlyFraction);
+                    if (reduced <= ModConfig.DecontaminationMinIntensity)
+                    {
+                        ClearZone(zone);
+                        _zones.RemoveAt(i);
+                        ModConfig.Log("Contamination zone decontaminated and removed");
+                    }
+                    else
+                    {
+                        zone.Intensity = reduced;
+                        _zones[i] = zone;
+                        SetZone(zone); // 下げた濃度をグリッドへ反映（上書き）
+                    }
+                }
+                else
+                {
+                    ReassertZone(zone); // 自然減衰対策で維持（現在の濃度に戻す）
+                }
+            }
+        }
+
+        /// <summary>汚染を維持する（自然減衰で下がったセルを zone.Intensity まで引き上げる）。</summary>
+        public static void ReassertZone(ContaminationZone zone)
+        {
+            List<CellDose> doses = PollutionGrid.CellsInRadius(zone.CenterX, zone.CenterZ, zone.Radius, zone.Intensity);
+            for (int i = 0; i < doses.Count; i++) PollutionField.ApplyDose(doses[i]);
+            RefreshZoneTexture(zone);
+        }
+
+        /// <summary>汚染を上書き設定する（除染で下げた濃度を反映）。</summary>
+        private static void SetZone(ContaminationZone zone)
+        {
+            List<CellDose> doses = PollutionGrid.CellsInRadius(zone.CenterX, zone.CenterZ, zone.Radius, zone.Intensity);
+            for (int i = 0; i < doses.Count; i++) PollutionField.SetDose(doses[i]);
+            RefreshZoneTexture(zone);
+        }
+
+        public static void ClearZone(ContaminationZone zone)
+        {
+            List<CellDose> doses = PollutionGrid.CellsInRadius(zone.CenterX, zone.CenterZ, zone.Radius, zone.Intensity);
+            for (int i = 0; i < doses.Count; i++) PollutionField.ClearCell(doses[i].Index);
+            RefreshZoneTexture(zone);
+        }
+
+        /// <summary>ゾーン付近に稼働中の除染施設があるか（ゾーン半径＋施設効果範囲内）。</summary>
+        private static bool IsDecontaminated(ContaminationZone zone)
+        {
+            float reach = zone.Radius + ModConfig.DecontaminationFacilityRange;
+            float reach2 = reach * reach;
+            for (int i = 0; i < _facilities.Count; i++)
+            {
+                float dx = _facilities[i].x - zone.CenterX;
+                float dz = _facilities[i].z - zone.CenterZ;
+                if (dx * dx + dz * dz <= reach2) return true;
+            }
+            return false;
+        }
+
+        /// <summary>BuildingManager を走査し、稼働中の除染施設（名称に Decontamination を含む）の位置を集める。</summary>
+        private static void ScanFacilities()
+        {
+            _facilities.Clear();
+            BuildingManager bm = BuildingManager.instance;
+            if (bm == null) return;
+            Building[] buffer = bm.m_buildings.m_buffer;
+            if (buffer == null) return;
+
+            for (int i = 1; i < buffer.Length; i++)
+            {
+                Building.Flags flags = buffer[i].m_flags;
+                if ((flags & Building.Flags.Created) == 0) continue;
+                if ((flags & Building.Flags.Completed) == 0) continue;
+                const Building.Flags dead = Building.Flags.Abandoned | Building.Flags.BurnedDown
+                    | Building.Flags.Collapsed | Building.Flags.Deleted;
+                if ((flags & dead) != 0) continue;
+
+                BuildingInfo info = buffer[i].Info;
+                string name = info != null ? info.name : null;
+                if (string.IsNullOrEmpty(name)) continue;
+                if (name.IndexOf(ModConfig.DecontaminationKeyword, StringComparison.OrdinalIgnoreCase) < 0) continue;
+
+                _facilities.Add(buffer[i].m_position);
+            }
+        }
+
+        private static void RefreshZoneTexture(ContaminationZone zone)
+        {
+            int cellRadius = (int)(zone.Radius / PollutionGrid.CellSize) + 1;
+            int cx = PollutionGrid.WorldToCell(zone.CenterX);
+            int cz = PollutionGrid.WorldToCell(zone.CenterZ);
             int minX = Clamp(cx - cellRadius), maxX = Clamp(cx + cellRadius);
             int minZ = Clamp(cz - cellRadius), maxZ = Clamp(cz + cellRadius);
             PollutionField.Refresh(minX, minZ, maxX, maxZ);
