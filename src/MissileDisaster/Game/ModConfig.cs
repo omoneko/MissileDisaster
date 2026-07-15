@@ -80,6 +80,9 @@ namespace MissileDisaster.Game
         public const float SinkholeDepth = 16f;
         public const float DestructionRadius = 120f;
 
+        // 放射能汚染（核のみ・sim スレッドで NaturalResourceManager へ書込み）。中心の最大濃度(0-255)。
+        public const byte ContaminationMaxIntensity = 255;
+
         public static void Log(string msg) { Debug.Log(LogPrefix + msg); }
         public static void LogError(string msg) { Debug.LogError(LogPrefix + msg); }
     }

@@ -62,6 +62,52 @@ public class WarheadSpecTests
     }
 
     [Fact]
+    public void All_warheads_have_nonnegative_burn_radius()
+    {
+        foreach (WarheadType t in System.Enum.GetValues(typeof(WarheadType)))
+        {
+            Assert.True(WarheadSpec.For(t).BurnRadius >= 0f, $"{t} の延焼半径は非負");
+        }
+    }
+
+    [Fact]
+    public void WhitePhosphorus_is_incendiary_burn_exceeds_destruction()
+    {
+        var wp = WarheadSpec.For(WarheadType.WhitePhosphorus);
+        Assert.True(wp.BurnRadius > wp.DestructionRadius, "焼夷弾は延焼が破壊を上回る");
+    }
+
+    [Fact]
+    public void Thermobaric_and_nuclear_burn_wider_than_conventional()
+    {
+        float conv = WarheadSpec.For(WarheadType.Conventional).BurnRadius;
+        Assert.True(WarheadSpec.For(WarheadType.Thermobaric).BurnRadius > conv);
+        Assert.True(WarheadSpec.For(WarheadType.Nuclear).BurnRadius > conv);
+    }
+
+    [Fact]
+    public void Nuclear_has_the_largest_burn_radius()
+    {
+        float nuke = WarheadSpec.For(WarheadType.Nuclear).BurnRadius;
+        foreach (WarheadType t in new[] { WarheadType.Conventional, WarheadType.Cluster,
+            WarheadType.WhitePhosphorus, WarheadType.Thermobaric })
+        {
+            Assert.True(nuke > WarheadSpec.For(t).BurnRadius, $"核が {t} より広い延焼");
+        }
+    }
+
+    [Fact]
+    public void Only_nuclear_has_a_positive_contamination_radius()
+    {
+        Assert.True(WarheadSpec.For(WarheadType.Nuclear).ContaminationRadius > 0f, "核は汚染半径>0");
+        foreach (WarheadType t in new[] { WarheadType.Conventional, WarheadType.Cluster,
+            WarheadType.WhitePhosphorus, WarheadType.Thermobaric })
+        {
+            Assert.Equal(0f, WarheadSpec.For(t).ContaminationRadius, 3);
+        }
+    }
+
+    [Fact]
     public void Nuclear_is_the_largest_and_only_contaminating_warhead()
     {
         var nuke = WarheadSpec.For(WarheadType.Nuclear);

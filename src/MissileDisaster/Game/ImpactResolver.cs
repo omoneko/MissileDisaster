@@ -14,7 +14,7 @@ namespace MissileDisaster.Game
             if (spec.SubmunitionCount <= 1)
             {
                 // 単一着弾（Conventional/Thermobaric/Nuclear）。
-                ApplyBlast(target, spec.CraterRadius, spec.CraterDepth, spec.DestructionRadius, spec.RaiseCraterEdges);
+                ApplyBlast(target, spec.CraterRadius, spec.CraterDepth, spec.DestructionRadius, spec.BurnRadius, spec.RaiseCraterEdges);
             }
             else
             {
@@ -23,29 +23,37 @@ namespace MissileDisaster.Game
                 for (int i = 0; i < offsets.Length; i++)
                 {
                     Vector3 p = new Vector3(target.x + offsets[i].X, target.y, target.z + offsets[i].Z);
-                    ApplyBlast(p, spec.CraterRadius, spec.CraterDepth, spec.DestructionRadius, spec.RaiseCraterEdges);
+                    ApplyBlast(p, spec.CraterRadius, spec.CraterDepth, spec.DestructionRadius, spec.BurnRadius, spec.RaiseCraterEdges);
                 }
             }
 
             if (spec.Contaminates)
             {
-                // 放射能汚染の実装は後続フェーズ。現状はログのみ（着弾は上のクレーター＋破壊で表現）。
-                ModConfig.Log("Nuclear warhead contamination flagged (実汚染は後続フェーズ) at " + target);
+                // 放射能汚染を土壌汚染グリッドへ書き込む（sim スレッド）。
+                Contamination.ContaminationManager.Apply(target.x, target.z, spec.ContaminationRadius);
             }
 
             ModConfig.Log("Impact resolved: " + spec.Type + " x" + spec.SubmunitionCount + " at " + target);
         }
 
-        /// <summary>1 発ぶんのクレーター＋範囲破壊を適用する（sim スレッド）。</summary>
-        private static void ApplyBlast(Vector3 pos, float craterRadius, float craterDepth, float destructionRadius, bool raiseEdges)
+        /// <summary>1 発ぶんのクレーター＋範囲破壊＋延焼を適用する（sim スレッド）。</summary>
+        private static void ApplyBlast(Vector3 pos, float craterRadius, float craterDepth,
+            float destructionRadius, float burnRadius, bool raiseEdges)
         {
             // クレーター（バニラ SinkholeAI と同じ MakeCrater 呼び出し）。
             DisasterHelpers.MakeCrater(new Vector2(pos.x, pos.z), craterRadius, craterDepth, raiseEdges);
 
-            // 範囲破壊。preRadius=totalRadius にする（0 だと何も壊れない既知の罠を回避）。
+            // 範囲破壊＋延焼。DestroyStuff の末尾2引数 burnMin/burnMax が延焼帯（この帯の建物は着火）。
+            // preRadius/totalRadius は処理外周なので destMax と burnMax の大きい方に合わせる
+            // （小さいと外側が走査されない既知の罠を回避）。
             int seed = (int)SimulationManager.instance.m_randomizer.Int32(1000000u);
-            float r = destructionRadius;
-            DisasterHelpers.DestroyStuff(seed, null, pos, r, r, 0f, r * 0.5f, r, r * 0.3f, r * 0.6f);
+            float destMax = destructionRadius;
+            float burnMax = burnRadius;
+            float outer = destMax > burnMax ? destMax : burnMax;
+            float destMin = destMax * 0.5f;
+            float burnMin = destMax * 0.3f;
+            if (burnMin > burnMax * 0.5f) burnMin = burnMax * 0.5f; // 延焼帯が反転しないよう内縁を抑える
+            DisasterHelpers.DestroyStuff(seed, null, pos, outer, outer, 0f, destMin, destMax, burnMin, burnMax);
         }
     }
 }
