@@ -134,7 +134,9 @@ namespace MissileDisaster.Game.Defense
 
             _interceptors.Clear();
             bool radar = false;
-            int inactiveMatches = 0; // 名前一致したが未完成/非アクティブ/破壊済み（診断用）
+            int inactiveMatches = 0; // 名前一致したが未完成/破壊済み（診断用）
+            Building.Flags firstInactiveFlags = 0; // 最初の非稼働建物のフラグ（原因診断用）
+            string firstInactiveName = null;
 
             for (int i = 1; i < buffer.Length; i++)
             {
@@ -153,6 +155,7 @@ namespace MissileDisaster.Game.Defense
 
                 if (!IsOperational(flags))
                 {
+                    if (inactiveMatches == 0) { firstInactiveFlags = flags; firstInactiveName = name; }
                     inactiveMatches++;
                     continue;
                 }
@@ -176,26 +179,36 @@ namespace MissileDisaster.Game.Defense
             }
 
             _radarActive = radar;
-            LogChangesIfAny(_interceptors.Count, inactiveMatches, radar);
+            LogChangesIfAny(_interceptors.Count, inactiveMatches, radar, firstInactiveFlags, firstInactiveName);
         }
 
         /// <summary>検出状況が前回から変わった時だけログを出す（実機での検出確認・毎走査のスパム防止）。</summary>
-        private static void LogChangesIfAny(int active, int inactive, bool radar)
+        private static void LogChangesIfAny(int active, int inactive, bool radar,
+            Building.Flags firstInactiveFlags, string firstInactiveName)
         {
             if (active == _lastLoggedActive && inactive == _lastLoggedInactive && radar == _lastLoggedRadar) return;
             _lastLoggedActive = active;
             _lastLoggedInactive = inactive;
             _lastLoggedRadar = radar;
-            ModConfig.Log("Interceptors detected: active=" + active + ", radar=" + radar
-                + (inactive > 0 ? ", 名前一致だが非稼働=" + inactive : ""));
+            string msg = "Interceptors detected: active=" + active + ", radar=" + radar;
+            if (inactive > 0)
+            {
+                // 非稼働の原因を特定するため、最初の該当建物のフラグを出力する。
+                msg += ", 名前一致だが非稼働=" + inactive
+                    + " [例 '" + firstInactiveName + "' flags=" + firstInactiveFlags + "]";
+            }
+            ModConfig.Log(msg);
         }
 
-        /// <summary>建物が「稼働中」か（生成済み・完成・破壊されていない・アクティブ）。</summary>
+        /// <summary>
+        /// 建物が「稼働中」か（生成済み・完成・破壊されていない）。
+        /// 注: 一部のカスタムアセットは有電力でも Building.Flags.Active が立たない。Active 必須にすると
+        /// 迎撃が一切発動しないため要件から外し、Completed（完成済み）＋非破壊のみを条件とする。
+        /// </summary>
         private static bool IsOperational(Building.Flags flags)
         {
             if ((flags & Building.Flags.Created) == 0) return false;
             if ((flags & Building.Flags.Completed) == 0) return false;
-            if ((flags & Building.Flags.Active) == 0) return false;
             const Building.Flags dead = Building.Flags.Abandoned | Building.Flags.BurnedDown
                 | Building.Flags.Collapsed | Building.Flags.Deleted;
             return (flags & dead) == 0;
