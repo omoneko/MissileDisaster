@@ -83,6 +83,45 @@ namespace MissileDisaster.Game
         // 放射能汚染（核のみ・sim スレッドで NaturalResourceManager へ書込み）。中心の最大濃度(0-255)。
         public const byte ContaminationMaxIntensity = 255;
 
+        // クレーターの上限（地形ハイトマップを破綻させないための工学的安全上限。ゲームバランスではない）。
+        // 実被害半径は破壊/延焼/汚染で表現し、クレーター(地形変形)だけは端末保護のため丸める。
+        public const float CraterRadiusMax = 500f;
+        public const float CraterDepthMax = 80f;
+
+        // 破壊/延焼半径の工学的安全上限。大威力核の実半径はマップを超えるため、DestroyStuff の
+        // 極端な走査によるフリーズを避ける安全弁（マップ全域を覆う十分な大きさ。ゲームバランス目的ではない）。
+        public const float MaxEffectRadius = 12000f;
+        // 汚染半径の上限（土壌汚染グリッドの範囲=約±8.6km。これ以上はマップ全域を覆うため走査の無駄を省く）。
+        public const float MaxContaminationRadius = 8600f;
+
+        // 着弾爆発エフェクト（バニラ隕石着弾エフェクトを流用・メインスレッドで DispatchEffect）。
+        // 非核: 爆発規模(破壊半径)に応じて複数の隕石エフェクトを散布し面で見せる。核: 単一の特大エフェクト。
+        public const int ExplosionMaxBlooms = 40;         // 非核の隕石エフェクト最大同時数
+        public const float ExplosionBloomScaleMax = 7f;   // 非核の1発あたり最大スケール（控えめ）
+        public const float ExplosionBloomSpacing = 180f;  // この距離ごとに1発（半径/この値=発数目安）
+        public const float NuclearExplosionScaleMax = 140f; // 核の単一エフェクトの最大スケール
+
+        // サウンド（Sounds/*.mp3 を実行時に読み込み、3D 位置音として再生。メインスレッド）。
+        public const string SoundsFolderName = "Sounds";
+        public const float SoundVolumeNormal = 0.5f;      // 通常の効果音音量（0-1）
+        public const float SoundVolumeNuclear = 1.0f;     // 核爆発は他の2倍（AudioSource 上限1.0のため他を0.5に）
+        // 3D 減衰の最小/最大距離(m)。最小内は最大音量、最大で無音。
+        public const float SoundLaunchMinDistance = 300f;
+        public const float SoundLaunchMaxDistance = 8000f;   // 発射音は遠方まで届かせ距離で増減
+        public const float SoundExplosionMinDistance = 200f;
+        public const float SoundExplosionMaxDistance = 5000f;
+        public const float SoundNuclearMinDistance = 600f;
+        public const float SoundNuclearMaxDistance = 16000f;  // 核はマップ全域級
+        public const float SoundInterceptMinDistance = 150f;
+        public const float SoundInterceptMaxDistance = 4000f;
+
+        // 弾頭選択UIパネル（メインスレッド・UIView 直下に常設）。
+        public const float PanelPosX = 16f;    // 画面左からの位置
+        public const float PanelPosY = 200f;   // 画面上からの位置
+        public const float PanelWidth = 264f;
+        public const float PanelButtonHeight = 26f;
+        public const float PanelButtonGap = 4f;
+
         public static void Log(string msg) { Debug.Log(LogPrefix + msg); }
         public static void LogError(string msg) { Debug.LogError(LogPrefix + msg); }
     }

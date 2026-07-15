@@ -20,4 +20,13 @@ if (Test-Path $modelsSrc) {
     Write-Host "モデル配置完了: $modelsDst"
 }
 
+# サウンド資産(Sounds/*.mp3)を配布する。実行時に SoundLibrary が読み込む。
+$soundsSrc = "src\MissileDisaster\Sounds"
+if (Test-Path $soundsSrc) {
+    $soundsDst = Join-Path $modDir "Sounds"
+    New-Item -ItemType Directory -Force -Path $soundsDst | Out-Null
+    Copy-Item (Join-Path $soundsSrc "*") $soundsDst -Include *.wav -Force
+    Write-Host "サウンド配置完了: $soundsDst"
+}
+
 Write-Host "配置完了: $modDir"

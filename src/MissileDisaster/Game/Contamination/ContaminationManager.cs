@@ -14,6 +14,8 @@ namespace MissileDisaster.Game.Contamination
         public static void Apply(float worldX, float worldZ, float radiusMeters)
         {
             if (radiusMeters <= 0f) return;
+            // グリッド範囲を超える半径はマップ全域を覆うため、走査の無駄を省く安全上限で丸める。
+            if (radiusMeters > ModConfig.MaxContaminationRadius) radiusMeters = ModConfig.MaxContaminationRadius;
 
             List<CellDose> doses = PollutionGrid.CellsInRadius(
                 worldX, worldZ, radiusMeters, ModConfig.ContaminationMaxIntensity);

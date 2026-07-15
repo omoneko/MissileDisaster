@@ -27,16 +27,19 @@ namespace MissileDisaster.Game
         /// <summary>メインスレッド。飛翔体の現在ワールド座標（迎撃判定用）。GameObject 破棄後は着弾点を返す。</summary>
         public Vector3 CurrentPosition => _go != null ? _go.transform.position : _target;
 
+        /// <summary>発射地点（高高度の apex）。発射音の3D音源位置に使う。</summary>
+        public Vector3 LaunchPosition => _apex;
+
         /// <summary>迎撃(命中確定)済みか。true の弾は再交戦せず、着弾してもダメージを発生させない。</summary>
         public bool Doomed => _doomed;
 
         /// <summary>迎撃ミサイルの命中が確定した弾に印を付ける（メインスレッド）。</summary>
         public void MarkDoomed() { _doomed = true; }
 
-        public Missile(Vector3 target, WarheadType type)
+        public Missile(Vector3 target, WarheadSpec spec)
         {
             _target = target;
-            _spec = WarheadSpec.For(type);
+            _spec = spec;
 
             // 固定方位・高高度の apex から降下する。上昇枝は存在しない(= 終端のみ描画)。
             Offset2 off = LaunchGeometry.BearingOffset(ModConfig.IncomingBearingDegrees, ModConfig.ApexHorizontalOffset);

@@ -15,17 +15,27 @@ public class WarheadSpecTests
     }
 
     [Fact]
-    public void Conventional_keeps_baseline_values()
+    public void Conventional_is_a_single_realistic_high_explosive_impact()
     {
         var s = WarheadSpec.For(WarheadType.Conventional);
         Assert.Equal(WarheadType.Conventional, s.Type);
-        Assert.Equal(60f, s.CraterRadius, 3);
-        Assert.Equal(16f, s.CraterDepth, 3);
-        Assert.Equal(120f, s.DestructionRadius, 3);
         Assert.Equal(1, s.SubmunitionCount);
         Assert.Equal(0f, s.SpreadRadius, 3);
         Assert.False(s.RaiseCraterEdges);
         Assert.False(s.Contaminates);
+        // 大型 HE 弾頭 ~1t 相当の実被害規模（核より桁違いに小さい）。
+        Assert.InRange(s.DestructionRadius, 40f, 150f);
+        Assert.True(s.CraterRadius > 0f && s.CraterRadius < 30f);
+    }
+
+    [Fact]
+    public void Nuclear_damage_dwarfs_conventional_using_real_radii()
+    {
+        var conv = WarheadSpec.For(WarheadType.Conventional);
+        var nuke = WarheadSpec.For(WarheadType.Nuclear);
+        // 150kt 基準の 5psi 実半径 ~3.7km は通常弾の数十倍。
+        Assert.True(nuke.DestructionRadius > conv.DestructionRadius * 20f, "核は通常弾の20倍超の破壊半径");
+        Assert.True(nuke.BurnRadius > nuke.DestructionRadius, "熱線/延焼は破壊より広い");
     }
 
     [Theory]
@@ -59,6 +69,79 @@ public class WarheadSpecTests
         var conv = WarheadSpec.For(WarheadType.Conventional);
         Assert.True(thermo.DestructionRadius > conv.DestructionRadius, "過圧は広域破壊");
         Assert.False(thermo.Contaminates);
+    }
+
+    [Fact]
+    public void Groundburst_leaves_spec_unchanged()
+    {
+        var s = WarheadSpec.For(WarheadType.Nuclear);
+        var g = s.WithBurst(BurstType.Groundburst);
+        Assert.Equal(s.CraterRadius, g.CraterRadius, 3);
+        Assert.Equal(s.ContaminationRadius, g.ContaminationRadius, 3);
+        Assert.Equal(s.Contaminates, g.Contaminates);
+        Assert.Equal(s.DestructionRadius, g.DestructionRadius, 3);
+        Assert.Equal(s.BurnRadius, g.BurnRadius, 3);
+    }
+
+    [Fact]
+    public void Airburst_removes_crater_and_contamination_and_widens_blast()
+    {
+        var s = WarheadSpec.For(WarheadType.Nuclear);
+        var a = s.WithBurst(BurstType.Airburst);
+        Assert.Equal(0f, a.CraterRadius, 3);
+        Assert.Equal(0f, a.CraterDepth, 3);
+        Assert.False(a.RaiseCraterEdges);
+        Assert.False(a.Contaminates, "空中爆発は降下物ほぼ無し");
+        Assert.Equal(0f, a.ContaminationRadius, 3);
+        Assert.True(a.DestructionRadius > s.DestructionRadius, "空中爆発は破壊が広がる");
+        Assert.True(a.BurnRadius > s.BurnRadius, "空中爆発は延焼が広がる");
+    }
+
+    [Fact]
+    public void WithBurst_does_not_mutate_the_original()
+    {
+        var s = WarheadSpec.For(WarheadType.Nuclear);
+        float beforeCrater = s.CraterRadius;
+        bool beforeContam = s.Contaminates;
+        s.WithBurst(BurstType.Airburst);
+        Assert.Equal(beforeCrater, s.CraterRadius, 3);
+        Assert.Equal(beforeContam, s.Contaminates);
+    }
+
+    [Fact]
+    public void Scaled_by_one_is_unchanged()
+    {
+        var s = WarheadSpec.For(WarheadType.Nuclear);
+        var scaled = s.Scaled(1f);
+        Assert.Equal(s.CraterRadius, scaled.CraterRadius, 3);
+        Assert.Equal(s.DestructionRadius, scaled.DestructionRadius, 3);
+        Assert.Equal(s.BurnRadius, scaled.BurnRadius, 3);
+        Assert.Equal(s.ContaminationRadius, scaled.ContaminationRadius, 3);
+    }
+
+    [Fact]
+    public void Scaled_multiplies_all_radii_but_keeps_flags_and_type()
+    {
+        var s = WarheadSpec.For(WarheadType.Nuclear);
+        var scaled = s.Scaled(2f);
+        Assert.Equal(s.CraterRadius * 2f, scaled.CraterRadius, 3);
+        Assert.Equal(s.CraterDepth * 2f, scaled.CraterDepth, 3);
+        Assert.Equal(s.DestructionRadius * 2f, scaled.DestructionRadius, 3);
+        Assert.Equal(s.BurnRadius * 2f, scaled.BurnRadius, 3);
+        Assert.Equal(s.ContaminationRadius * 2f, scaled.ContaminationRadius, 3);
+        Assert.Equal(s.SubmunitionCount, scaled.SubmunitionCount);
+        Assert.Equal(s.RaiseCraterEdges, scaled.RaiseCraterEdges);
+        Assert.Equal(s.Contaminates, scaled.Contaminates);
+        Assert.Equal(s.Type, scaled.Type);
+    }
+
+    [Fact]
+    public void Scaled_does_not_mutate_the_original()
+    {
+        var s = WarheadSpec.For(WarheadType.Nuclear);
+        float before = s.CraterRadius;
+        s.Scaled(3f);
+        Assert.Equal(before, s.CraterRadius, 3);
     }
 
     [Fact]

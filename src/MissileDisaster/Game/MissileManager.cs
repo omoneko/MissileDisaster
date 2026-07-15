@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using MissileDisaster.Core;
+using MissileDisaster.Game.Audio;
 using MissileDisaster.Game.Defense;
 using MissileDisaster.Game.Effects;
 using UnityEngine;
@@ -32,11 +33,28 @@ namespace MissileDisaster.Game
         /// <summary>メインスレッドから読む。</summary>
         public static bool HasActive => _missiles.Count > 0;
 
-        /// <summary>メインスレッド専用。</summary>
-        public static void Launch(Vector3 target, WarheadType type)
+        /// <summary>
+        /// メインスレッド専用。核なら nuclearYieldMultiplier で効果半径をスケールし、爆発高度(burst)を反映した spec で発射する。
+        /// 非核では multiplier は無視。空中爆発はクレーター/汚染を無くし破壊・延焼を広げる（全弾頭に適用）。
+        /// </summary>
+        public static void Launch(Vector3 target, WarheadType type, float nuclearYieldMultiplier, BurstType burst)
         {
-            _missiles.Add(new Missile(target, type));
-            ModConfig.Log("Missile launched at " + target + " (" + type + ")");
+            WarheadSpec spec = WarheadSpec.For(type);
+            if (type == WarheadType.Nuclear && nuclearYieldMultiplier > 0f)
+            {
+                spec = spec.Scaled(nuclearYieldMultiplier);
+            }
+            spec = spec.WithBurst(burst);
+            Missile missile = new Missile(target, spec);
+            _missiles.Add(missile);
+
+            // 発射音（launcher2/launcher7 をランダム）。発射地点(apex)から距離で増減する3D音。
+            string launcher = UnityEngine.Random.value < 0.5f ? SoundLibrary.Launcher2 : SoundLibrary.Launcher7;
+            SoundPlayer.PlayAt(launcher, missile.LaunchPosition, ModConfig.SoundVolumeNormal,
+                ModConfig.SoundLaunchMinDistance, ModConfig.SoundLaunchMaxDistance);
+
+            ModConfig.Log("Missile launched at " + target + " (" + type + ", " + burst
+                + (type == WarheadType.Nuclear ? ", x" + nuclearYieldMultiplier.ToString("0.00") : "") + ")");
         }
 
         /// <summary>
@@ -54,9 +72,11 @@ namespace MissileDisaster.Game
                 bool impacted = m.UpdateVisual(simTimeDelta);
                 if (impacted)
                 {
-                    // 命中確定(Doomed)弾は迎撃済み扱い＝ダメージ無し。未撃墜のみ着弾ダメージを積む。
+                    // 命中確定(Doomed)弾は迎撃済み扱い＝ダメージ・爆発なし。未撃墜のみ着弾ダメージ＋爆発エフェクト。
                     if (!m.Doomed)
                     {
+                        ExplosionFx.Play(m.Target, m.Spec); // 隕石着弾エフェクト（規模連動・メインスレッド）
+                        PlayImpactSound(m.Target, m.Spec);  // 爆発音（核は atomic_bomb を2倍音量）
                         lock (_impactLock)
                         {
                             _impactQueue.Add(new ImpactJob { Target = m.Target, Spec = m.Spec });
@@ -96,6 +116,8 @@ namespace MissileDisaster.Game
                     int idx = _missiles.IndexOf(prey);
                     if (idx >= 0) RemoveMissile(idx, prey); // 撃墜: ダメージ無しで消滅＋他の追尾弾の参照解除
                     InterceptFx.PlayFlash(point);
+                    SoundPlayer.PlayAt(SoundLibrary.Intercept, point, ModConfig.SoundVolumeNormal,
+                        ModConfig.SoundInterceptMinDistance, ModConfig.SoundInterceptMaxDistance);
                 }
                 else
                 {
@@ -104,6 +126,21 @@ namespace MissileDisaster.Game
 
                 p.Destroy();
                 _interceptors.RemoveAt(j);
+            }
+        }
+
+        /// <summary>着弾音（メインスレッド）。核は atomic_bomb を2倍音量＋広い可聴範囲、他は explosion1。</summary>
+        private static void PlayImpactSound(Vector3 target, WarheadSpec spec)
+        {
+            if (spec.Type == WarheadType.Nuclear)
+            {
+                SoundPlayer.PlayAt(SoundLibrary.Nuclear, target, ModConfig.SoundVolumeNuclear,
+                    ModConfig.SoundNuclearMinDistance, ModConfig.SoundNuclearMaxDistance);
+            }
+            else
+            {
+                SoundPlayer.PlayAt(SoundLibrary.Explosion, target, ModConfig.SoundVolumeNormal,
+                    ModConfig.SoundExplosionMinDistance, ModConfig.SoundExplosionMaxDistance);
             }
         }
 

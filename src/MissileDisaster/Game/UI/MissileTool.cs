@@ -10,9 +10,11 @@ namespace MissileDisaster.Game.UI
     /// </summary>
     public class MissileTool : ToolBase
     {
-        // 選択中の弾頭種別。正式な選択 UI は後続フェーズ。現状はツール使用中に数字キー1-5で切替できる暫定手段
-        // （種別ごとの着弾差を実機確認するため）。static なのでツール再起動を跨いで選択を保持する。
+        // 選択中の弾頭種別・核出力(kt)・爆発高度。UI パネル(MissilePanel)から設定する。
+        // static なのでツール再起動を跨いで保持する。
         public static WarheadType CurrentWarhead = WarheadType.Conventional;
+        public static int CurrentYieldKilotons = NuclearYields.StandardKilotons;
+        public static BurstType CurrentBurst = BurstType.Groundburst;
 
         private Vector3 m_cachedPosition;
         private bool m_placementValid;
@@ -55,25 +57,12 @@ namespace MissileDisaster.Game.UI
 
         protected override void OnToolGUI(Event e)
         {
-            // 弾頭種別の暫定選択（数字キー1-5）。正式UIは後続フェーズ。
-            if (e.type == EventType.KeyDown && TrySelectWarhead(e.keyCode))
-            {
-                ModConfig.Log("Selected warhead: " + CurrentWarhead);
-                return;
-            }
-
-            // 選択中の弾頭を画面左上に表示（実機確認用の簡易ラベル）。
-            if (e.type == EventType.Repaint)
-            {
-                GUI.Label(new Rect(12f, 12f, 480f, 24f),
-                    "[MissileDisaster] 弾頭[1-5]: " + CurrentWarhead + "  (F9で照準→クリックで発射)");
-            }
-
             if (m_toolController.IsInsideUI) return;
             if (e.type != EventType.MouseDown || e.button != 0 || !m_placementValid) return;
             try
             {
-                MissileManager.Launch(m_cachedPosition, CurrentWarhead);
+                float yield = NuclearYields.Multiplier(CurrentYieldKilotons);
+                MissileManager.Launch(m_cachedPosition, CurrentWarhead, yield, CurrentBurst);
             }
             catch (System.Exception ex)
             {
@@ -82,20 +71,6 @@ namespace MissileDisaster.Game.UI
             finally
             {
                 ToolsModifierControl.SetTool<DefaultTool>();
-            }
-        }
-
-        /// <summary>数字キー1-5を弾頭種別に対応付ける。該当キーなら true。</summary>
-        private static bool TrySelectWarhead(KeyCode key)
-        {
-            switch (key)
-            {
-                case KeyCode.Alpha1: case KeyCode.Keypad1: CurrentWarhead = WarheadType.Conventional; return true;
-                case KeyCode.Alpha2: case KeyCode.Keypad2: CurrentWarhead = WarheadType.Cluster; return true;
-                case KeyCode.Alpha3: case KeyCode.Keypad3: CurrentWarhead = WarheadType.WhitePhosphorus; return true;
-                case KeyCode.Alpha4: case KeyCode.Keypad4: CurrentWarhead = WarheadType.Thermobaric; return true;
-                case KeyCode.Alpha5: case KeyCode.Keypad5: CurrentWarhead = WarheadType.Nuclear; return true;
-                default: return false;
             }
         }
     }

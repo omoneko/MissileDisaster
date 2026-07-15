@@ -17,6 +17,7 @@ namespace MissileDisaster.Game.Loading
                 MissileDisaster.Game.MissileManager.Reset();
                 Defense.InterceptorRegistry.Reset();
                 UI.ToolRegistration.Register<UI.MissileTool>();
+                UI.MissilePanel.Create();
             }
             catch (System.Exception e)
             {
@@ -31,6 +32,7 @@ namespace MissileDisaster.Game.Loading
             {
                 MissileDisaster.Game.MissileManager.Reset();
                 Defense.InterceptorRegistry.Reset();
+                UI.MissilePanel.Destroy();
             }
             catch (System.Exception e)
             {

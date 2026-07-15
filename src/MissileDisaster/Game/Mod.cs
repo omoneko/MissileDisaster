@@ -23,6 +23,7 @@ namespace MissileDisaster.Game
                 if (info != null && !string.IsNullOrEmpty(info.modPath))
                 {
                     MissileModelProvider.Initialize(info.modPath);
+                    Audio.SoundLibrary.Initialize(info.modPath);
                 }
                 else
                 {
