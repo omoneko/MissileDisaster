@@ -10,8 +10,9 @@ namespace MissileDisaster.Game.UI
     /// </summary>
     public class MissileTool : ToolBase
     {
-        // Phase 1 は通常弾頭固定。後続 Phase で選択 UI から差し替える。
-        public WarheadType SelectedWarhead = WarheadType.Conventional;
+        // 選択中の弾頭種別。正式な選択 UI は後続フェーズ。現状はツール使用中に数字キー1-5で切替できる暫定手段
+        // （種別ごとの着弾差を実機確認するため）。static なのでツール再起動を跨いで選択を保持する。
+        public static WarheadType CurrentWarhead = WarheadType.Conventional;
 
         private Vector3 m_cachedPosition;
         private bool m_placementValid;
@@ -54,11 +55,25 @@ namespace MissileDisaster.Game.UI
 
         protected override void OnToolGUI(Event e)
         {
+            // 弾頭種別の暫定選択（数字キー1-5）。正式UIは後続フェーズ。
+            if (e.type == EventType.KeyDown && TrySelectWarhead(e.keyCode))
+            {
+                ModConfig.Log("Selected warhead: " + CurrentWarhead);
+                return;
+            }
+
+            // 選択中の弾頭を画面左上に表示（実機確認用の簡易ラベル）。
+            if (e.type == EventType.Repaint)
+            {
+                GUI.Label(new Rect(12f, 12f, 480f, 24f),
+                    "[MissileDisaster] 弾頭[1-5]: " + CurrentWarhead + "  (F9で照準→クリックで発射)");
+            }
+
             if (m_toolController.IsInsideUI) return;
             if (e.type != EventType.MouseDown || e.button != 0 || !m_placementValid) return;
             try
             {
-                MissileManager.Launch(m_cachedPosition, SelectedWarhead);
+                MissileManager.Launch(m_cachedPosition, CurrentWarhead);
             }
             catch (System.Exception ex)
             {
@@ -67,6 +82,20 @@ namespace MissileDisaster.Game.UI
             finally
             {
                 ToolsModifierControl.SetTool<DefaultTool>();
+            }
+        }
+
+        /// <summary>数字キー1-5を弾頭種別に対応付ける。該当キーなら true。</summary>
+        private static bool TrySelectWarhead(KeyCode key)
+        {
+            switch (key)
+            {
+                case KeyCode.Alpha1: case KeyCode.Keypad1: CurrentWarhead = WarheadType.Conventional; return true;
+                case KeyCode.Alpha2: case KeyCode.Keypad2: CurrentWarhead = WarheadType.Cluster; return true;
+                case KeyCode.Alpha3: case KeyCode.Keypad3: CurrentWarhead = WarheadType.WhitePhosphorus; return true;
+                case KeyCode.Alpha4: case KeyCode.Keypad4: CurrentWarhead = WarheadType.Thermobaric; return true;
+                case KeyCode.Alpha5: case KeyCode.Keypad5: CurrentWarhead = WarheadType.Nuclear; return true;
+                default: return false;
             }
         }
     }
