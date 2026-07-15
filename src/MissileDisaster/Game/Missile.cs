@@ -19,9 +19,19 @@ namespace MissileDisaster.Game
         private readonly WarheadSpec _spec;
         private readonly GameObject _go;
         private float _t;
+        private bool _doomed;
 
         public Vector3 Target => _target;
         public WarheadSpec Spec => _spec;
+
+        /// <summary>メインスレッド。飛翔体の現在ワールド座標（迎撃判定用）。GameObject 破棄後は着弾点を返す。</summary>
+        public Vector3 CurrentPosition => _go != null ? _go.transform.position : _target;
+
+        /// <summary>迎撃(命中確定)済みか。true の弾は再交戦せず、着弾してもダメージを発生させない。</summary>
+        public bool Doomed => _doomed;
+
+        /// <summary>迎撃ミサイルの命中が確定した弾に印を付ける（メインスレッド）。</summary>
+        public void MarkDoomed() { _doomed = true; }
 
         public Missile(Vector3 target, WarheadType type)
         {

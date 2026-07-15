@@ -19,15 +19,6 @@ namespace MissileDisaster.Game.Simulation
                     ToolsModifierControl.SetTool<MissileDisaster.Game.UI.MissileTool>();
                 }
 
-                // 迎撃施設の設置ホットキー（Ctrl+1..4）。ツールバー非依存の確実な設置手段。
-                if (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl))
-                {
-                    HandleBuildingHotkey();
-                }
-
-                // 迎撃施設ボタンを災害タブへ反映（パネル生成後に一度だけ実行される）。
-                MissileDisaster.Game.Defense.CustomBuildingFactory.PumpPanelRefresh();
-
                 bool paused = SimulationManager.instance.SimulationPaused;
                 if (!paused)
                 {
@@ -37,31 +28,6 @@ namespace MissileDisaster.Game.Simulation
             catch (System.Exception e)
             {
                 ModConfig.LogError("OnUpdate error: " + e);
-            }
-        }
-
-        /// <summary>Ctrl+1..4 で対応する迎撃施設を BuildingTool に載せる（クリックで設置）。</summary>
-        private static void HandleBuildingHotkey()
-        {
-            KeyCode[] keys = { KeyCode.Alpha1, KeyCode.Alpha2, KeyCode.Alpha3, KeyCode.Alpha4 };
-            string[] names = MissileDisaster.Game.Defense.CustomBuildingFactory.BuildingNames();
-            for (int i = 0; i < keys.Length && i < names.Length; i++)
-            {
-                if (!Input.GetKeyDown(keys[i])) continue;
-                BuildingInfo info = MissileDisaster.Game.Defense.CustomBuildingFactory.Get(names[i]);
-                if (info == null)
-                {
-                    ModConfig.LogError("BuildingHotkey: 未登録 " + names[i]);
-                    return;
-                }
-                BuildingTool tool = ToolsModifierControl.SetTool<BuildingTool>();
-                if (tool != null)
-                {
-                    tool.m_prefab = info;
-                    tool.m_relocate = 0;
-                    ModConfig.Log("BuildingHotkey: 設置ツールに載せました " + info.name);
-                }
-                return;
             }
         }
 

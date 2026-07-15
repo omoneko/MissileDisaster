@@ -38,10 +38,42 @@ namespace MissileDisaster.Game
         public static readonly Color TrailFireEdgeColor = new Color(0.9f, 0.28f, 0.06f, 1f); // 赤橙(縁)
         public static readonly Color TrailSmokeColor = new Color(0.16f, 0.15f, 0.14f, 0.2f); // 暗い煙・薄く
 
-        // 迎撃施設（正規建物・実行時クローン）。災害サービスの設置建物をテンプレとしてクローンし
-        // （→災害タブに入る）、メッシュ/名前/AI/マス/コスト/電力/水 を差し替える。仕様は
-        // CustomBuildingFactory.Specs 参照。見つからない場合の最終フォールバックテンプレ名:
-        public const string FallbackBuildingTemplateName = "Wind Turbine";
+        // 迎撃施設は Asset Editor で作成した正規アセット（PAC3/THAAD/Aegis/Radar）。
+        // Mod はコスト/電力/水を上書きせず、設置された建物を「名前で検出」して迎撃判定のみ行う。
+        // 迎撃判定・建物走査・クールダウンはすべてメインスレッド（MissileManager.UpdateVisual 側）。
+        public const int InterceptorScanIntervalFrames = 30;  // 建物再走査の間引き（~0.5s @60fps）
+        public const float RadarSupportMultiplier = 1.5f;     // レーダー稼働時の迎撃確率倍率
+
+        // 迎撃成功時の閃光（バニラ非依存の簡易パーティクルバースト。メインスレッド）。
+        public const int InterceptFlashBurst = 40;            // 一度に放出する火花数
+        public const float InterceptFlashLifetime = 0.5f;     // 火花の寿命(秒)
+        public const float InterceptFlashSpeed = 60f;         // 火花の初速(拡散・m/秒)
+        public const float InterceptFlashSize = 40f;          // 火花の基準サイズ(m)
+        public static readonly Color InterceptFlashCoreColor = new Color(1f, 0.95f, 0.7f, 1f);  // 中心の白橙
+        public static readonly Color InterceptFlashEdgeColor = new Color(1f, 0.55f, 0.15f, 1f); // 縁の橙
+
+        // 迎撃ミサイル本体（可視・メインスレッド）。命中/失敗を問わず発射器から実際に飛ばす。
+        // モデルは Models/<name>.obj（+Z=機首）。層ごとに実機に近い速度を割り当てる。
+        public const string InterceptorModelPac = "Interceptor_PAC";     // PAC-3
+        public const string InterceptorModelThaad = "Interceptor_THAAD"; // THAAD
+        public const string InterceptorModelArrow = "Interceptor_SM";    // SM-3(Aegis)
+        public const float InterceptorModelScale = 12f;
+        public const float InterceptorSpeedPac = 1700f;    // PAC-3 ~Mach5
+        public const float InterceptorSpeedThaad = 2500f;  // THAAD ~Mach8
+        public const float InterceptorSpeedArrow = 3000f;  // SM-3 ~Mach10
+        public const float InterceptorCatchRadius = 60f;   // 迎撃点への到達判定距離(m)
+        public const float InterceptorMaxFlightSeconds = 8f; // 到達不能時の保険（消滅まで）
+        public const int InterceptFizzleBurst = 14;        // 失敗時の小さな煙玉の粒数
+
+        // 迎撃ミサイルの噴煙トレイル（ロケット排気。煙は少しの間残す）。ワールド空間で航跡を残す。
+        public const float ExhaustFireRate = 90f;          // ノズル火炎の毎秒放出数
+        public const float ExhaustFireLifetime = 0.25f;    // 火炎の寿命(秒)
+        public const float ExhaustFireSize = 8f;           // 火炎の基準サイズ(m)
+        public const float ExhaustSmokeRate = 60f;         // 噴煙の毎秒放出数
+        public const float ExhaustSmokeLifetime = 2.5f;    // 噴煙の寿命(秒)。長め=少しの間残る
+        public const float ExhaustSmokeSize = 7f;          // 噴煙の基準サイズ(m)。細く
+        public static readonly Color ExhaustFireColor = new Color(1f, 0.9f, 0.6f, 1f);         // 白橙の火炎
+        public static readonly Color ExhaustSmokeColor = new Color(0.85f, 0.85f, 0.85f, 0.32f); // 白っぽい薄煙
 
         // 着弾（通常弾頭・sim スレッドで DisasterHelpers を呼ぶ）。
         public const float SinkholeRadius = 60f;

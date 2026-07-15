@@ -3,7 +3,7 @@ using Xunit;
 
 public class InterceptDecisionTests
 {
-    private static readonly InterceptorTier Sam = InterceptorTiers.Sam; // alt[800,2500) range 4000 chance 0.6
+    private static readonly InterceptorTier Sam = InterceptorTiers.Sam; // alt[800,2500) range 4000 chance 0.75
 
     [Theory]
     [InlineData(1500f, 1000f, true)]   // 帯内・射程内
@@ -18,9 +18,9 @@ public class InterceptDecisionTests
     }
 
     [Theory]
-    [InlineData(0.0f, true)]    // roll < 0.6 → 迎撃
-    [InlineData(0.59f, true)]
-    [InlineData(0.6f, false)]   // roll == chance → 失敗(未満のみ成功)
+    [InlineData(0.0f, true)]    // roll < 0.75 → 迎撃
+    [InlineData(0.74f, true)]
+    [InlineData(0.75f, false)]  // roll == chance → 失敗(未満のみ成功)
     [InlineData(0.9f, false)]
     public void ShouldIntercept_rolls_within_zone(float roll, bool expected)
     {

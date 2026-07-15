@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using MissileDisaster.Core;
+using MissileDisaster.Game.Defense;
+using MissileDisaster.Game.Effects;
 using UnityEngine;
 
 namespace MissileDisaster.Game
@@ -22,7 +24,8 @@ namespace MissileDisaster.Game
             public WarheadSpec Spec;
         }
 
-        private static readonly List<Missile> _missiles = new List<Missile>();        // メインスレッド専用
+        private static readonly List<Missile> _missiles = new List<Missile>();                    // メインスレッド専用
+        private static readonly List<InterceptorProjectile> _interceptors = new List<InterceptorProjectile>(); // メインスレッド専用
         private static readonly List<ImpactJob> _impactQueue = new List<ImpactJob>();  // 受け渡し(ロック保護)
         private static readonly object _impactLock = new object();
 
@@ -36,22 +39,82 @@ namespace MissileDisaster.Game
             ModConfig.Log("Missile launched at " + target + " (" + type + ")");
         }
 
-        /// <summary>メインスレッド専用。飛翔を進め、着弾したものはダメージを enqueue して破棄・除去。</summary>
+        /// <summary>
+        /// メインスレッド専用。迎撃施設の走査/クールダウン、迎撃ミサイルの飛翔と解決、飛来弾の飛翔と交戦を進める。
+        /// 着弾（未撃墜）弾はダメージを enqueue して破棄。命中確定弾は着弾させずダメージも出さない。
+        /// </summary>
         public static void UpdateVisual(float simTimeDelta)
         {
+            InterceptorRegistry.Tick(simTimeDelta);
+            UpdateInterceptors(simTimeDelta);
+
             for (int i = _missiles.Count - 1; i >= 0; i--)
             {
                 Missile m = _missiles[i];
                 bool impacted = m.UpdateVisual(simTimeDelta);
                 if (impacted)
                 {
-                    lock (_impactLock)
+                    // 命中確定(Doomed)弾は迎撃済み扱い＝ダメージ無し。未撃墜のみ着弾ダメージを積む。
+                    if (!m.Doomed)
                     {
-                        _impactQueue.Add(new ImpactJob { Target = m.Target, Spec = m.Spec });
+                        lock (_impactLock)
+                        {
+                            _impactQueue.Add(new ImpactJob { Target = m.Target, Spec = m.Spec });
+                        }
                     }
-                    m.DestroyVisual();
-                    _missiles.RemoveAt(i);
+                    RemoveMissile(i, m);
+                    continue;
                 }
+
+                if (m.Doomed) continue; // 迎撃弾が向かっている最中。再交戦しない。
+
+                // 交戦: 圏内で待機中の発射器が1基だけ実弾を発射する。命中確定なら弾に印を付ける。
+                Vector3 launcher;
+                InterceptorKind kind;
+                bool isHit;
+                if (InterceptorRegistry.TryEngage(m.CurrentPosition, m.Target, out launcher, out kind, out isHit))
+                {
+                    if (isHit) m.MarkDoomed();
+                    _interceptors.Add(new InterceptorProjectile(launcher, m, kind, isHit));
+                }
+            }
+        }
+
+        /// <summary>メインスレッド専用。迎撃ミサイルを前進させ、迎撃点到達で解決（撃墜=閃光、空振り=不発煙）。</summary>
+        private static void UpdateInterceptors(float simTimeDelta)
+        {
+            for (int j = _interceptors.Count - 1; j >= 0; j--)
+            {
+                InterceptorProjectile p = _interceptors[j];
+                bool connectedHit;
+                Vector3 point;
+                if (!p.Update(simTimeDelta, out connectedHit, out point)) continue;
+
+                if (connectedHit && p.Prey != null)
+                {
+                    Missile prey = p.Prey;
+                    int idx = _missiles.IndexOf(prey);
+                    if (idx >= 0) RemoveMissile(idx, prey); // 撃墜: ダメージ無しで消滅＋他の追尾弾の参照解除
+                    InterceptFx.PlayFlash(point);
+                }
+                else
+                {
+                    InterceptFx.PlayFizzle(point);
+                }
+
+                p.Destroy();
+                _interceptors.RemoveAt(j);
+            }
+        }
+
+        /// <summary>メインスレッド専用。飛来弾を破棄・除去し、それを追尾中の迎撃弾の参照を解く。</summary>
+        private static void RemoveMissile(int index, Missile m)
+        {
+            m.DestroyVisual();
+            _missiles.RemoveAt(index);
+            for (int j = 0; j < _interceptors.Count; j++)
+            {
+                if (_interceptors[j].Prey == m) _interceptors[j].ClearPrey();
             }
         }
 
@@ -74,11 +137,13 @@ namespace MissileDisaster.Game
             }
         }
 
-        /// <summary>メインスレッド専用。全飛翔体を破棄し、キューも空にする。</summary>
+        /// <summary>メインスレッド専用。全飛翔体（飛来弾・迎撃弾）を破棄し、キューも空にする。</summary>
         public static void Reset()
         {
             for (int i = 0; i < _missiles.Count; i++) _missiles[i].DestroyVisual();
             _missiles.Clear();
+            for (int j = 0; j < _interceptors.Count; j++) _interceptors[j].Destroy();
+            _interceptors.Clear();
             lock (_impactLock) { _impactQueue.Clear(); }
         }
     }
