@@ -83,6 +83,10 @@ namespace MissileDisaster.Game
         // 放射能汚染（核のみ・sim スレッドで NaturalResourceManager へ書込み）。中心の最大濃度(0-255)。
         public const byte ContaminationMaxIntensity = 255;
 
+        // 破壊の同心円モデル: 内側 DestructionCoreFraction までは全壊、そこから破壊半径へ向け破壊確率が低下する。
+        // Nukemap の「ほぼ全壊/民家破壊」半径比 ≈ 0.2 に倣う。
+        public const float DestructionCoreFraction = 0.2f;
+
         // クレーターの上限（地形ハイトマップを破綻させないための工学的安全上限。ゲームバランスではない）。
         // 実被害半径は破壊/延焼/汚染で表現し、クレーター(地形変形)だけは端末保護のため丸める。
         public const float CraterRadiusMax = 500f;
@@ -95,10 +99,8 @@ namespace MissileDisaster.Game
         public const float MaxContaminationRadius = 8600f;
 
         // 着弾爆発エフェクト（バニラ隕石着弾エフェクトを流用・メインスレッドで DispatchEffect）。
-        // 非核: 爆発規模(破壊半径)に応じて複数の隕石エフェクトを散布し面で見せる。核: 単一の特大エフェクト。
-        public const int ExplosionMaxBlooms = 40;         // 非核の隕石エフェクト最大同時数
+        // 通常弾/サーモバリックは単一エフェクト、子弾散布弾は散布点ごと、核は単一の特大＋キノコ雲。
         public const float ExplosionBloomScaleMax = 7f;   // 非核の1発あたり最大スケール（控えめ）
-        public const float ExplosionBloomSpacing = 180f;  // この距離ごとに1発（半径/この値=発数目安）
         public const float NuclearExplosionScaleMax = 140f; // 核の単一エフェクトの最大スケール
 
         // サウンド（Sounds/*.mp3 を実行時に読み込み、3D 位置音として再生。メインスレッド）。

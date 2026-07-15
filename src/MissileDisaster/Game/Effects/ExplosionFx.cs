@@ -54,19 +54,9 @@ namespace MissileDisaster.Game.Effects
                     return;
                 }
 
-                // 単一着弾: 破壊半径に応じた数の隕石エフェクトを散布＋中心に大きな1発。
-                int blooms = Mathf.Clamp(Mathf.RoundToInt(radius / ModConfig.ExplosionBloomSpacing), 1, ModConfig.ExplosionMaxBlooms);
-                float perScale = Mathf.Clamp(radius / 600f, 1f, ModConfig.ExplosionBloomScaleMax);
-
-                Dispatch(effect, center, Mathf.Min(perScale * 1.8f, ModConfig.ExplosionBloomScaleMax));
-                if (blooms > 1)
-                {
-                    Offset2[] pts = SubmunitionScatter.Offsets(blooms, radius * 0.85f);
-                    for (int i = 0; i < pts.Length; i++)
-                    {
-                        Dispatch(effect, new Vector3(center.x + pts[i].X, center.y, center.z + pts[i].Z), perScale);
-                    }
-                }
+                // 単一着弾（通常弾・サーモバリック）: 着弾点に単一の爆発エフェクト（規模連動スケール）。
+                float singleScale = Mathf.Clamp(radius / 50f, 2f, ModConfig.ExplosionBloomScaleMax);
+                Dispatch(effect, center, singleScale);
             }
             catch (Exception e)
             {

@@ -59,12 +59,14 @@ namespace MissileDisaster.Game
             float destMax = destructionRadius > ModConfig.MaxEffectRadius ? ModConfig.MaxEffectRadius : destructionRadius;
             float burnMax = burnRadius > ModConfig.MaxEffectRadius ? ModConfig.MaxEffectRadius : burnRadius;
             float outer = destMax > burnMax ? destMax : burnMax;
+            // 距離減衰(同心円): 内側 core までは全壊、core→destMax で破壊確率が低下する（destMin=core）。
+            float core = destMax * ModConfig.DestructionCoreFraction;
             // removeRadius 内は「土台ごと撤去」＝道路・橋・基礎まで破壊。
-            //  - 地上爆発: 破壊半径いっぱいを撤去（クレーター化。道路・橋・基礎を破壊）。
-            //  - 空中爆発: removeRadius=0。建物は倒壊のみで、基礎・道路・水道管・地下鉄は残す。
-            float removeRadius = groundburst ? destMax : 0f;
-            float destMin = destMax * 0.5f;
-            float burnMin = destMax * 0.3f;
+            //  - 地上爆発: core 内をクレーター化して撤去（道路・橋・基礎を破壊）。外周は建物のみ確率破壊。
+            //  - 空中爆発: removeRadius=0。撤去せず建物倒壊のみで、基礎・道路・水道管・地下鉄は残す。
+            float removeRadius = groundburst ? core : 0f;
+            float destMin = core;
+            float burnMin = core;
             if (burnMin > burnMax * 0.5f) burnMin = burnMax * 0.5f; // 延焼帯が反転しないよう内縁を抑える
             DisasterHelpers.DestroyStuff(seed, null, pos, outer, outer, removeRadius, destMin, destMax, burnMin, burnMax);
         }

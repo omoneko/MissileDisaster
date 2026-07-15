@@ -31,6 +31,7 @@ namespace MissileDisaster.Game.UI
         private static UIButton[] _warheadButtons;
         private static UIButton[] _burstButtons;
         private static UITextField _ktField;
+        private static UITextField _kgField;
 
         /// <summary>レベルロード時にメインスレッドから呼ぶ。パネルを生成する。</summary>
         public static void Create()
@@ -80,6 +81,7 @@ namespace MissileDisaster.Game.UI
                 _warheadButtons = null;
                 _burstButtons = null;
                 _ktField = null;
+                _kgField = null;
             }
         }
 
@@ -121,6 +123,12 @@ namespace MissileDisaster.Game.UI
             y += ModConfig.PanelButtonHeight + ModConfig.PanelButtonGap;
 
             _ktField = MakeKtField(pad, y, w);
+            y += 26f + ModConfig.PanelButtonGap;
+
+            // 通常爆弾の出力（kg TNT 手入力・非核弾頭に適用）
+            y += 4f;
+            y = AddSectionLabel("Conventional Yield (non-nuclear, kg TNT)", pad, y);
+            _kgField = MakeKgField(pad, y, w);
             y += 26f + ModConfig.PanelButtonGap;
 
             // 爆発高度（空中/地上）
@@ -201,7 +209,7 @@ namespace MissileDisaster.Game.UI
             return dd;
         }
 
-        private static UITextField MakeKtField(float x, float y, float width)
+        private static UITextField MakeNumericField(float x, float y, float width, int initial, string tooltip)
         {
             UITextField tf = _panel.AddUIComponent<UITextField>();
             tf.size = new Vector2(width, 26f);
@@ -210,7 +218,7 @@ namespace MissileDisaster.Game.UI
             tf.readOnly = false;
             tf.numericalOnly = true;
             tf.allowFloats = false;
-            tf.maxLength = 7;
+            tf.maxLength = 8;
             tf.selectionSprite = "EmptySprite";
             tf.normalBgSprite = "TextFieldPanel";
             tf.hoveredBgSprite = "TextFieldPanelHovered";
@@ -220,11 +228,24 @@ namespace MissileDisaster.Game.UI
             tf.padding = new RectOffset(8, 8, 6, 6);
             tf.horizontalAlignment = UIHorizontalAlignment.Left;
             tf.verticalAlignment = UIVerticalAlignment.Middle;
-            tf.text = MissileTool.CurrentYieldKilotons.ToString();
-            tf.tooltip = "Enter yield in kt (press Enter)";
+            tf.text = initial.ToString();
+            tf.tooltip = tooltip;
+            return tf;
+        }
 
+        private static UITextField MakeKtField(float x, float y, float width)
+        {
+            UITextField tf = MakeNumericField(x, y, width, MissileTool.CurrentYieldKilotons, "Enter yield in kt (press Enter)");
             tf.eventTextSubmitted += (c, s) => ApplyKtText(s);
             tf.eventLostFocus += (c, p) => { if (_ktField != null) ApplyKtText(_ktField.text); };
+            return tf;
+        }
+
+        private static UITextField MakeKgField(float x, float y, float width)
+        {
+            UITextField tf = MakeNumericField(x, y, width, MissileTool.CurrentConventionalKilograms, "Enter charge in kg TNT (press Enter)");
+            tf.eventTextSubmitted += (c, s) => ApplyKgText(s);
+            tf.eventLostFocus += (c, p) => { if (_kgField != null) ApplyKgText(_kgField.text); };
             return tf;
         }
 
@@ -238,6 +259,19 @@ namespace MissileDisaster.Game.UI
             else if (_ktField != null)
             {
                 _ktField.text = MissileTool.CurrentYieldKilotons.ToString(); // 不正入力は現在値へ戻す
+            }
+        }
+
+        private static void ApplyKgText(string s)
+        {
+            int kg;
+            if (int.TryParse(s, out kg) && kg > 0)
+            {
+                MissileTool.CurrentConventionalKilograms = kg;
+            }
+            else if (_kgField != null)
+            {
+                _kgField.text = MissileTool.CurrentConventionalKilograms.ToString(); // 不正入力は現在値へ戻す
             }
         }
 

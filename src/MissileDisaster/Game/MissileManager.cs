@@ -34,15 +34,15 @@ namespace MissileDisaster.Game
         public static bool HasActive => _missiles.Count > 0;
 
         /// <summary>
-        /// メインスレッド専用。核なら nuclearYieldMultiplier で効果半径をスケールし、爆発高度(burst)を反映した spec で発射する。
-        /// 非核では multiplier は無視。空中爆発はクレーター/汚染を無くし破壊・延焼を広げる（全弾頭に適用）。
+        /// メインスレッド専用。出力係数(yieldMultiplier)で効果半径をスケールし、爆発高度(burst)を反映した spec で発射する。
+        /// 係数は呼び出し側が弾頭に応じて算出（核=kt由来、非核=kg由来）。空中爆発はクレーター/汚染を無くし破壊・延焼を広げる。
         /// </summary>
-        public static void Launch(Vector3 target, WarheadType type, float nuclearYieldMultiplier, BurstType burst)
+        public static void Launch(Vector3 target, WarheadType type, float yieldMultiplier, BurstType burst)
         {
             WarheadSpec spec = WarheadSpec.For(type);
-            if (type == WarheadType.Nuclear && nuclearYieldMultiplier > 0f)
+            if (yieldMultiplier > 0f)
             {
-                spec = spec.Scaled(nuclearYieldMultiplier);
+                spec = spec.Scaled(yieldMultiplier);
             }
             spec = spec.WithBurst(burst);
             Missile missile = new Missile(target, spec);
@@ -54,7 +54,7 @@ namespace MissileDisaster.Game
                 ModConfig.SoundLaunchMinDistance, ModConfig.SoundLaunchMaxDistance);
 
             ModConfig.Log("Missile launched at " + target + " (" + type + ", " + burst
-                + (type == WarheadType.Nuclear ? ", x" + nuclearYieldMultiplier.ToString("0.00") : "") + ")");
+                + ", x" + yieldMultiplier.ToString("0.00") + ")");
         }
 
         /// <summary>

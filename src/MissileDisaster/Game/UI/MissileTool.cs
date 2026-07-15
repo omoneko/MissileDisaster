@@ -14,6 +14,7 @@ namespace MissileDisaster.Game.UI
         // static なのでツール再起動を跨いで保持する。
         public static WarheadType CurrentWarhead = WarheadType.Conventional;
         public static int CurrentYieldKilotons = NuclearYields.StandardKilotons;
+        public static int CurrentConventionalKilograms = ConventionalYields.ReferenceKilograms;
         public static BurstType CurrentBurst = BurstType.Groundburst;
 
         private Vector3 m_cachedPosition;
@@ -61,7 +62,10 @@ namespace MissileDisaster.Game.UI
             if (e.type != EventType.MouseDown || e.button != 0 || !m_placementValid) return;
             try
             {
-                float yield = NuclearYields.Multiplier(CurrentYieldKilotons);
+                // 核は kt、非核は kg TNT から出力係数を求める（爆風半径 ∝ 出力^(1/3)）。
+                float yield = CurrentWarhead == WarheadType.Nuclear
+                    ? NuclearYields.Multiplier(CurrentYieldKilotons)
+                    : ConventionalYields.Multiplier(CurrentConventionalKilograms);
                 MissileManager.Launch(m_cachedPosition, CurrentWarhead, yield, CurrentBurst);
             }
             catch (System.Exception ex)
