@@ -9,8 +9,8 @@ public class ZoneSerializerTests
     {
         var zones = new List<ContaminationZone>
         {
-            new ContaminationZone(100.5f, -200.25f, 460f, 1234567890L, 255),
-            new ContaminationZone(-50f, 75f, 5300f, 987654321L, 128), // 除染途中の濃度も保持
+            new ContaminationZone(100.5f, -200.25f, 460f, 1234567890L, 255f),
+            new ContaminationZone(-50f, 75f, 5300f, 987654321L, 128.5f), // 除染途中の端数濃度も保持
         };
         byte[] bytes = ZoneSerializer.Serialize(zones);
         List<ContaminationZone> back = ZoneSerializer.Deserialize(bytes);
@@ -22,7 +22,7 @@ public class ZoneSerializerTests
             Assert.Equal(zones[i].CenterZ, back[i].CenterZ, 3);
             Assert.Equal(zones[i].Radius, back[i].Radius, 3);
             Assert.Equal(zones[i].StartTicks, back[i].StartTicks);
-            Assert.Equal(zones[i].Intensity, back[i].Intensity);
+            Assert.Equal(zones[i].Intensity, back[i].Intensity, 3);
         }
     }
 

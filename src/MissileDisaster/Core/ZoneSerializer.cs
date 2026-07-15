@@ -6,7 +6,7 @@ namespace MissileDisaster.Core
     /// <summary>汚染ゾーン台帳を byte[] に直列化/復元（セーブデータ保存用）。NuclearMeltdown から移植。</summary>
     public static class ZoneSerializer
     {
-        public const byte Version = 2; // v2: Intensity を追加
+        public const byte Version = 3; // v3: Intensity を float 化（端数保持）
 
         public static byte[] Serialize(List<ContaminationZone> zones)
         {
@@ -22,7 +22,7 @@ namespace MissileDisaster.Core
                     w.Write(z.CenterZ);
                     w.Write(z.Radius);
                     w.Write(z.StartTicks);
-                    w.Write(z.Intensity);
+                    w.Write(z.Intensity); // float
                 }
                 w.Flush();
                 return ms.ToArray();
@@ -47,7 +47,7 @@ namespace MissileDisaster.Core
                         float cz = r.ReadSingle();
                         float radius = r.ReadSingle();
                         long start = r.ReadInt64();
-                        byte intensity = r.ReadByte();
+                        float intensity = r.ReadSingle();
                         result.Add(new ContaminationZone(cx, cz, radius, start, intensity));
                     }
                 }

@@ -62,16 +62,19 @@ namespace MissileDisaster.Game.Contamination
         /// </summary>
         public static void Maintain(long nowTicks)
         {
-            if (_zones.Count == 0) return;
             if (++_maintainCounter < ModConfig.ContaminationMaintainInterval) return;
             _maintainCounter = 0;
 
+            // 経過月は処理サイクル間で測る。ゾーンが無くても時刻は前進させる（新ゾーンに空白期間を課さない=P2対策）。
             double deltaMonths = _lastMaintainTicks == 0
                 ? 0.0
                 : ContaminationDecay.MonthsBetween(_lastMaintainTicks, nowTicks);
             _lastMaintainTicks = nowTicks;
+            if (_zones.Count == 0) { _facilities.Clear(); return; }
 
             ScanFacilities();
+
+            double decayFactor = ContaminationDecay.DecayFactor(deltaMonths, ModConfig.DecontaminationMonthlyFraction);
 
             for (int i = _zones.Count - 1; i >= 0; i--)
             {
@@ -85,11 +88,11 @@ namespace MissileDisaster.Game.Contamination
                     continue;
                 }
 
-                if (deltaMonths > 0.0 && IsDecontaminated(zone))
+                if (decayFactor < 1.0 && IsDecontaminated(zone))
                 {
-                    byte reduced = ContaminationDecay.ReducedIntensity(
-                        zone.Intensity, deltaMonths, ModConfig.DecontaminationMonthlyFraction);
-                    if (reduced <= ModConfig.DecontaminationMinIntensity)
+                    // float 濃度に係数を掛け続けるので微小間隔でも端数が失われず着実に減衰する。
+                    zone.Intensity = (float)(zone.Intensity * decayFactor);
+                    if (zone.Intensity <= ModConfig.DecontaminationMinIntensity)
                     {
                         ClearZone(zone);
                         _zones.RemoveAt(i);
@@ -97,7 +100,6 @@ namespace MissileDisaster.Game.Contamination
                     }
                     else
                     {
-                        zone.Intensity = reduced;
                         _zones[i] = zone;
                         SetZone(zone); // 下げた濃度をグリッドへ反映（上書き）
                     }
@@ -109,10 +111,19 @@ namespace MissileDisaster.Game.Contamination
             }
         }
 
+        /// <summary>float 濃度を土壌汚染セルの上限濃度(byte)へ丸める。</summary>
+        private static byte ToByteIntensity(float intensity)
+        {
+            int v = (int)(intensity + 0.5f);
+            if (v < 0) return 0;
+            if (v > 255) return 255;
+            return (byte)v;
+        }
+
         /// <summary>汚染を維持する（自然減衰で下がったセルを zone.Intensity まで引き上げる）。</summary>
         public static void ReassertZone(ContaminationZone zone)
         {
-            List<CellDose> doses = PollutionGrid.CellsInRadius(zone.CenterX, zone.CenterZ, zone.Radius, zone.Intensity);
+            List<CellDose> doses = PollutionGrid.CellsInRadius(zone.CenterX, zone.CenterZ, zone.Radius, ToByteIntensity(zone.Intensity));
             for (int i = 0; i < doses.Count; i++) PollutionField.ApplyDose(doses[i]);
             RefreshZoneTexture(zone);
         }
@@ -120,14 +131,14 @@ namespace MissileDisaster.Game.Contamination
         /// <summary>汚染を上書き設定する（除染で下げた濃度を反映）。</summary>
         private static void SetZone(ContaminationZone zone)
         {
-            List<CellDose> doses = PollutionGrid.CellsInRadius(zone.CenterX, zone.CenterZ, zone.Radius, zone.Intensity);
+            List<CellDose> doses = PollutionGrid.CellsInRadius(zone.CenterX, zone.CenterZ, zone.Radius, ToByteIntensity(zone.Intensity));
             for (int i = 0; i < doses.Count; i++) PollutionField.SetDose(doses[i]);
             RefreshZoneTexture(zone);
         }
 
         public static void ClearZone(ContaminationZone zone)
         {
-            List<CellDose> doses = PollutionGrid.CellsInRadius(zone.CenterX, zone.CenterZ, zone.Radius, zone.Intensity);
+            List<CellDose> doses = PollutionGrid.CellsInRadius(zone.CenterX, zone.CenterZ, zone.Radius, ToByteIntensity(zone.Intensity));
             for (int i = 0; i < doses.Count; i++) PollutionField.ClearCell(doses[i].Index);
             RefreshZoneTexture(zone);
         }
