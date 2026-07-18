@@ -134,7 +134,11 @@ namespace MissileDisaster.Game
         public const float PanelButtonHeight = 26f;
         public const float PanelButtonGap = 4f;
 
-        public static void Log(string msg) { Debug.Log(LogPrefix + msg); }
+        // 詳細ログの出力可否。公開版は false（静かに）。不具合調査時のみ true にして再ビルドする。
+        // エラー(LogError)は常時出力する。static readonly にして到達不能コード警告(CS0162)を避ける。
+        public static readonly bool DebugLogging = false;
+
+        public static void Log(string msg) { if (DebugLogging) Debug.Log(LogPrefix + msg); }
         public static void LogError(string msg) { Debug.LogError(LogPrefix + msg); }
     }
 }
