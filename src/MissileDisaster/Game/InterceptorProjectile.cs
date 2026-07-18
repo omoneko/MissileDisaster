@@ -107,7 +107,7 @@ namespace MissileDisaster.Game
 
             // フォールバック（モデル読込不可時の小さな球）。
             GameObject sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            sphere.transform.localScale = new Vector3(8f, 8f, 8f);
+            sphere.transform.localScale = new Vector3(4f, 4f, 4f); // 従来8の半分
             Collider col = sphere.GetComponent<Collider>();
             if (col != null) Object.Destroy(col);
             return sphere;

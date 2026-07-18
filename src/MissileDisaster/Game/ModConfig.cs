@@ -20,7 +20,7 @@ namespace MissileDisaster.Game
         // 飛来ミサイルの表示モデル（Models/&lt;name&gt;.obj）。モデル軸は +Z=機首。
         public const string ModelsFolderName = "Models";
         public const string IncomingMissileModelName = "IncomingWarhead";
-        public const float IncomingMissileScale = 18f;     // モデル ~2m → 実機 ~38m。実機で調整
+        public const float IncomingMissileScale = 9f;      // モデル ~2m → 実機 ~19m（従来18の半分）
         public const float ObjMetallic = 0.6f;             // Standard シェーダの金属質
         public const float ObjGlossiness = 0.5f;           // Standard シェーダの滑らかさ
         public static readonly Color ObjFallbackColor = new Color(0.25f, 0.25f, 0.25f, 1f); // MTL 欠落時の既定色
@@ -57,7 +57,7 @@ namespace MissileDisaster.Game
         public const string InterceptorModelPac = "Interceptor_PAC";     // PAC-3
         public const string InterceptorModelThaad = "Interceptor_THAAD"; // THAAD
         public const string InterceptorModelArrow = "Interceptor_SM";    // SM-3(Aegis)
-        public const float InterceptorModelScale = 12f;
+        public const float InterceptorModelScale = 6f; // 従来12の半分
         public const float InterceptorSpeedPac = 1700f;    // PAC-3 ~Mach5
         public const float InterceptorSpeedThaad = 2500f;  // THAAD ~Mach8
         public const float InterceptorSpeedArrow = 3000f;  // SM-3 ~Mach10

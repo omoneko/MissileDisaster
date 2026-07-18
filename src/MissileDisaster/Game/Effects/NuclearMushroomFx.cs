@@ -20,10 +20,10 @@ namespace MissileDisaster.Game.Effects
             try
             {
                 EnsureAssets();
-                float height = Mathf.Clamp(blastRadius * 0.7f, 400f, 5000f);
-                float capR = Mathf.Clamp(blastRadius * 0.3f, 200f, 3000f);
-                float stemR = capR * 0.35f;
-                float riseTime = Mathf.Clamp(height / 700f, 2f, 7f);
+                float height = Mathf.Clamp(blastRadius * 0.8f, 500f, 6000f); // 成層圏まで高く立ち上る
+                float capR = Mathf.Clamp(blastRadius * 0.35f, 250f, 3500f);  // 頂部の傘（キャノピー）は広く
+                float stemR = capR * 0.32f;
+                float riseTime = Mathf.Clamp(height / 450f, 5f, 14f);        // ゆっくり上昇（滞留感）
 
                 CreateFireball(center, capR);
                 CreateStem(center, stemR, height, riseTime);
@@ -59,11 +59,11 @@ namespace MissileDisaster.Game.Effects
             var go = NewSystem("MushroomStem", center, _smokeMat);
             var ps = go.GetComponent<ParticleSystem>();
             var main = ps.main;
-            main.startLifetime = riseTime + 2f;
-            main.startSpeed = stemR * 0.15f;
+            main.startLifetime = riseTime + 8f; // 立ち上った煙柱が長く残る
+            main.startSpeed = stemR * 0.12f;
             main.startSize = stemR * 1.1f;
             main.startColor = new ParticleSystem.MinMaxGradient(new Color(0.16f, 0.15f, 0.14f, 0.7f));
-            main.maxParticles = 400;
+            main.maxParticles = 500;
             main.duration = riseTime;
             main.loop = false;
 
@@ -72,16 +72,16 @@ namespace MissileDisaster.Game.Effects
 
             Sphere(ps, stemR);
 
-            // 上昇（ワールド空間で一定の上向き速度）。
+            // 上昇（ワールド空間で一定の上向き速度）。riseTime が長いほどゆっくり昇る。
             var vel = ps.velocityOverLifetime;
             vel.enabled = true;
             vel.space = ParticleSystemSimulationSpace.World;
             vel.y = new ParticleSystem.MinMaxCurve(height / riseTime);
 
-            AlphaFade(ps);
+            AlphaFadeSlow(ps);
             SizeCurve(ps, 0.8f, 1.6f);
             ps.Play();
-            UnityEngine.Object.Destroy(go, riseTime + 3f);
+            UnityEngine.Object.Destroy(go, riseTime + 9f);
         }
 
         private static void CreateCap(Vector3 top, float capR, float riseTime)
@@ -89,20 +89,22 @@ namespace MissileDisaster.Game.Effects
             var go = NewSystem("MushroomCap", top, _smokeMat);
             var ps = go.GetComponent<ParticleSystem>();
             var main = ps.main;
-            main.startDelay = riseTime * 0.6f; // 煙柱が頂部へ到達する頃に膨らむ
-            main.startLifetime = 7f;
-            main.startSpeed = capR * 0.18f;
-            main.startSize = capR * 0.8f;
+            main.startDelay = riseTime * 0.55f; // 煙柱が頂部へ到達する頃に膨らみ始める
+            main.startLifetime = 18f;           // 成層圏で長く滞留
+            main.startSpeed = capR * 0.35f;     // 外側へ吹き出して傘（キャノピー）を形成
+            main.startSize = capR * 0.7f;
             main.startColor = new ParticleSystem.MinMaxGradient(
                 new Color(0.18f, 0.16f, 0.15f, 0.7f), new Color(0.1f, 0.09f, 0.085f, 0.7f));
-            main.maxParticles = 300;
+            main.maxParticles = 500;
+            main.gravityModifier = 0.015f;      // 縁がわずかに垂れて笠のロールオーバー感
 
-            Burst(ps, 70);
-            Sphere(ps, capR * 0.5f);
-            AlphaFade(ps);
-            SizeCurve(ps, 0.7f, 1.9f);
+            Burst(ps, 100);
+            ConeUp(ps, capR * 0.35f, 62f);      // 上向き広角コーンで外側へ傘状に展開
+            DampenRise(ps, capR * 0.22f, 0.2f); // 上昇を頭打ちにして水平展開・滞留させる
+            AlphaFadeSlow(ps);
+            SizeCurve(ps, 0.7f, 2.5f);          // 大きく横へ広がる
             ps.Play();
-            UnityEngine.Object.Destroy(go, riseTime * 0.6f + 8f);
+            UnityEngine.Object.Destroy(go, riseTime * 0.55f + 20f);
         }
 
         // ---- helpers ----
@@ -153,6 +155,42 @@ namespace MissileDisaster.Game.Effects
             sol.enabled = true;
             sol.size = new ParticleSystem.MinMaxCurve(1f,
                 new AnimationCurve(new Keyframe(0f, from), new Keyframe(1f, to)));
+        }
+
+        /// <summary>長めに視認できてからゆっくり消えるアルファ（滞留感）。</summary>
+        private static void AlphaFadeSlow(ParticleSystem ps)
+        {
+            var col = ps.colorOverLifetime;
+            col.enabled = true;
+            var grad = new Gradient();
+            grad.SetKeys(
+                new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
+                new[]
+                {
+                    new GradientAlphaKey(0.6f, 0f), new GradientAlphaKey(0.85f, 0.25f),
+                    new GradientAlphaKey(0.7f, 0.7f), new GradientAlphaKey(0f, 1f)
+                });
+            col.color = new ParticleSystem.MinMaxGradient(grad);
+        }
+
+        /// <summary>上向きの広角コーンから放出（頂部で外側へ傘状に広がる）。Cone(+Z)を上へ向ける。</summary>
+        private static void ConeUp(ParticleSystem ps, float radius, float angle)
+        {
+            var shape = ps.shape;
+            shape.enabled = true;
+            shape.shapeType = ParticleSystemShapeType.Cone;
+            shape.angle = angle;
+            shape.radius = radius;
+            ps.transform.rotation = Quaternion.Euler(-90f, 0f, 0f);
+        }
+
+        /// <summary>上昇速度を頭打ちにして水平展開・滞留させる。</summary>
+        private static void DampenRise(ParticleSystem ps, float limit, float dampen)
+        {
+            var lv = ps.limitVelocityOverLifetime;
+            lv.enabled = true;
+            lv.dampen = dampen;
+            lv.limit = new ParticleSystem.MinMaxCurve(limit);
         }
 
         private static void EnsureAssets()

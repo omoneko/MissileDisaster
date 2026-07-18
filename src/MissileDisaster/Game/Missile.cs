@@ -74,7 +74,7 @@ namespace MissileDisaster.Game
 
             // フォールバック（Phase 1 と同じ球）。
             GameObject sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            sphere.transform.localScale = new Vector3(12f, 12f, 12f);
+            sphere.transform.localScale = new Vector3(6f, 6f, 6f); // 従来12の半分（モデル未読込時のフォールバック）
             Collider col = sphere.GetComponent<Collider>();
             if (col != null) Object.Destroy(col);
             return sphere;

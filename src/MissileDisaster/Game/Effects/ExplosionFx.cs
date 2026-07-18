@@ -25,20 +25,25 @@ namespace MissileDisaster.Game.Effects
                 EffectInfo effect = ResolveMeteorEffect();
                 float radius = Mathf.Max(spec.DestructionRadius, spec.BurnRadius * 0.5f, 30f);
 
-                // 核は DLC の有無に関わらず規模連動の特大キノコ雲を出す。
-                if (spec.Type == WarheadType.Nuclear) NuclearMushroomFx.Play(center, radius);
+                if (spec.Type == WarheadType.Nuclear)
+                {
+                    if (effect != null)
+                    {
+                        // DLCあり: 隕石(メテオ)着弾エフェクト＝あの大きなキノコ状の雲を破壊半径連動でスケール表示。
+                        float nukeScale = Mathf.Clamp(radius / 60f, 12f, ModConfig.NuclearExplosionScaleMax);
+                        Dispatch(effect, center, nukeScale);
+                    }
+                    else
+                    {
+                        // DLCなし: 自作の白煙キノコ雲を規模連動で生成（滞留・成層圏での傘状展開を再現）。
+                        NuclearMushroomFx.Play(center, radius);
+                    }
+                    return;
+                }
 
                 if (effect == null)
                 {
                     ExplosionFallback.Play(center, radius);
-                    return;
-                }
-
-                if (spec.Type == WarheadType.Nuclear)
-                {
-                    // 核: 着弾点に1つの特大メテオエフェクト（基部の閃光/衝撃波）。キノコ雲は上で発火済み。
-                    float nukeScale = Mathf.Clamp(radius / 60f, 12f, ModConfig.NuclearExplosionScaleMax);
-                    Dispatch(effect, center, nukeScale);
                     return;
                 }
 
