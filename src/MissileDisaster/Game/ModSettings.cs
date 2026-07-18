@@ -20,7 +20,8 @@ namespace MissileDisaster.Game
 
         public static SavedInt LaunchKey;             // 起動キー（KeyCode を int で保存）
         public static SavedInt RandomEnabled;         // ランダム攻撃 0/1
-        public static SavedInt RandomIntervalSeconds; // ランダム攻撃の間隔（実時間秒）
+        public static SavedInt StrikeFrequencyPct;    // 攻撃頻度（自然災害比のパーセント。25..300, 既定100=×1.0）
+        public static SavedInt AttackPattern;         // 着弾パターン 0=Single,1=MIRV,2=Random
         public static SavedInt RandomWarhead;         // 0=ランダム, 1..5=固定(通常/クラスター/白リン/サーモ/核)
 
         private static bool _ready;
@@ -36,7 +37,8 @@ namespace MissileDisaster.Game
                 }
                 LaunchKey = new SavedInt("launchKey", FileName, (int)KeyCode.F9, true);
                 RandomEnabled = new SavedInt("randomEnabled", FileName, 0, true);
-                RandomIntervalSeconds = new SavedInt("randomIntervalSeconds", FileName, 180, true);
+                StrikeFrequencyPct = new SavedInt("strikeFrequencyPct", FileName, 100, true);
+                AttackPattern = new SavedInt("attackPattern", FileName, 0, true);
                 RandomWarhead = new SavedInt("randomWarhead", FileName, 0, true);
                 _ready = true;
             }
@@ -56,9 +58,16 @@ namespace MissileDisaster.Game
             get { return RandomEnabled != null && RandomEnabled.value != 0; }
         }
 
-        public static int RandomInterval
+        /// <summary>攻撃頻度の乗数（自然災害比）。0.25〜3.0、既定1.0。</summary>
+        public static double StrikeFrequency
         {
-            get { return RandomIntervalSeconds != null ? RandomIntervalSeconds.value : 180; }
+            get { return StrikeFrequencyPct != null ? StrikeFrequencyPct.value / 100.0 : 1.0; }
+        }
+
+        /// <summary>着弾パターン 0=Single,1=MIRV,2=Random。</summary>
+        public static int AttackPatternValue
+        {
+            get { return AttackPattern != null ? AttackPattern.value : 0; }
         }
     }
 }

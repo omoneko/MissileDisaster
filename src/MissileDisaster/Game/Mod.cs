@@ -68,10 +68,15 @@ namespace MissileDisaster.Game
                 launch.AddButton("Reset panel to a visible position", () => UI.MissilePanel.ResetPosition());
 
                 UIHelperBase rnd = helper.AddGroup("Random missile strikes");
-                rnd.AddCheckbox("Enable random strikes (like a natural disaster)",
+                rnd.AddCheckbox("Enable random strikes (occur between natural disasters)",
                     ModSettings.IsRandomEnabled, b => ModSettings.RandomEnabled.value = b ? 1 : 0);
-                rnd.AddSlider("Interval between strikes (seconds)", 30f, 900f, 10f,
-                    ModSettings.RandomInterval, v => ModSettings.RandomIntervalSeconds.value = (int)v);
+                // 頻度は自然災害頻度に対する倍率(0.25〜3.0)。内部は percent(25..300)で保存。
+                rnd.AddSlider("Strike frequency (x natural disaster rate)", 0.25f, 3f, 0.25f,
+                    (float)ModSettings.StrikeFrequency,
+                    v => ModSettings.StrikeFrequencyPct.value = (int)Math.Round(v * 100.0));
+                string[] patterns = { "Single", "MIRV", "Random" };
+                rnd.AddDropdown("Attack pattern", patterns, ModSettings.AttackPatternValue,
+                    i => { if (ModSettings.AttackPattern != null) ModSettings.AttackPattern.value = i; });
                 string[] warheads = { "Random", "Conventional", "Cluster", "White Phosphorus", "Thermobaric", "Nuclear" };
                 rnd.AddDropdown("Warhead", warheads,
                     ModSettings.RandomWarhead != null ? ModSettings.RandomWarhead.value : 0,

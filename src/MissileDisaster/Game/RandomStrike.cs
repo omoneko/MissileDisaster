@@ -4,58 +4,65 @@ using UnityEngine;
 namespace MissileDisaster.Game
 {
     /// <summary>
-    /// ランダム攻撃モード：一定間隔でランダムな地点へミサイルを飛来させる（バニラ災害のようなランダム発生）。
-    /// 可能なら既存の建物を狙って街に着弾させ、無ければ地図中央付近のランダム座標へ。すべてメインスレッド。
+    /// ランダム攻撃モード：発火タイミングは StrikeScheduler（sim スレッド）が決め、本クラスは
+    /// メインスレッドで実際の発射を行う。着弾パターン（Single/MIRV/Random）を設定で分岐する。
+    /// MIRV は複数弾を同一フレームで発射する＝全弾の飛翔時間が一定のため着弾も同時になる。
+    /// 目標は優先照準（StrikeTargeting：原発/迎撃施設＞交通拠点＞ランドマーク＞その他）で抽選し、
+    /// MIRV は各弾が独立に抽選されるため複数の重要施設へ同時着弾しうる。すべてメインスレッド。
     /// </summary>
     public static class RandomStrike
     {
-        public static void Fire()
+        private const int MirvMin = 3;          // MIRV 発数の下限
+        private const int MirvMax = 6;          // MIRV 発数の上限（Random.Range 上端は排他なので +1 して使う）
+        private const float MirvChance = 0.30f; // Random パターンで MIRV になる確率（残り70%はSingle）
+        private const float FallbackRange = 4500f;
+
+        /// <summary>設定の AttackPattern に従って攻撃を実行（メインスレッド専用）。</summary>
+        public static void FireStrike()
         {
             try
             {
-                Vector3 target;
-                if (!TryRandomBuilding(out target))
+                StrikeTargeting targeting = new StrikeTargeting();
+                targeting.Scan(); // 建物走査は1回だけ。MIRV でも使い回す。
+
+                int count = ResolveWarheadCount();
+                for (int i = 0; i < count; i++)
                 {
-                    float range = 4500f;
-                    float x = Random.Range(-range, range);
-                    float z = Random.Range(-range, range);
-                    target = new Vector3(x, 0f, z);
-                    target.y = TerrainManager.instance.SampleRawHeightSmoothWithWater(target, false, 0f);
+                    FireOne(targeting);
                 }
-
-                WarheadType type = PickWarhead();
-                float yield = type == WarheadType.Nuclear
-                    ? NuclearYields.Multiplier(NuclearYields.StandardKilotons)
-                    : ConventionalYields.Multiplier(ConventionalYields.ReferenceKilograms);
-
-                MissileManager.Launch(target, type, yield, BurstType.Groundburst);
             }
             catch (System.Exception e)
             {
-                ModConfig.LogError("RandomStrike.Fire error: " + e);
+                ModConfig.LogError("RandomStrike.FireStrike error: " + e);
             }
         }
 
-        /// <summary>建物バッファをランダムに数回サンプルし、稼働中建物の位置を返す。無ければ false。</summary>
-        private static bool TryRandomBuilding(out Vector3 pos)
+        /// <summary>着弾パターンから今回の発射数を決める。Single=1, MIRV=3〜6, Random=70%Single/30%MIRV。</summary>
+        private static int ResolveWarheadCount()
         {
-            pos = Vector3.zero;
-            BuildingManager bm = BuildingManager.instance;
-            if (bm == null) return false;
-            Building[] buffer = bm.m_buildings.m_buffer;
-            if (buffer == null || buffer.Length <= 1) return false;
+            int pattern = ModSettings.AttackPatternValue;
+            bool mirv = pattern == 1 || (pattern == 2 && Random.value < MirvChance);
+            return mirv ? Random.Range(MirvMin, MirvMax + 1) : 1;
+        }
 
-            const Building.Flags dead = Building.Flags.Deleted | Building.Flags.Collapsed | Building.Flags.BurnedDown;
-            for (int tries = 0; tries < 60; tries++)
+        /// <summary>1発を発射（優先照準で目標を抽選、無ければランダム座標）。メインスレッド専用。</summary>
+        private static void FireOne(StrikeTargeting targeting)
+        {
+            Vector3 target;
+            if (targeting == null || !targeting.TryPick(out target))
             {
-                int i = Random.Range(1, buffer.Length);
-                Building.Flags f = buffer[i].m_flags;
-                if ((f & Building.Flags.Created) == 0) continue;
-                if ((f & dead) != 0) continue;
-                pos = buffer[i].m_position;
-                return true;
+                float x = Random.Range(-FallbackRange, FallbackRange);
+                float z = Random.Range(-FallbackRange, FallbackRange);
+                target = new Vector3(x, 0f, z);
+                target.y = TerrainManager.instance.SampleRawHeightSmoothWithWater(target, false, 0f);
             }
-            return false;
+
+            WarheadType type = PickWarhead();
+            float yield = type == WarheadType.Nuclear
+                ? NuclearYields.Multiplier(NuclearYields.StandardKilotons)
+                : ConventionalYields.Multiplier(ConventionalYields.ReferenceKilograms);
+
+            MissileManager.Launch(target, type, yield, BurstType.Groundburst);
         }
 
         private static WarheadType PickWarhead()
