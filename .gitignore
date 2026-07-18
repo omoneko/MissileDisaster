@@ -8,3 +8,12 @@ obj/
 # OS
 Thumbs.db
 .DS_Store
+# Raw media & model sources (keep out of repo; use external/LFS if needed)
+*.mp4
+*.mp3
+*.blend
+*.blend1
+# Dated screenshots / recordings
+スクリーンショット*.png
+レコーディング*
+画像*.png
