@@ -10,11 +10,17 @@ namespace MissileDisaster.Game.Simulation
     /// </summary>
     public class MissileThreadingExtension : ThreadingExtensionBase
     {
+        private float _randomTimer;
+
         public override void OnUpdate(float realTimeDelta, float simulationTimeDelta)
         {
             try
             {
-                if (Input.GetKeyDown(ModConfig.ManualTriggerKey))
+                // パネルを確実に表示（UIView 準備前に失敗しても毎フレームでリトライ）。Mac 等で左のパネルが出ない対策。
+                MissileDisaster.Game.UI.MissilePanel.EnsureCreated();
+
+                // 起動キー（Modオプションで再割り当て可能。既定 F9）。
+                if (Input.GetKeyDown(ModSettings.LaunchKeyCode))
                 {
                     ToolsModifierControl.SetTool<MissileDisaster.Game.UI.MissileTool>();
                 }
@@ -23,6 +29,21 @@ namespace MissileDisaster.Game.Simulation
                 if (!paused)
                 {
                     MissileManager.UpdateVisual(simulationTimeDelta);
+
+                    // ランダム攻撃モード（バニラ災害のように一定間隔でランダム着弾）。実時間で計測。
+                    if (ModSettings.IsRandomEnabled)
+                    {
+                        _randomTimer += realTimeDelta;
+                        if (_randomTimer >= ModSettings.RandomInterval)
+                        {
+                            _randomTimer = 0f;
+                            RandomStrike.Fire();
+                        }
+                    }
+                    else
+                    {
+                        _randomTimer = 0f;
+                    }
                 }
             }
             catch (System.Exception e)

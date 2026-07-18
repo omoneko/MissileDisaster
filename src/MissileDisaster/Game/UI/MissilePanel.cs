@@ -61,6 +61,24 @@ namespace MissileDisaster.Game.UI
             }
         }
 
+        /// <summary>毎フレーム呼んでよい。パネルが未生成なら生成する（UIView 準備前の失敗をリトライして確実に出す）。</summary>
+        public static void EnsureCreated()
+        {
+            if (_panel == null) Create();
+        }
+
+        /// <summary>パネルを画面内の既定位置へ戻す（画面外に消えた・見つからない時の復帰用）。</summary>
+        public static void ResetPosition()
+        {
+            EnsureCreated();
+            if (_panel != null)
+            {
+                _panel.relativePosition = new Vector3(ModConfig.PanelPosX, ModConfig.PanelPosY);
+                _panel.Show();
+                _panel.BringToFront();
+            }
+        }
+
         /// <summary>レベルアンロード時に呼ぶ。パネルを破棄し参照を捨てる（静的状態を残さない）。</summary>
         public static void Destroy()
         {

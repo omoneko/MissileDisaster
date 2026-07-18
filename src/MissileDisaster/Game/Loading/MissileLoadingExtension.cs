@@ -14,6 +14,7 @@ namespace MissileDisaster.Game.Loading
             base.OnLevelLoaded(mode);
             try
             {
+                ModSettings.Ensure();
                 MissileDisaster.Game.MissileManager.Reset();
                 Defense.InterceptorRegistry.Reset();
                 UI.ToolRegistration.Register<UI.MissileTool>();
