@@ -163,6 +163,7 @@ namespace MissileDisaster.Game.Effects
             if (mat.HasProperty("_TintColor")) mat.SetColor("_TintColor", white);
             if (mat.HasProperty("_Color")) mat.SetColor("_Color", white);
             mat.color = white;
+            RenderAssets.ApplyDepthOcclusion(mat); // 手前の建物に遮蔽させる（透過防止）
             ModConfig.Log("MissileTrail: " + (additive ? "fire" : "smoke") + " shader = " + shader.name);
             return mat;
         }

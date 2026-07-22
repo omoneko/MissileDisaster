@@ -53,6 +53,27 @@ namespace MissileDisaster.Game.Effects
             return null;
         }
 
+        /// <summary>
+        /// パーティクル用マテリアルに、シーンの奥行きに対して正しく遮蔽される描画状態を強制する。
+        /// 透明キュー（不透明ジオメトリの後に描画）＋ ZTest LEqual（手前の建物等に遮蔽される）＋ ZWrite Off。
+        /// 一部の組み込み/フォールバックシェーダーは ZTest が Always 相当で、煙が手前の建物を透過するため。
+        /// シェーダーが該当プロパティを持たない場合 SetInt は無視される（無害）。
+        /// </summary>
+        public static void ApplyDepthOcclusion(Material mat)
+        {
+            if (mat == null) return;
+            try
+            {
+                mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent; // 3000: 不透明の後
+                mat.SetInt("_ZTest", (int)UnityEngine.Rendering.CompareFunction.LessEqual); // 手前の不透明物に遮蔽
+                mat.SetInt("_ZWrite", 0); // 半透明なので深度書き込みはしない
+            }
+            catch (Exception e)
+            {
+                ModConfig.LogError("RenderAssets.ApplyDepthOcclusion error: " + e);
+            }
+        }
+
         /// <summary>初回のみ、利用可能なシェーダー名と主要候補の Shader.Find 可否をログ出力する。</summary>
         public static void DumpAvailableShadersOnce()
         {

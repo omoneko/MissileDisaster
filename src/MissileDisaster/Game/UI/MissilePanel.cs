@@ -53,6 +53,7 @@ namespace MissileDisaster.Game.UI
                 _panel.height = y + 8f;
 
                 RefreshHighlight();
+                _panel.Hide(); // 既定は非表示。災害タブのミサイルボタンで開く。
                 ModConfig.Log("MissilePanel を生成しました");
             }
             catch (System.Exception e)
@@ -67,16 +68,43 @@ namespace MissileDisaster.Game.UI
             if (_panel == null) Create();
         }
 
-        /// <summary>パネルを画面内の既定位置へ戻す（画面外に消えた・見つからない時の復帰用）。</summary>
+        /// <summary>パネルを画面内の既定位置へ戻して表示する（画面外に消えた・見つからない時の復帰用）。</summary>
         public static void ResetPosition()
         {
             EnsureCreated();
             if (_panel != null)
             {
                 _panel.relativePosition = new Vector3(ModConfig.PanelPosX, ModConfig.PanelPosY);
-                _panel.Show();
-                _panel.BringToFront();
+                Show();
             }
+        }
+
+        /// <summary>災害タブのミサイルボタンから呼ぶ。表示中なら隠し、非表示なら出す。</summary>
+        public static void Toggle()
+        {
+            EnsureCreated();
+            if (_panel == null) return;
+            if (_panel.isVisible) Hide(); else Show();
+        }
+
+        /// <summary>パネルを表示して前面へ。</summary>
+        public static void Show()
+        {
+            EnsureCreated();
+            if (_panel != null) { _panel.Show(); _panel.BringToFront(); }
+        }
+
+        /// <summary>災害タブのミサイルアイコンから呼ぶ：パネルを出し、そのまま照準ツールを起動する。</summary>
+        public static void ShowAndStartTargeting()
+        {
+            Show();
+            StartAiming(); // ToolsModifierControl.SetTool<MissileTool>()
+        }
+
+        /// <summary>パネルを隠す（災害タブのボタンから開き直せる）。</summary>
+        public static void Hide()
+        {
+            if (_panel != null) _panel.Hide();
         }
 
         /// <summary>レベルアンロード時に呼ぶ。パネルを破棄し参照を捨てる（静的状態を残さない）。</summary>
@@ -119,6 +147,13 @@ namespace MissileDisaster.Game.UI
             drag.width = ModConfig.PanelWidth;
             drag.height = 24f;
             drag.relativePosition = new Vector3(0f, 0f);
+
+            // 閉じるボタン（右上）。ドラッグハンドルより後に追加＝手前でクリックを受ける。
+            // 閉じても災害タブのミサイルボタンから開き直せる。
+            UIButton closeBtn = MakeButton("✕", ModConfig.PanelWidth - 26f, 3f, 22f);
+            closeBtn.textScale = 0.9f;
+            closeBtn.tooltip = "Close (reopen from the Missile button in the Disasters panel)";
+            closeBtn.eventClick += (c, p) => Hide();
             y += 26f;
 
             // 弾頭選択

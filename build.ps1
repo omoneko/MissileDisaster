@@ -29,4 +29,13 @@ if (Test-Path $soundsSrc) {
     Write-Host "サウンド配置完了: $soundsDst"
 }
 
+# タブ内アイコン(災害パネル)。MODフォルダ直下に icon.png を配置し、ボタンがこれを使う。
+$iconSrc = "icon.png"
+if (Test-Path $iconSrc) {
+    Copy-Item $iconSrc (Join-Path $modDir "icon.png") -Force
+    Write-Host "icon.png(タブアイコン)を配置しました"
+} else {
+    Write-Host "警告: $iconSrc が見つかりません。タブアイコンは手続き生成シルエットになります。"
+}
+
 Write-Host "配置完了: $modDir"

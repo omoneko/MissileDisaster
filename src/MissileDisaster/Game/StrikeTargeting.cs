@@ -33,6 +33,11 @@ namespace MissileDisaster.Game
             Building[] buffer = bm.m_buildings.m_buffer;
             if (buffer == null) return;
 
+            // プレイヤー設定のキーワードを走査前に1回だけ展開する。
+            string[] aKw = TargetTierClassifier.ParseKeywords(ModSettings.PriorityAText);
+            string[] bKw = TargetTierClassifier.ParseKeywords(ModSettings.PriorityBText);
+            string[] cKw = TargetTierClassifier.ParseKeywords(ModSettings.PriorityCText);
+
             const Building.Flags dead = Building.Flags.Deleted | Building.Flags.Collapsed
                 | Building.Flags.BurnedDown | Building.Flags.Abandoned;
             for (int i = 1; i < buffer.Length; i++)
@@ -43,7 +48,7 @@ namespace MissileDisaster.Game
                 BuildingInfo info = buffer[i].Info;
                 if (info == null) continue;
 
-                int tier = TargetTierClassifier.ClassifyByName(info.name);
+                int tier = TargetTierClassifier.Classify(info.name, aKw, bKw, cKw);
                 if (tier == TargetTierClassifier.TierNone && info.m_buildingAI is MonumentAI)
                 {
                     tier = TargetTierClassifier.TierC; // ランドマーク/モニュメントは AI 型で補完

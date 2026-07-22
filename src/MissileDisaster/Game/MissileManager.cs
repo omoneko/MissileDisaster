@@ -77,6 +77,11 @@ namespace MissileDisaster.Game
                     {
                         ExplosionFx.Play(m.Target, m.Spec); // 隕石着弾エフェクト（規模連動・メインスレッド）
                         PlayImpactSound(m.Target, m.Spec);  // 爆発音（核は atomic_bomb を2倍音量）
+                        // 核着弾点を疎結合ビーコンへ公開（外部Mod連携の隠し要素: Alien のトライポッド直撃転倒）。
+                        if (m.Spec.Type == WarheadType.Nuclear)
+                        {
+                            NuclearImpactBeacon.Publish(m.Target.x, m.Target.z);
+                        }
                         lock (_impactLock)
                         {
                             _impactQueue.Add(new ImpactJob { Target = m.Target, Spec = m.Spec });
@@ -182,6 +187,7 @@ namespace MissileDisaster.Game
             for (int j = 0; j < _interceptors.Count; j++) _interceptors[j].Destroy();
             _interceptors.Clear();
             lock (_impactLock) { _impactQueue.Clear(); }
+            NuclearImpactBeacon.Reset(); // 核着弾ビーコンも空にする（レベル切替で持ち越さない）
         }
     }
 }

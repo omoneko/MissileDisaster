@@ -1,11 +1,13 @@
 using System;
+using System.Collections.Generic;
 
 namespace MissileDisaster.Core
 {
     /// <summary>
     /// ランダム攻撃の優先照準：建物名から優先度層を判定する純粋ロジック（UnityEngine 非依存）。
-    /// A(0)=原発/Aegis/THAAD/PAC3、B(1)=空港/鉄道駅/港、C(2)=ランドマーク/モニュメント、None(-1)。
-    /// 判定対象は info.name（非ローカライズのプレハブ名/Workshop風 "12345.PAC3_Data" にも部分一致）。
+    /// A(0)＞B(1)＞C(2)＞None(-1)。各層のキーワード群はプレイヤー設定（カンマ区切り）から与えられ、
+    /// 建物の内部名(info.name、非ローカライズ)に部分一致（大文字小文字無視）で判定する。
+    /// 例: A に "Oil" を足すと石油系の建物が最優先で狙われる。
     /// ランドマーク/モニュメントは名前だけでは判別しづらいため、Game 層で AI 型(MonumentAI)により
     /// TierC を補完する（本分類は名前ベースのみを担当）。
     /// </summary>
@@ -16,26 +18,27 @@ namespace MissileDisaster.Core
         public const int TierC = 2;
         public const int TierNone = -1;
 
-        // A：原子力発電所（迎撃施設 Aegis/THAAD/PAC3 は InterceptorNameMatcher で別途判定）
-        public static readonly string[] NuclearKeywords = { "Nuclear" };
-        // B
-        public static readonly string[] AirportKeywords = { "Airport" };
-        public static readonly string[] StationKeywords = { "Train Station", "Railway", "Cargo Train" };
-        public static readonly string[] HarborKeywords = { "Harbor", "Harbour" };
+        /// <summary>カンマ区切り文字列をキーワード配列へ（前後空白除去・空要素破棄）。</summary>
+        public static string[] ParseKeywords(string csv)
+        {
+            if (string.IsNullOrEmpty(csv)) return new string[0];
+            string[] raw = csv.Split(',');
+            var list = new List<string>(raw.Length);
+            for (int i = 0; i < raw.Length; i++)
+            {
+                string k = raw[i].Trim();
+                if (k.Length > 0) list.Add(k);
+            }
+            return list.ToArray();
+        }
 
-        /// <summary>建物名から優先度層を返す（該当なしは TierNone）。判定順: A(迎撃/原発)→B。</summary>
-        public static int ClassifyByName(string name)
+        /// <summary>建物名から優先度層を返す（該当なしは TierNone）。判定順 A→B→C。</summary>
+        public static int Classify(string name, string[] aKeywords, string[] bKeywords, string[] cKeywords)
         {
             if (string.IsNullOrEmpty(name)) return TierNone;
-
-            InterceptorKind kind;
-            if (InterceptorNameMatcher.TryMatchTier(name, out kind)) return TierA;
-            if (ContainsAny(name, NuclearKeywords)) return TierA;
-
-            if (ContainsAny(name, AirportKeywords)) return TierB;
-            if (ContainsAny(name, StationKeywords)) return TierB;
-            if (ContainsAny(name, HarborKeywords)) return TierB;
-
+            if (ContainsAny(name, aKeywords)) return TierA;
+            if (ContainsAny(name, bKeywords)) return TierB;
+            if (ContainsAny(name, cKeywords)) return TierC;
             return TierNone;
         }
 

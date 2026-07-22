@@ -24,8 +24,9 @@ namespace MissileDisaster.Game.Simulation
         {
             try
             {
-                // パネルを確実に表示（UIView 準備前に失敗しても毎フレームでリトライ）。Mac 等で左のパネルが出ない対策。
+                // パネルは非表示で用意し、災害タブのミサイルボタンを取り付ける（出現を毎フレームで待つ）。
                 MissileDisaster.Game.UI.MissilePanel.EnsureCreated();
+                MissileDisaster.Game.UI.MissileDisasterButton.EnsureAttached();
 
                 // 起動キー（Modオプションで再割り当て可能。既定 F9）。
                 if (Input.GetKeyDown(ModSettings.LaunchKeyCode))

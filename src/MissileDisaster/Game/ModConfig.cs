@@ -134,6 +134,13 @@ namespace MissileDisaster.Game
         public const float PanelButtonHeight = 26f;
         public const float PanelButtonGap = 4f;
 
+        // 災害パネル（バニラ DisastersPanel）に貼るミサイル起動ボタン（UFO! ボタンと同方式）。
+        public const float TabButtonWidth = 46f;
+        public const float TabButtonHeight = 36f;
+        public const float TabButtonOffsetX = 8f;   // パネル右端からの内側マージン
+        public const float TabButtonOffsetY = -40f; // パネル上端からの相対Y（負=災害アイコン列の上へはみ出す）
+        public const int TabButtonFallbackFrames = 600; // 災害パネル未出現時にフォールバックへ切替えるまで
+
         // 詳細ログの出力可否。公開版は false（静かに）。不具合調査時のみ true にして再ビルドする。
         // エラー(LogError)は常時出力する。static readonly にして到達不能コード警告(CS0162)を避ける。
         public static readonly bool DebugLogging = false;

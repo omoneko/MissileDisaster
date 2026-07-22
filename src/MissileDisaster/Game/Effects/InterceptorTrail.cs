@@ -172,6 +172,7 @@ namespace MissileDisaster.Game.Effects
             if (mat.HasProperty("_TintColor")) mat.SetColor("_TintColor", Color.white);
             if (mat.HasProperty("_Color")) mat.SetColor("_Color", Color.white);
             mat.color = Color.white;
+            RenderAssets.ApplyDepthOcclusion(mat); // 手前の建物に遮蔽させる（透過防止）
             return mat;
         }
 
