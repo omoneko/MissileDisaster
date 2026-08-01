@@ -82,6 +82,9 @@ namespace MissileDisaster.Game
                         {
                             NuclearImpactBeacon.Publish(m.Target.x, m.Target.z);
                         }
+                        // 全弾種の着弾を汎用ビーコンへ公開（CS:WARFRONTが軍事ユニットへの被害判定に使う）。
+                        ImpactBeacon.Publish(m.Target.x, m.Target.z,
+                            m.Spec.DestructionRadius, m.Spec.BurnRadius, m.Spec.Type == WarheadType.Nuclear);
                         lock (_impactLock)
                         {
                             _impactQueue.Add(new ImpactJob { Target = m.Target, Spec = m.Spec });
@@ -188,6 +191,7 @@ namespace MissileDisaster.Game
             _interceptors.Clear();
             lock (_impactLock) { _impactQueue.Clear(); }
             NuclearImpactBeacon.Reset(); // 核着弾ビーコンも空にする（レベル切替で持ち越さない）
+            ImpactBeacon.Reset(); // 汎用着弾ビーコンも同様
         }
     }
 }
