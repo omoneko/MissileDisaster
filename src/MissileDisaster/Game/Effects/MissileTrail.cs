@@ -3,10 +3,12 @@ using UnityEngine;
 namespace MissileDisaster.Game.Effects
 {
     /// <summary>
-    /// 飛来ミサイルに隕石風の燃焼トレイル（火の粉＋煙）を付与する。
-    /// パーティクルはワールド空間でシミュレートするため、急降下する弾体の後方に燃える航跡を残す。
-    /// マテリアルは CS ランタイムで実在するシェーダーを解決して割り当てる（"Particles/Additive" は
-    /// 除去されマゼンタになりがちなため）。GameObject/Mesh/Material を生成するためメインスレッド専用。
+    /// Gives an incoming missile a meteor-like burning trail of sparks and smoke.
+    /// The particles simulate in world space, so a burning wake is left behind the diving
+    /// missile.
+    /// The materials are built from shaders that actually exist in the CS runtime, because
+    /// "Particles/Additive" is usually stripped and would leave everything magenta.
+    /// It creates GameObjects, Meshes and Materials, so it is main thread only.
     /// </summary>
     public static class MissileTrail
     {
@@ -15,7 +17,7 @@ namespace MissileDisaster.Game.Effects
         private static Texture2D _glowTex;
         private static bool _assetsReady;
 
-        /// <summary>弾体 GameObject に火の粉と煙のパーティクルを子として付与する。失敗しても飛翔は継続。</summary>
+        /// <summary>Attaches the spark and smoke particles as children of the missile. A failure here does not stop it flying.</summary>
         public static void Attach(GameObject missile)
         {
             if (missile == null) return;
@@ -46,7 +48,7 @@ namespace MissileDisaster.Game.Effects
             ParticleSystem ps = NewChildSystem(missile, "MissileTrail_Fire");
             var main = ps.main;
             main.simulationSpace = ParticleSystemSimulationSpace.World;
-            main.scalingMode = ParticleSystemScalingMode.Local; // 親(弾体)のスケールを無視
+            main.scalingMode = ParticleSystemScalingMode.Local; // ignores the missile's own scale
             main.startLifetime = ModConfig.TrailFireLifetime;
             main.startSpeed = ModConfig.TrailFireSpeed;
             main.startSize = ModConfig.TrailFireSize;
@@ -62,7 +64,7 @@ namespace MissileDisaster.Game.Effects
             shape.radius = ModConfig.TrailFireSize * 0.2f;
 
             EnableAlphaFade(ps);
-            EnableSizeCurve(ps, 1f, 0.1f); // 火の粉は縮んで消える
+            EnableSizeCurve(ps, 1f, 0.1f); // the sparks shrink away
 
             var renderer = ps.GetComponent<ParticleSystemRenderer>();
             renderer.material = _fireMat;
@@ -93,12 +95,12 @@ namespace MissileDisaster.Game.Effects
             shape.radius = ModConfig.TrailSmokeSize * 0.15f;
 
             EnableAlphaFade(ps);
-            EnableSizeCurve(ps, 0.6f, 1.4f); // 煙は膨らむ
+            EnableSizeCurve(ps, 0.6f, 1.4f); // the smoke billows
 
             var renderer = ps.GetComponent<ParticleSystemRenderer>();
             renderer.material = _smokeMat;
             renderer.renderMode = ParticleSystemRenderMode.Billboard;
-            renderer.sortingFudge = 20f; // 火の粉より後ろ(奥)に描画
+            renderer.sortingFudge = 20f; // drawn behind the sparks
 
             ps.Play();
         }
@@ -112,7 +114,7 @@ namespace MissileDisaster.Game.Effects
             return go.AddComponent<ParticleSystem>();
         }
 
-        /// <summary>寿命に沿ってアルファを 1→0 へフェードさせる（色は startColor 由来を維持）。</summary>
+        /// <summary>Fades the alpha from 1 to 0 over the particle's lifetime, keeping the colour from startColor.</summary>
         private static void EnableAlphaFade(ParticleSystem ps)
         {
             var col = ps.colorOverLifetime;
@@ -129,7 +131,7 @@ namespace MissileDisaster.Game.Effects
             col.color = new ParticleSystem.MinMaxGradient(grad);
         }
 
-        /// <summary>寿命に沿ってサイズを from→to 倍へ変化させる。</summary>
+        /// <summary>Scales the size from one multiplier to another over the particle's lifetime.</summary>
         private static void EnableSizeCurve(ParticleSystem ps, float from, float to)
         {
             var sol = ps.sizeOverLifetime;
@@ -138,7 +140,7 @@ namespace MissileDisaster.Game.Effects
             sol.size = new ParticleSystem.MinMaxCurve(1f, curve);
         }
 
-        /// <summary>加算(火) または アルファブレンド(煙) のパーティクル用マテリアルを、実在シェーダーで生成する。</summary>
+        /// <summary>Creates the particle material - additive for fire, alpha-blended for smoke - from a shader that exists.</summary>
         private static Material BuildParticleMaterial(bool additive)
         {
             Shader shader = additive
@@ -150,7 +152,7 @@ namespace MissileDisaster.Game.Effects
                     : RenderAssets.FindLoadedContaining("alpha blend", "alphablend");
             if (shader == null) shader = RenderAssets.FindFirst("Sprites/Default", "Unlit/Transparent");
             if (shader == null) shader = RenderAssets.FindLoadedContaining("particle", "sprite", "unlit");
-            if (shader == null) shader = Shader.Find("Standard"); // 最後の砦(発光しないがマゼンタ回避)
+            if (shader == null) shader = Shader.Find("Standard"); // last resort: it does not glow, but it is not magenta
             if (shader == null) return null;
 
             var mat = new Material(shader);
@@ -163,12 +165,12 @@ namespace MissileDisaster.Game.Effects
             if (mat.HasProperty("_TintColor")) mat.SetColor("_TintColor", white);
             if (mat.HasProperty("_Color")) mat.SetColor("_Color", white);
             mat.color = white;
-            RenderAssets.ApplyDepthOcclusion(mat); // 手前の建物に遮蔽させる（透過防止）
+            RenderAssets.ApplyDepthOcclusion(mat); // let buildings in front occlude it, instead of showing through
             ModConfig.Log("MissileTrail: " + (additive ? "fire" : "smoke") + " shader = " + shader.name);
             return mat;
         }
 
-        /// <summary>中心が明るく外周が透明な放射状グロー texture（丸いパーティクル用）。</summary>
+        /// <summary>A radial glow texture, bright at the centre and transparent at the edge, for round particles.</summary>
         private static Texture2D BuildGlowTexture(int size)
         {
             var tex = new Texture2D(size, size, TextureFormat.ARGB32, false);
@@ -183,7 +185,7 @@ namespace MissileDisaster.Game.Effects
                     float dy = (y - half) / half;
                     float d = Mathf.Sqrt(dx * dx + dy * dy);
                     float a = Mathf.Clamp01(1f - d);
-                    a = a * a; // 中心を締めて縁を柔らかく
+                    a = a * a; // tightens the centre and softens the edge
                     pixels[y * size + x] = new Color(1f, 1f, 1f, a);
                 }
             }

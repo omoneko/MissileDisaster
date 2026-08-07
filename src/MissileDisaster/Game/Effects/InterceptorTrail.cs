@@ -3,9 +3,10 @@ using UnityEngine;
 namespace MissileDisaster.Game.Effects
 {
     /// <summary>
-    /// 迎撃ミサイルに付けるロケット排気トレイル（ノズル火炎＋噴煙）。ワールド空間なので飛翔経路に
-    /// 白い噴煙の航跡を残し、弾体破棄後も噴煙は寿命まで漂わせる（「少しの間残る」）。
-    /// GameObject/Material/Mesh を生成するためメインスレッド専用。
+    /// The rocket exhaust on an interceptor: flame at the nozzle plus smoke. It simulates in
+    /// world space, so it leaves a white wake along the flight path, and the smoke drifts on for
+    /// its full lifetime even after the missile itself is destroyed.
+    /// It creates GameObjects, Materials and Meshes, so it is main thread only.
     /// </summary>
     public static class InterceptorTrail
     {
@@ -14,7 +15,7 @@ namespace MissileDisaster.Game.Effects
         private static Texture2D _glowTex;
         private static bool _ready;
 
-        /// <summary>迎撃ミサイル GameObject にノズル火炎と噴煙を子として付与する。失敗しても飛翔は継続。</summary>
+        /// <summary>Attaches the nozzle flame and the smoke as children of the interceptor. A failure here does not stop it flying.</summary>
         public static void Attach(GameObject interceptor)
         {
             if (interceptor == null) return;
@@ -31,8 +32,9 @@ namespace MissileDisaster.Game.Effects
         }
 
         /// <summary>
-        /// 弾体からトレイルを切り離し、新規放出だけ止めて既存の噴煙は寿命まで残す。
-        /// 弾体ごと即破棄すると噴煙が一瞬で消えるため、迎撃点到達時にこれを呼ぶ。
+        /// Detaches the trail from the missile and stops only new emission, so the smoke already
+        /// out lasts its full lifetime. Destroying it with the missile would make the wake vanish
+        /// instantly, so this is called on reaching the intercept point.
         /// </summary>
         public static void DetachAndLinger(GameObject interceptor)
         {
@@ -43,7 +45,7 @@ namespace MissileDisaster.Game.Effects
             {
                 ParticleSystem ps = systems[i];
                 if (ps == null) continue;
-                ps.transform.SetParent(null, true); // ワールド位置維持で独立
+                ps.transform.SetParent(null, true); // detached, keeping its world position
                 ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
                 Object.Destroy(ps.gameObject, life + 0.1f);
             }
@@ -93,7 +95,7 @@ namespace MissileDisaster.Game.Effects
             var main = ps.main;
             main.simulationSpace = ParticleSystemSimulationSpace.World;
             main.scalingMode = ParticleSystemScalingMode.Local;
-            main.startLifetime = ModConfig.ExhaustSmokeLifetime; // 長め=噴煙が残る
+            main.startLifetime = ModConfig.ExhaustSmokeLifetime; // long, so the wake stays up
             main.startSpeed = 0.6f;
             main.startSize = ModConfig.ExhaustSmokeSize;
             main.startColor = new ParticleSystem.MinMaxGradient(ModConfig.ExhaustSmokeColor);
@@ -108,7 +110,7 @@ namespace MissileDisaster.Game.Effects
             shape.radius = ModConfig.ExhaustSmokeSize * 0.12f;
 
             EnableAlphaFade(ps);
-            EnableSizeCurve(ps, 0.5f, 1.1f); // 噴煙は細いまま薄れる（膨張を抑制）
+            EnableSizeCurve(ps, 0.5f, 1.1f); // the smoke thins out while staying narrow, rather than billowing
 
             var renderer = ps.GetComponent<ParticleSystemRenderer>();
             if (_smokeMat != null) renderer.material = _smokeMat;
@@ -172,7 +174,7 @@ namespace MissileDisaster.Game.Effects
             if (mat.HasProperty("_TintColor")) mat.SetColor("_TintColor", Color.white);
             if (mat.HasProperty("_Color")) mat.SetColor("_Color", Color.white);
             mat.color = Color.white;
-            RenderAssets.ApplyDepthOcclusion(mat); // 手前の建物に遮蔽させる（透過防止）
+            RenderAssets.ApplyDepthOcclusion(mat); // let buildings in front occlude it, instead of showing through
             return mat;
         }
 

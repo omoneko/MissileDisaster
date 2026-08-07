@@ -4,10 +4,10 @@ using Xunit;
 public class LaunchGeometryTests
 {
     [Theory]
-    [InlineData(0f, 100f, 0f, 100f)]     // 北=+Z
-    [InlineData(90f, 100f, 100f, 0f)]    // 東=+X
-    [InlineData(180f, 100f, 0f, -100f)]  // 南=-Z
-    [InlineData(270f, 100f, -100f, 0f)]  // 西=-X
+    [InlineData(0f, 100f, 0f, 100f)]     // north is +Z
+    [InlineData(90f, 100f, 100f, 0f)]    // east is +X
+    [InlineData(180f, 100f, 0f, -100f)]  // south is -Z
+    [InlineData(270f, 100f, -100f, 0f)]  // west is -X
     public void BearingOffset_maps_compass_directions(float deg, float dist, float ex, float ez)
     {
         Offset2 o = LaunchGeometry.BearingOffset(deg, dist);

@@ -3,13 +3,14 @@ using MissileDisaster.Core;
 namespace MissileDisaster.Game.Contamination
 {
     /// <summary>
-    /// NaturalResourceManager の土壌汚染セルへの書き込みラッパ。汚染はゲームのセーブに含まれ、
-    /// 汚染オーバーレイに可視化される。書き込みは着弾処理と同じ sim スレッドから行うこと。
-    /// NuclearMeltdown.Game.PollutionField から必要分を移植。
+    /// Wrapper for writing to NaturalResourceManager's ground pollution cells. The pollution is
+    /// part of the game's own save and shows up on its pollution overlay. Writes must come from
+    /// the simulation thread, the same one that resolves impacts.
+    /// Ported, in part, from NuclearMeltdown.Game.PollutionField.
     /// </summary>
     public static class PollutionField
     {
-        /// <summary>セルの汚染を dose 以上へ引き上げる（既存がより高ければ据え置き）。実際に書き換えたら true。</summary>
+        /// <summary>Raises a cell to at least the given dose, leaving it alone if it is already higher. True if it actually changed.</summary>
         public static bool ApplyDose(CellDose dose)
         {
             var arr = NaturalResourceManager.instance.m_naturalResources;
@@ -22,7 +23,7 @@ namespace MissileDisaster.Game.Contamination
             return false;
         }
 
-        /// <summary>セルの汚染を dose.Intensity に上書き設定する（除染で濃度を下げる用）。実際に書き換えたら true。</summary>
+        /// <summary>Overwrites a cell with dose.Intensity, used to lower it during decontamination. True if it actually changed.</summary>
         public static bool SetDose(CellDose dose)
         {
             var arr = NaturalResourceManager.instance.m_naturalResources;
@@ -35,7 +36,7 @@ namespace MissileDisaster.Game.Contamination
             return false;
         }
 
-        /// <summary>セルの汚染を0にする（ゾーン期限切れのクリア用）。実際に書き換えたら true。</summary>
+        /// <summary>Clears a cell to zero, used when a zone expires. True if it actually changed.</summary>
         public static bool ClearCell(int index)
         {
             var arr = NaturalResourceManager.instance.m_naturalResources;
@@ -48,7 +49,7 @@ namespace MissileDisaster.Game.Contamination
             return false;
         }
 
-        /// <summary>指定セル範囲の汚染テクスチャを更新する。</summary>
+        /// <summary>Refreshes the pollution texture over the given range of cells.</summary>
         public static void Refresh(int minX, int minZ, int maxX, int maxZ)
         {
             NaturalResourceManager.instance.AreaModifiedB(minX, minZ, maxX, maxZ);

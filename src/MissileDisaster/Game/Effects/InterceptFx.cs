@@ -4,9 +4,12 @@ using UnityEngine;
 namespace MissileDisaster.Game.Effects
 {
     /// <summary>
-    /// 迎撃成功時の簡易閃光。迎撃点で加算パーティクルを一度だけバースト放出し、短寿命で消す。
-    /// バニラの爆発プレハブに依存しない自前実装（参照解決の失敗でマゼンタ化するのを避ける）。
-    /// GameObject/Material を生成するためメインスレッド専用（MissileManager.UpdateVisual 側から呼ぶ）。
+    /// The flash on a successful interception: one burst of additive particles at the intercept
+    /// point, gone again quickly.
+    /// It owes nothing to the game's own explosion prefabs, which avoids the magenta result when
+    /// a reference cannot be resolved.
+    /// It creates GameObjects and Materials, so it is main thread only, called from
+    /// MissileManager.UpdateVisual.
     /// </summary>
     public static class InterceptFx
     {
@@ -14,14 +17,14 @@ namespace MissileDisaster.Game.Effects
         private static Texture2D _glowTex;
         private static bool _ready;
 
-        /// <summary>迎撃成功時の閃光を一度だけ放出する（撃墜）。</summary>
+        /// <summary>Emits the flash of a successful interception, once.</summary>
         public static void PlayFlash(Vector3 point)
         {
             Emit("InterceptFlash", point, ModConfig.InterceptFlashBurst,
                 ModConfig.InterceptFlashSize, ModConfig.InterceptFlashSpeed);
         }
 
-        /// <summary>迎撃失敗（空振り）時の小さな不発煙を放出する。</summary>
+        /// <summary>Emits the small puff of smoke a miss leaves behind.</summary>
         public static void PlayFizzle(Vector3 point)
         {
             Emit("InterceptFizzle", point, ModConfig.InterceptFizzleBurst,
@@ -57,7 +60,7 @@ namespace MissileDisaster.Game.Effects
                 shape.radius = size * 0.2f;
 
                 EnableAlphaFade(ps);
-                EnableSizeCurve(ps, 1f, 0.15f); // 火花は縮んで消える
+                EnableSizeCurve(ps, 1f, 0.15f); // the sparks shrink away
 
                 var renderer = ps.GetComponent<ParticleSystemRenderer>();
                 if (_flashMat != null) renderer.material = _flashMat;
@@ -80,7 +83,7 @@ namespace MissileDisaster.Game.Effects
             _flashMat = BuildAdditiveMaterial(_glowTex);
         }
 
-        /// <summary>寿命に沿ってアルファを 1→0 へフェード。</summary>
+        /// <summary>Fades the alpha from 1 to 0 over the particle's lifetime.</summary>
         private static void EnableAlphaFade(ParticleSystem ps)
         {
             var col = ps.colorOverLifetime;
@@ -97,7 +100,7 @@ namespace MissileDisaster.Game.Effects
             col.color = new ParticleSystem.MinMaxGradient(grad);
         }
 
-        /// <summary>寿命に沿ってサイズを from→to 倍へ。</summary>
+        /// <summary>Scales the size from one multiplier to another over the particle's lifetime.</summary>
         private static void EnableSizeCurve(ParticleSystem ps, float from, float to)
         {
             var sol = ps.sizeOverLifetime;
@@ -106,7 +109,7 @@ namespace MissileDisaster.Game.Effects
             sol.size = new ParticleSystem.MinMaxCurve(1f, curve);
         }
 
-        /// <summary>加算パーティクル用マテリアルを、CS ランタイムで実在するシェーダーで生成する。</summary>
+        /// <summary>Creates the additive particle material from a shader that actually exists in the CS runtime.</summary>
         private static Material BuildAdditiveMaterial(Texture2D tex)
         {
             Shader shader = RenderAssets.FindFirst(
@@ -129,7 +132,7 @@ namespace MissileDisaster.Game.Effects
             return mat;
         }
 
-        /// <summary>中心が明るく外周が透明な放射状グロー texture。</summary>
+        /// <summary>A radial glow texture, bright at the centre and transparent at the edge.</summary>
         private static Texture2D BuildGlowTexture(int size)
         {
             var tex = new Texture2D(size, size, TextureFormat.ARGB32, false);

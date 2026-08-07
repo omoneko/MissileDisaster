@@ -10,7 +10,7 @@ public class ZoneSerializerTests
         var zones = new List<ContaminationZone>
         {
             new ContaminationZone(100.5f, -200.25f, 460f, 1234567890L, 255f),
-            new ContaminationZone(-50f, 75f, 5300f, 987654321L, 128.5f), // 除染途中の端数濃度も保持
+            new ContaminationZone(-50f, 75f, 5300f, 987654321L, 128.5f), // a fractional intensity, part way through decontamination, survives too
         };
         byte[] bytes = ZoneSerializer.Serialize(zones);
         List<ContaminationZone> back = ZoneSerializer.Deserialize(bytes);

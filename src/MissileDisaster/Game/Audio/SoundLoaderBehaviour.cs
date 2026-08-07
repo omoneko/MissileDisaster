@@ -5,9 +5,9 @@ using UnityEngine;
 namespace MissileDisaster.Game.Audio
 {
     /// <summary>
-    /// Sounds/*.mp3 を WWW で読み込んで SoundLibrary に登録するコルーチンホスト（メインスレッド）。
-    /// DontDestroyOnLoad の隠し GameObject に付与され、1回だけ全ファイルを読み込む。
-    /// MP3 のランタイムデコードは WWW.GetAudioClip(AudioType.MPEG) を使う。
+    /// Coroutine host that loads the files in Sounds through WWW and registers them with
+    /// SoundLibrary. Main thread.
+    /// It lives on a hidden DontDestroyOnLoad GameObject and loads every file exactly once.
     /// </summary>
     public class SoundLoaderBehaviour : MonoBehaviour
     {
@@ -25,11 +25,12 @@ namespace MissileDisaster.Game.Audio
             for (int i = 0; i < SoundLibrary.FileNames.Length; i++)
             {
                 string name = SoundLibrary.FileNames[i];
-                // CS の Unity 5.6 は実行時MP3デコード非対応(AudioType.MPEGがnull)のため WAV を読む。
+                // CS runs Unity 5.6, which cannot decode mp3 at runtime - AudioType.MPEG simply
+                // yields null - so these are WAV.
                 string path = Path.Combine(folder, name + ".wav");
                 if (!File.Exists(path))
                 {
-                    ModConfig.LogError("SoundLoader: ファイルなし " + path);
+                    ModConfig.LogError("SoundLoader: file not found " + path);
                     continue;
                 }
 
@@ -39,20 +40,20 @@ namespace MissileDisaster.Game.Audio
 
                 if (!string.IsNullOrEmpty(www.error))
                 {
-                    ModConfig.LogError("SoundLoader: 読込失敗 " + name + " : " + www.error);
+                    ModConfig.LogError("SoundLoader: load failed " + name + " : " + www.error);
                     continue;
                 }
 
                 AudioClip clip = null;
                 try { clip = www.GetAudioClip(false, false, AudioType.WAV); }
-                catch (System.Exception e) { ModConfig.LogError("SoundLoader: デコード失敗 " + name + " : " + e); }
+                catch (System.Exception e) { ModConfig.LogError("SoundLoader: decode failed " + name + " : " + e); }
                 if (clip == null)
                 {
-                    ModConfig.LogError("SoundLoader: GetAudioClip が null " + name);
+                    ModConfig.LogError("SoundLoader: GetAudioClip returned null " + name);
                     continue;
                 }
 
-                // 非同期デコードの完了を待つ（最大5秒）。
+                // Wait for the asynchronous decode to finish, for at most five seconds.
                 float t = 0f;
                 while (clip.loadState == AudioDataLoadState.Loading && t < 5f)
                 {
@@ -61,13 +62,13 @@ namespace MissileDisaster.Game.Audio
                 }
                 if (clip.loadState == AudioDataLoadState.Failed)
                 {
-                    ModConfig.LogError("SoundLoader: ロード状態=Failed " + name);
+                    ModConfig.LogError("SoundLoader: load state is Failed " + name);
                     continue;
                 }
 
                 clip.name = name;
                 SoundLibrary.Register(name, clip);
-                ModConfig.Log("SoundLoader: 読込完了 " + name + " (" + clip.length.ToString("0.0") + "s)");
+                ModConfig.Log("SoundLoader: loaded " + name + " (" + clip.length.ToString("0.0") + "s)");
             }
         }
     }

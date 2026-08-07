@@ -6,18 +6,22 @@ using UnityEngine;
 namespace MissileDisaster.Game.Effects
 {
     /// <summary>
-    /// 着弾時にバニラの隕石(メテオ)着弾エフェクトを爆発規模に合わせて発火する。メインスレッド専用
-    /// （MissileManager.UpdateVisual の着弾側から呼ぶ）。爆発が大きいほど多数の隕石エフェクトを
-    /// 破壊半径内に散布して面で見せる。子弾散布弾は散布点ごとに発火する。
-    /// メテオエフェクト(Natural Disasters DLC)が無い環境では簡易パーティクル火球にフォールバックする。
-    /// NuclearMeltdown.Game.MeltdownEffect の EffectManager 発火パターンを踏襲。
+    /// Plays the game's meteor impact effect on impact, scaled to the size of the explosion.
+    /// Main thread only, called from the impact side of MissileManager.UpdateVisual.
+    /// The larger the explosion, the more copies of the effect are scattered across the
+    /// destruction radius, so it reads as an area rather than a point. A scattering warhead
+    /// fires one per submunition.
+    /// Without the meteor effect - that is, without the Natural Disasters DLC - it falls back to
+    /// a simple particle fireball.
+    /// It dispatches through EffectManager the same way NuclearMeltdown.Game.MeltdownEffect
+    /// does.
     /// </summary>
     public static class ExplosionFx
     {
         private static EffectInfo _meteorEffect;
         private static bool _searched;
 
-        /// <summary>着弾点で爆発エフェクトを発火する（メインスレッド）。失敗しても着弾処理は続行。</summary>
+        /// <summary>Plays the explosion at the impact point. Main thread. A failure here does not stop the impact resolving.</summary>
         public static void Play(Vector3 center, WarheadSpec spec)
         {
             try
@@ -29,13 +33,16 @@ namespace MissileDisaster.Game.Effects
                 {
                     if (effect != null)
                     {
-                        // DLCあり: 隕石(メテオ)着弾エフェクト＝あの大きなキノコ状の雲を破壊半径連動でスケール表示。
+                        // With the DLC: the meteor impact effect, that large mushroom-shaped
+                        // cloud, scaled with the destruction radius.
                         float nukeScale = Mathf.Clamp(radius / 60f, 12f, ModConfig.NuclearExplosionScaleMax);
                         Dispatch(effect, center, nukeScale);
                     }
                     else
                     {
-                        // DLCなし: 自作の白煙キノコ雲を規模連動で生成（滞留・成層圏での傘状展開を再現）。
+                        // Without it: this mod's own white mushroom cloud, scaled the same way,
+                        // which reproduces the lingering column and the canopy spreading out at
+                        // the top.
                         NuclearMushroomFx.Play(center, radius);
                     }
                     return;
@@ -49,7 +56,7 @@ namespace MissileDisaster.Game.Effects
 
                 if (spec.SubmunitionCount > 1)
                 {
-                    // 子弾散布: 散布点ごとに小さめのエフェクト。
+                    // Scattering warhead: a smaller effect at each submunition point.
                     Offset2[] offs = SubmunitionScatter.Offsets(spec.SubmunitionCount, spec.SpreadRadius);
                     float s = Mathf.Clamp(spec.DestructionRadius / 24f, 0.75f, 2.5f);
                     for (int i = 0; i < offs.Length; i++)
@@ -59,7 +66,8 @@ namespace MissileDisaster.Game.Effects
                     return;
                 }
 
-                // 単一着弾（通常弾・サーモバリック）: 着弾点に単一の爆発エフェクト（規模連動スケール）。
+                // A single detonation, conventional or thermobaric: one explosion at the impact
+                // point, scaled with the yield.
                 float singleScale = Mathf.Clamp(radius / 50f, 2f, ModConfig.ExplosionBloomScaleMax);
                 Dispatch(effect, center, singleScale);
             }
@@ -78,8 +86,9 @@ namespace MissileDisaster.Game.Effects
         }
 
         /// <summary>
-        /// 隕石(メテオ)着弾エフェクトを解決する。メテオの実体は VehicleInfo に載る MeteorAI で、
-        /// その m_impactEffect が着弾エフェクト。初回のみ走査してキャッシュする（DLC 無しなら null）。
+        /// Resolves the meteor impact effect. A meteor is really a MeteorAI carried by a
+        /// VehicleInfo, and its m_impactEffect is the impact effect. The search runs once and is
+        /// cached; without the DLC the result is null.
         /// </summary>
         private static EffectInfo ResolveMeteorEffect()
         {
@@ -96,11 +105,11 @@ namespace MissileDisaster.Game.Effects
                     if (ai != null && ai.m_impactEffect != null)
                     {
                         _meteorEffect = ai.m_impactEffect;
-                        ModConfig.Log("ExplosionFx: 隕石着弾エフェクトを取得しました");
+                        ModConfig.Log("ExplosionFx: found the meteor impact effect");
                         return _meteorEffect;
                     }
                 }
-                ModConfig.Log("ExplosionFx: 隕石エフェクト無し(DLC非所持?) — 簡易火球にフォールバック");
+                ModConfig.Log("ExplosionFx: no meteor effect, probably no DLC - falling back to the simple fireball");
             }
             catch (Exception e)
             {

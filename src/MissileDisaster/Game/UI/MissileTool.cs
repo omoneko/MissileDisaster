@@ -5,13 +5,15 @@ using UnityEngine;
 namespace MissileDisaster.Game.UI
 {
     /// <summary>
-    /// 着弾点をクリック指定するツール。バニラ災害と同じ「狙って左クリックで確定」。
-    /// ToolBase のライフサイクルはメイン/レンダースレッドなので Launch を直接呼んでよい。
+    /// The tool for clicking where the missile should land, with the same feel as the vanilla
+    /// disasters: aim, then left click to confirm.
+    /// A ToolBase lifecycle runs on the main/render thread, so calling Launch directly from here
+    /// is safe.
     /// </summary>
     public class MissileTool : ToolBase
     {
-        // 選択中の弾頭種別・核出力(kt)・爆発高度。UI パネル(MissilePanel)から設定する。
-        // static なのでツール再起動を跨いで保持する。
+        // The selected warhead, nuclear yield in kilotons and burst height, all set from
+        // MissilePanel. They are static, so they survive the tool being reopened.
         public static WarheadType CurrentWarhead = WarheadType.Conventional;
         public static int CurrentYieldKilotons = NuclearYields.StandardKilotons;
         public static int CurrentConventionalKilograms = ConventionalYields.ReferenceKilograms;
@@ -62,7 +64,8 @@ namespace MissileDisaster.Game.UI
             if (e.type != EventType.MouseDown || e.button != 0 || !m_placementValid) return;
             try
             {
-                // 核は kt、非核は kg TNT から出力係数を求める（爆風半径 ∝ 出力^(1/3)）。
+                // The yield factor comes from kilotons for a nuclear warhead and from kilograms
+                // of TNT otherwise; the blast radius goes as its cube root.
                 float yield = CurrentWarhead == WarheadType.Nuclear
                     ? NuclearYields.Multiplier(CurrentYieldKilotons)
                     : ConventionalYields.Multiplier(CurrentConventionalKilograms);

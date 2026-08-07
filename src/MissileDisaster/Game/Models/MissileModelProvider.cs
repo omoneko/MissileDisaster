@@ -7,10 +7,12 @@ using UnityEngine;
 namespace MissileDisaster.Game.Models
 {
     /// <summary>
-    /// モデル GameObject 生成の単一窓口。Mod 配置フォルダの Models/&lt;name&gt;.obj(+.mtl) から
-    /// 実行時にメッシュを構築してキャッシュし、要求ごとに新しいインスタンスを返す。
-    /// Alien Invasion の ModelProvider を縮小移植（AssetBundle・デカール等は持ち込まない）。
-    /// GameObject/Mesh/Material の生成を伴うため、必ずメインスレッドから呼ぶこと。
+    /// Single entry point for creating model GameObjects. The mesh is built at runtime from
+    /// Models/&lt;name&gt;.obj (and its .mtl) inside the mod folder, cached, and a fresh instance
+    /// returned for each request.
+    /// This is a cut-down port of Alien Invasion's ModelProvider, without the AssetBundle or the
+    /// decal handling.
+    /// It creates GameObjects, Meshes and Materials, so it must be called from the main thread.
     /// </summary>
     public static class MissileModelProvider
     {
@@ -32,7 +34,7 @@ namespace MissileDisaster.Game.Models
             _modDirectory = modDirectory;
         }
 
-        /// <summary>Models/&lt;name&gt;.obj を単一サブメッシュ Mesh として読み込む（建物 m_mesh 用）。失敗時 null。キャッシュ有り。</summary>
+        /// <summary>Loads Models/&lt;name&gt;.obj as a single-submesh Mesh, for a building's m_mesh. Null on failure. Cached.</summary>
         public static Mesh LoadMergedMesh(string name)
         {
             try
@@ -46,7 +48,7 @@ namespace MissileDisaster.Game.Models
                 Mesh mesh;
                 if (!MissileMeshBuilder.TryBuildMergedMesh(data, out mesh))
                 {
-                    ModConfig.LogError("MissileModelProvider.LoadMergedMesh: メッシュ構築失敗 name=" + name);
+                    ModConfig.LogError("MissileModelProvider.LoadMergedMesh: failed to build the mesh, name=" + name);
                     return null;
                 }
                 _meshCache[name] = mesh;
@@ -63,19 +65,19 @@ namespace MissileDisaster.Game.Models
         {
             if (string.IsNullOrEmpty(_modDirectory))
             {
-                ModConfig.LogError("MissileModelProvider.LoadObjData: modDirectory 未初期化");
+                ModConfig.LogError("MissileModelProvider.LoadObjData: modDirectory is not set");
                 return null;
             }
             string objPath = Path.Combine(Path.Combine(_modDirectory, ModConfig.ModelsFolderName), name + ".obj");
             if (!File.Exists(objPath))
             {
-                ModConfig.LogError("MissileModelProvider.LoadObjData: OBJ が見つかりません path=" + objPath);
+                ModConfig.LogError("MissileModelProvider.LoadObjData: OBJ not found, path=" + objPath);
                 return null;
             }
             return ObjParser.Parse(File.ReadAllText(objPath));
         }
 
-        /// <summary>指定名モデルの新しいインスタンスを返す。生成できなければ null（呼び出し側でフォールバック）。</summary>
+        /// <summary>A new instance of the named model, or null if it could not be created, in which case the caller falls back.</summary>
         public static GameObject CreateInstance(string name)
         {
             try
@@ -125,7 +127,7 @@ namespace MissileDisaster.Game.Models
             {
                 if (string.IsNullOrEmpty(_modDirectory))
                 {
-                    ModConfig.LogError("MissileModelProvider.BuildFromObj: modDirectory 未初期化 (Initialize 未呼び出し)");
+                    ModConfig.LogError("MissileModelProvider.BuildFromObj: modDirectory is not set (Initialize was never called)");
                     return null;
                 }
 
@@ -133,7 +135,7 @@ namespace MissileDisaster.Game.Models
                 string objPath = Path.Combine(modelsDir, name + ".obj");
                 if (!File.Exists(objPath))
                 {
-                    ModConfig.LogError("MissileModelProvider: OBJ が見つかりません path=" + objPath);
+                    ModConfig.LogError("MissileModelProvider: OBJ not found, path=" + objPath);
                     return null;
                 }
 
@@ -152,11 +154,11 @@ namespace MissileDisaster.Game.Models
                 Material[] materials;
                 if (!MissileMeshBuilder.TryBuild(data, mtl, ModConfig.ObjFallbackColor, out mesh, out materials))
                 {
-                    ModConfig.LogError("MissileModelProvider: OBJ からのメッシュ構築に失敗 name=" + name + " path=" + objPath);
+                    ModConfig.LogError("MissileModelProvider: failed to build the mesh from the OBJ, name=" + name + " path=" + objPath);
                     return null;
                 }
 
-                ModConfig.Log("MissileModelProvider: OBJ からモデルを構築しました name=" + name);
+                ModConfig.Log("MissileModelProvider: built the model from its OBJ, name=" + name);
                 var built = new BuiltModel();
                 built.Mesh = mesh;
                 built.Materials = materials;

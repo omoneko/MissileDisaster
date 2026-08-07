@@ -4,8 +4,9 @@ using UnityEngine;
 namespace MissileDisaster.Game.Effects
 {
     /// <summary>
-    /// メテオ着弾エフェクトが使えない環境向けの自前の爆発火球（加算の火炎バースト＋黒煙）。
-    /// 破壊半径に合わせてスケールする。メインスレッド専用。
+    /// This mod's own explosion fireball - an additive burst of flame plus black smoke - for
+    /// when the meteor impact effect is unavailable. It scales with the destruction radius.
+    /// Main thread only.
     /// </summary>
     public static class ExplosionFallback
     {

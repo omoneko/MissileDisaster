@@ -28,7 +28,7 @@ public class SubmunitionScatterTests
         foreach (Offset2 p in pts)
         {
             float r = (float)System.Math.Sqrt(p.X * p.X + p.Z * p.Z);
-            Assert.True(r <= spread + 1e-3f, $"点が散布半径を超過: r={r}");
+            Assert.True(r <= spread + 1e-3f, $"a point fell outside the scatter radius: r={r}");
         }
     }
 
@@ -61,13 +61,14 @@ public class SubmunitionScatterTests
     public void Points_are_distinct_and_spread_out()
     {
         Offset2[] pts = SubmunitionScatter.Offsets(9, 160f);
-        // 少なくとも外側の点は原点から十分離れている（全点が中心に潰れていない）。
+        // The outer points at least are well away from the origin, so they have not all
+        // collapsed to the centre.
         float maxR = 0f;
         foreach (Offset2 p in pts)
         {
             float r = (float)System.Math.Sqrt(p.X * p.X + p.Z * p.Z);
             if (r > maxR) maxR = r;
         }
-        Assert.True(maxR > 80f, $"散布が狭すぎる: maxR={maxR}");
+        Assert.True(maxR > 80f, $"the scatter is too tight: maxR={maxR}");
     }
 }

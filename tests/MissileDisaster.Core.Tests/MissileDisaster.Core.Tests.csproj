@@ -6,7 +6,7 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <!-- Core の実ソースを直接コンパイルしてテスト（別ビルド不要） -->
+    <!-- Compile the real Core sources straight into the test assembly, so no separate build is needed -->
     <Compile Include="..\..\src\MissileDisaster\Core\**\*.cs" LinkBase="Core" />
   </ItemGroup>
   <ItemGroup>

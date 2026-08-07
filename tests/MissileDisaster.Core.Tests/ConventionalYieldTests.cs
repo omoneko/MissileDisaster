@@ -12,7 +12,8 @@ public class ConventionalYieldTests
     [Fact]
     public void Multiplier_follows_cube_root_of_charge_ratio()
     {
-        // 爆風半径 ∝ 装薬量^(1/3)。基準1000kgに対し 8000kg なら 2倍。
+        // The blast radius goes as the cube root of the charge, so 8000 kg against the 1000 kg
+        // baseline is twice the radius.
         Assert.Equal(2f, ConventionalYields.Multiplier(8000), 3);
     }
 

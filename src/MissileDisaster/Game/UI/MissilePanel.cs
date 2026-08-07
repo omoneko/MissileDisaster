@@ -5,10 +5,13 @@ using UnityEngine;
 namespace MissileDisaster.Game.UI
 {
     /// <summary>
-    /// 弾頭種別・核出力(kt)・爆発高度を選ぶ常設パネル（UIView 直下）。選択は MissileTool の静的値へ反映し、
-    /// 「照準開始」で MissileTool を起動→マップクリックで発射する。核出力はカタログ(10種)選択と kt 手入力の両対応。
-    /// AlienInvasion.InvasionUI と同じく、レベルロードで Create、アンロードで Destroy して静的状態を残さない。
-    /// UIComponent はメインスレッドで生成すること。
+    /// The permanent panel - a direct child of UIView - for choosing the warhead, the nuclear
+    /// yield in kilotons and the burst height. The choices are written to MissileTool's static
+    /// fields, and starting the aiming opens MissileTool, after which a click on the map
+    /// launches. The yield can be picked from a catalogue of ten weapons or typed in directly.
+    /// As with AlienInvasion.InvasionUI, it is created on level load and destroyed on unload, so
+    /// no static state is left behind.
+    /// UIComponents must be created on the main thread.
     /// </summary>
     public static class MissilePanel
     {
@@ -33,17 +36,17 @@ namespace MissileDisaster.Game.UI
         private static UITextField _ktField;
         private static UITextField _kgField;
 
-        /// <summary>レベルロード時にメインスレッドから呼ぶ。パネルを生成する。</summary>
+        /// <summary>Creates the panel. Called from the main thread on level load.</summary>
         public static void Create()
         {
             try
             {
                 UIView view = UIView.GetAView();
-                if (view == null) { ModConfig.LogError("MissilePanel.Create: UIView が null"); return; }
-                if (view.FindUIComponent<UIPanel>(PanelName) != null) return; // 二重生成防止
+                if (view == null) { ModConfig.LogError("MissilePanel.Create: UIView is null"); return; }
+                if (view.FindUIComponent<UIPanel>(PanelName) != null) return; // guard against creating it twice
 
                 _panel = view.AddUIComponent(typeof(UIPanel)) as UIPanel;
-                if (_panel == null) { ModConfig.LogError("MissilePanel.Create: UIPanel 生成失敗"); return; }
+                if (_panel == null) { ModConfig.LogError("MissilePanel.Create: failed to create the UIPanel"); return; }
                 _panel.name = PanelName;
                 _panel.backgroundSprite = "MenuPanel2";
                 _panel.width = ModConfig.PanelWidth;
@@ -53,8 +56,8 @@ namespace MissileDisaster.Game.UI
                 _panel.height = y + 8f;
 
                 RefreshHighlight();
-                _panel.Hide(); // 既定は非表示。災害タブのミサイルボタンで開く。
-                ModConfig.Log("MissilePanel を生成しました");
+                _panel.Hide(); // hidden by default; the button in the disasters tab opens it
+                ModConfig.Log("created MissilePanel");
             }
             catch (System.Exception e)
             {
@@ -62,13 +65,13 @@ namespace MissileDisaster.Game.UI
             }
         }
 
-        /// <summary>毎フレーム呼んでよい。パネルが未生成なら生成する（UIView 準備前の失敗をリトライして確実に出す）。</summary>
+        /// <summary>Safe to call every frame; creates the panel if it does not exist yet, which retries past a UIView that was not ready.</summary>
         public static void EnsureCreated()
         {
             if (_panel == null) Create();
         }
 
-        /// <summary>パネルを画面内の既定位置へ戻して表示する（画面外に消えた・見つからない時の復帰用）。</summary>
+        /// <summary>Moves the panel back to its default on-screen position and shows it, to recover one dragged off screen or otherwise lost.</summary>
         public static void ResetPosition()
         {
             EnsureCreated();
@@ -79,7 +82,7 @@ namespace MissileDisaster.Game.UI
             }
         }
 
-        /// <summary>災害タブのミサイルボタンから呼ぶ。表示中なら隠し、非表示なら出す。</summary>
+        /// <summary>Called from the button in the disasters tab: hides the panel if it is showing and shows it if it is not.</summary>
         public static void Toggle()
         {
             EnsureCreated();
@@ -87,27 +90,27 @@ namespace MissileDisaster.Game.UI
             if (_panel.isVisible) Hide(); else Show();
         }
 
-        /// <summary>パネルを表示して前面へ。</summary>
+        /// <summary>Shows the panel and brings it to the front.</summary>
         public static void Show()
         {
             EnsureCreated();
             if (_panel != null) { _panel.Show(); _panel.BringToFront(); }
         }
 
-        /// <summary>災害タブのミサイルアイコンから呼ぶ：パネルを出し、そのまま照準ツールを起動する。</summary>
+        /// <summary>Called from the missile icon in the disasters tab: shows the panel and opens the aiming tool straight away.</summary>
         public static void ShowAndStartTargeting()
         {
             Show();
             StartAiming(); // ToolsModifierControl.SetTool<MissileTool>()
         }
 
-        /// <summary>パネルを隠す（災害タブのボタンから開き直せる）。</summary>
+        /// <summary>Hides the panel; the button in the disasters tab opens it again.</summary>
         public static void Hide()
         {
             if (_panel != null) _panel.Hide();
         }
 
-        /// <summary>レベルアンロード時に呼ぶ。パネルを破棄し参照を捨てる（静的状態を残さない）。</summary>
+        /// <summary>Called on level unload. Destroys the panel and drops the references, leaving no static state behind.</summary>
         public static void Destroy()
         {
             try
@@ -137,7 +140,7 @@ namespace MissileDisaster.Game.UI
             float w = ModConfig.PanelWidth - pad * 2f;
             float y = pad;
 
-            // タイトル（ドラッグ可能ハンドル）
+            // The title, which doubles as the drag handle
             UILabel title = _panel.AddUIComponent<UILabel>();
             title.text = "Missile Launch Control";
             title.textScale = 0.9f;
@@ -148,27 +151,28 @@ namespace MissileDisaster.Game.UI
             drag.height = 24f;
             drag.relativePosition = new Vector3(0f, 0f);
 
-            // 閉じるボタン（右上）。ドラッグハンドルより後に追加＝手前でクリックを受ける。
-            // 閉じても災害タブのミサイルボタンから開き直せる。
+            // The close button, top right. It is added after the drag handle, so it sits in
+            // front and receives the click. Closing is not final: the button in the disasters
+            // tab opens the panel again.
             UIButton closeBtn = MakeButton("✕", ModConfig.PanelWidth - 26f, 3f, 22f);
             closeBtn.textScale = 0.9f;
             closeBtn.tooltip = "Close (reopen from the Missile button in the Disasters panel)";
             closeBtn.eventClick += (c, p) => Hide();
             y += 26f;
 
-            // 弾頭選択
+            // Warhead selection
             y = AddSectionLabel("Warhead", pad, y);
             _warheadButtons = new UIButton[Warheads.Length];
             for (int i = 0; i < Warheads.Length; i++)
             {
-                WarheadType type = Warheads[i]; // クロージャ用にローカルへ束縛
+                WarheadType type = Warheads[i]; // bound to a local for the closure
                 UIButton b = MakeButton(WarheadLabels[i], pad, y, w);
                 b.eventClick += (c, p) => { MissileTool.CurrentWarhead = type; RefreshHighlight(); };
                 _warheadButtons[i] = b;
                 y += ModConfig.PanelButtonHeight + ModConfig.PanelButtonGap;
             }
 
-            // 核出力（カタログ選択 or kt 手入力）
+            // Nuclear yield: pick from the catalogue or type the kilotons in
             y += 4f;
             y = AddSectionLabel("Nuclear Yield (nuclear only, kt)", pad, y);
 
@@ -178,13 +182,13 @@ namespace MissileDisaster.Game.UI
             _ktField = MakeKtField(pad, y, w);
             y += 26f + ModConfig.PanelButtonGap;
 
-            // 通常爆弾の出力（kg TNT 手入力・非核弾頭に適用）
+            // Conventional yield, typed in as kilograms of TNT and applied to non-nuclear warheads
             y += 4f;
             y = AddSectionLabel("Conventional Yield (non-nuclear, kg TNT)", pad, y);
             _kgField = MakeKgField(pad, y, w);
             y += 26f + ModConfig.PanelButtonGap;
 
-            // 爆発高度（空中/地上）
+            // Burst height: air or ground
             y += 4f;
             y = AddSectionLabel("Burst Height", pad, y);
             _burstButtons = new UIButton[Bursts.Length];
@@ -199,7 +203,7 @@ namespace MissileDisaster.Game.UI
             }
             y += ModConfig.PanelButtonHeight + ModConfig.PanelButtonGap;
 
-            // 照準開始（ツール起動）
+            // Start aiming, which opens the tool
             y += 6f;
             UIButton launch = MakeButton("Start Targeting (click to launch)", pad, y, w);
             launch.color = new Color32(255, 190, 120, 255);
@@ -240,9 +244,9 @@ namespace MissileDisaster.Game.UI
                 items[i] = catalog[i].Name + " (" + catalog[i].Kilotons + "kt)";
             }
             dd.items = items;
-            dd.selectedIndex = -1; // 既定は未選択（kt は手入力の既定値を使う）
+            dd.selectedIndex = -1; // nothing selected by default; the typed-in yield's default applies
 
-            // トリガーボタン（右端の▼）
+            // The trigger button, the arrow at the right-hand end
             UIButton trigger = dd.AddUIComponent<UIButton>();
             trigger.text = "▼";
             trigger.textScale = 0.7f;
@@ -311,7 +315,7 @@ namespace MissileDisaster.Game.UI
             }
             else if (_ktField != null)
             {
-                _ktField.text = MissileTool.CurrentYieldKilotons.ToString(); // 不正入力は現在値へ戻す
+                _ktField.text = MissileTool.CurrentYieldKilotons.ToString(); // invalid input reverts to the current value
             }
         }
 
@@ -324,7 +328,7 @@ namespace MissileDisaster.Game.UI
             }
             else if (_kgField != null)
             {
-                _kgField.text = MissileTool.CurrentConventionalKilograms.ToString(); // 不正入力は現在値へ戻す
+                _kgField.text = MissileTool.CurrentConventionalKilograms.ToString(); // invalid input reverts to the current value
             }
         }
 
@@ -351,7 +355,7 @@ namespace MissileDisaster.Game.UI
             return b;
         }
 
-        /// <summary>選択中の弾頭・爆発高度ボタンをハイライトする。</summary>
+        /// <summary>Highlights the selected warhead and burst height buttons.</summary>
         private static void RefreshHighlight()
         {
             if (_warheadButtons != null)

@@ -3,8 +3,8 @@ using Xunit;
 
 public class TargetTierClassifierTests
 {
-    // 既定相当のキーワード群。
-    private static readonly string[] A = TargetTierClassifier.ParseKeywords("Nuclear, PAC3, THAAD, Aegis, イージス");
+    // The keywords the mod ships with.
+    private static readonly string[] A = TargetTierClassifier.ParseKeywords("Nuclear, PAC3, THAAD, Aegis, \u30a4\u30fc\u30b8\u30b9");
     private static readonly string[] B = TargetTierClassifier.ParseKeywords("Airport, Train Station, Railway, Cargo Train, Harbor, Harbour");
     private static readonly string[] C = TargetTierClassifier.ParseKeywords("");
 
@@ -13,7 +13,8 @@ public class TargetTierClassifierTests
     [InlineData("12345.PAC3_Data")]
     [InlineData("THAAD Battery")]
     [InlineData("Aegis Ashore")]
-    [InlineData("イージス基地")]
+    // Japanese for "Aegis base".
+    [InlineData("\u30a4\u30fc\u30b8\u30b9\u57fa\u5730")]
     public void Priority_A_targets(string name)
     {
         Assert.Equal(TargetTierClassifier.TierA, TargetTierClassifier.Classify(name, A, B, C));
@@ -54,7 +55,7 @@ public class TargetTierClassifierTests
     [Fact]
     public void Custom_keyword_can_be_added_to_a_tier()
     {
-        // プレイヤーが A に "Oil" を追加 → 石油系が最優先。
+        // The player adds "Oil" to tier A, which makes oil facilities the first choice.
         string[] customA = TargetTierClassifier.ParseKeywords("Nuclear, Oil");
         Assert.Equal(TargetTierClassifier.TierA, TargetTierClassifier.Classify("Oil Industry Building", customA, B, C));
     }

@@ -4,14 +4,15 @@ using UnityEngine;
 namespace MissileDisaster.Game.Audio
 {
     /// <summary>
-    /// Sounds/*.mp3 を実行時に読み込んで AudioClip をキャッシュする。読込はコルーチンで行うため、
-    /// DontDestroyOnLoad の隠しホスト GameObject 上の SoundLoaderBehaviour が実処理を担う。
-    /// Initialize(modPath) を Mod.OnEnabled で、EnsureLoaded() をレベルロードで呼ぶ（1回だけ読み込む）。
-    /// すべてメインスレッド。
+    /// Loads the files in Sounds at runtime and caches the AudioClips. Loading runs as a
+    /// coroutine, so the work itself is done by SoundLoaderBehaviour on a hidden
+    /// DontDestroyOnLoad host GameObject.
+    /// Mod.OnEnabled calls Initialize(modPath) and level load calls EnsureLoaded(); between them
+    /// the files are read exactly once. All main thread.
     /// </summary>
     public static class SoundLibrary
     {
-        // Sounds フォルダに置く mp3 のベース名（拡張子なし）。
+        // Base names, without extensions, of the files in the Sounds folder.
         public const string Launcher2 = "launcher2";
         public const string Launcher7 = "launcher7";
         public const string Explosion = "explosion1";
@@ -25,15 +26,16 @@ namespace MissileDisaster.Game.Audio
         private static readonly Dictionary<string, AudioClip> _clips = new Dictionary<string, AudioClip>();
 
         /// <summary>
-        /// Mod.OnEnabled から呼ぶ。DontDestroyOnLoad の常駐ホストを作り、Sounds/*.wav の読込を即開始する
-        /// （多重起動しない）。AlienInvasion.SoundManager と同じ実績パターン。メインスレッドから。
+        /// Called from Mod.OnEnabled. Creates the long-lived DontDestroyOnLoad host and starts
+        /// loading immediately, guarding against being started twice. This follows the same
+        /// pattern AlienInvasion.SoundManager uses. Main thread.
         /// </summary>
         public static void Initialize(string modDir)
         {
             if (_loadStarted) return;
             if (string.IsNullOrEmpty(modDir))
             {
-                ModConfig.LogError("SoundLibrary.Initialize: modDir が空");
+                ModConfig.LogError("SoundLibrary.Initialize: modDir is empty");
                 return;
             }
             _loadStarted = true;
@@ -56,7 +58,7 @@ namespace MissileDisaster.Game.Audio
             if (!string.IsNullOrEmpty(name) && clip != null) _clips[name] = clip;
         }
 
-        /// <summary>読込済みなら AudioClip を返す。未読込/失敗なら null。</summary>
+        /// <summary>The AudioClip once it has loaded, or null if it has not or the load failed.</summary>
         public static AudioClip Get(string name)
         {
             AudioClip c;

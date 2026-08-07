@@ -4,9 +4,10 @@ using UnityEngine;
 namespace MissileDisaster.Game.Audio
 {
     /// <summary>
-    /// 読込済み AudioClip を指定ワールド座標で3D再生する（メインスレッド専用）。
-    /// spatialBlend=1 の3D音源＋線形ロールオフで、リスナー(カメラ)からの距離で増幅/減衰する。
-    /// 一時 GameObject を作って再生し、クリップ長経過後に破棄する。
+    /// Plays a loaded AudioClip in 3D at a world position. Main thread only.
+    /// With spatialBlend at 1 and a linear rolloff, the volume follows the distance from the
+    /// listener, which is the camera.
+    /// A temporary GameObject carries the playback and is destroyed once the clip has finished.
     /// </summary>
     public static class SoundPlayer
     {
@@ -15,14 +16,14 @@ namespace MissileDisaster.Game.Audio
             try
             {
                 AudioClip clip = SoundLibrary.Get(clipName);
-                if (clip == null) return; // 未読込/失敗時は無音（着弾等の処理は継続）
+                if (clip == null) return; // silent if it never loaded; the impact still resolves
 
                 var go = new GameObject("MissileDisasterSound_" + clipName);
                 go.transform.position = position;
                 var src = go.AddComponent<AudioSource>();
                 src.clip = clip;
                 src.volume = Mathf.Clamp01(volume);
-                src.spatialBlend = 1f; // 完全3D
+                src.spatialBlend = 1f; // fully 3D
                 src.rolloffMode = AudioRolloffMode.Linear;
                 src.minDistance = minDistance;
                 src.maxDistance = maxDistance;

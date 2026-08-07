@@ -5,16 +5,18 @@ using UnityEngine;
 namespace MissileDisaster.Game.Effects
 {
     /// <summary>
-    /// CS の Unity ランタイムで「実際に利用可能なシェーダー」を見つけるユーティリティ。
-    /// CS は未参照の組み込みシェーダー（例: "Particles/Additive"）をビルドから除去していることが多く、
-    /// Shader.Find がそれらに null を返す → マテリアルが付かず「マゼンタ」になる。実在するものを順に探す。
-    /// Alien Invasion から移植（ロジック不変）。全て GameObject/Shader に触れるためメインスレッド専用。
+    /// Utility for finding shaders that actually exist in the CS Unity runtime.
+    /// CS usually strips built-in shaders it does not reference itself - "Particles/Additive",
+    /// for one - so Shader.Find returns null for them, the object ends up with no material and
+    /// renders in the magenta error colour. This walks the candidates until one resolves.
+    /// Ported unchanged from Alien Invasion. It all touches GameObjects and Shaders, so it is
+    /// main thread only.
     /// </summary>
     public static class RenderAssets
     {
         private static bool _dumped;
 
-        /// <summary>候補名を順に Shader.Find し、最初に見つかった(非null)シェーダーを返す。全滅なら null。</summary>
+        /// <summary>Shader.Find over the candidate names in order, returning the first that exists, or null if none do.</summary>
         public static Shader FindFirst(params string[] names)
         {
             if (names == null) return null;
@@ -25,12 +27,12 @@ namespace MissileDisaster.Game.Effects
                     Shader s = Shader.Find(names[i]);
                     if (s != null) return s;
                 }
-                catch (Exception) { /* 次の候補へ */ }
+                catch (Exception) { /* try the next candidate */ }
             }
             return null;
         }
 
-        /// <summary>ロード済みシェーダーから、名前に substrsLower のいずれか(小文字)を含む最初のものを返す。</summary>
+        /// <summary>The first loaded shader whose name contains any of substrsLower, which are lowercase.</summary>
         public static Shader FindLoadedContaining(params string[] substrsLower)
         {
             try
@@ -54,19 +56,21 @@ namespace MissileDisaster.Game.Effects
         }
 
         /// <summary>
-        /// パーティクル用マテリアルに、シーンの奥行きに対して正しく遮蔽される描画状態を強制する。
-        /// 透明キュー（不透明ジオメトリの後に描画）＋ ZTest LEqual（手前の建物等に遮蔽される）＋ ZWrite Off。
-        /// 一部の組み込み/フォールバックシェーダーは ZTest が Always 相当で、煙が手前の建物を透過するため。
-        /// シェーダーが該当プロパティを持たない場合 SetInt は無視される（無害）。
+        /// Forces a particle material into a render state that respects the depth of the scene.
+        /// That means the transparent queue, so it draws after the opaque geometry; ZTest
+        /// LEqual, so buildings in front of it occlude it; and ZWrite off.
+        /// Some built-in and fallback shaders behave as though ZTest were Always, which is what
+        /// made smoke show through buildings standing in front of it.
+        /// SetInt is harmlessly ignored on a shader without these properties.
         /// </summary>
         public static void ApplyDepthOcclusion(Material mat)
         {
             if (mat == null) return;
             try
             {
-                mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent; // 3000: 不透明の後
-                mat.SetInt("_ZTest", (int)UnityEngine.Rendering.CompareFunction.LessEqual); // 手前の不透明物に遮蔽
-                mat.SetInt("_ZWrite", 0); // 半透明なので深度書き込みはしない
+                mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent; // 3000, i.e. after the opaque geometry
+                mat.SetInt("_ZTest", (int)UnityEngine.Rendering.CompareFunction.LessEqual); // occluded by opaque objects in front
+                mat.SetInt("_ZWrite", 0); // translucent, so it does not write depth
             }
             catch (Exception e)
             {
@@ -74,7 +78,7 @@ namespace MissileDisaster.Game.Effects
             }
         }
 
-        /// <summary>初回のみ、利用可能なシェーダー名と主要候補の Shader.Find 可否をログ出力する。</summary>
+        /// <summary>Logs the available shader names, and whether Shader.Find resolved each main candidate. Runs once.</summary>
         public static void DumpAvailableShadersOnce()
         {
             if (_dumped) return;

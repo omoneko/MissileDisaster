@@ -4,9 +4,12 @@ using UnityEngine;
 namespace MissileDisaster.Game.Effects
 {
     /// <summary>
-    /// 核着弾点に、爆発規模(破壊半径)に合わせた特大のキノコ雲を生成する。メインスレッド専用。
-    /// 構成: 基部の火球（加算）＋立ち上る煙柱（stem, 上昇）＋頂部で膨らむ傘（cap, 遅延放出）。
-    /// マテリアルは CS ランタイムで実在するシェーダーを解決して割り当てる（マゼンタ回避）。
+    /// Builds the outsized mushroom cloud at a nuclear impact, scaled to the destruction radius.
+    /// Main thread only.
+    /// It has three parts: an additive fireball at the base, the stem rising from it, and the
+    /// cap that swells at the top, emitted on a delay.
+    /// The materials are built from shaders that actually exist in the CS runtime, which avoids
+    /// the magenta error colour.
     /// </summary>
     public static class NuclearMushroomFx
     {
@@ -20,10 +23,10 @@ namespace MissileDisaster.Game.Effects
             try
             {
                 EnsureAssets();
-                float height = Mathf.Clamp(blastRadius * 0.8f, 500f, 6000f); // 成層圏まで高く立ち上る
-                float capR = Mathf.Clamp(blastRadius * 0.35f, 250f, 3500f);  // 頂部の傘（キャノピー）は広く
+                float height = Mathf.Clamp(blastRadius * 0.8f, 500f, 6000f); // rises high enough to read as reaching the stratosphere
+                float capR = Mathf.Clamp(blastRadius * 0.35f, 250f, 3500f);  // the canopy at the top spreads wide
                 float stemR = capR * 0.32f;
-                float riseTime = Mathf.Clamp(height / 450f, 5f, 14f);        // ゆっくり上昇（滞留感）
+                float riseTime = Mathf.Clamp(height / 450f, 5f, 14f);        // it climbs slowly, so it appears to linger
 
                 CreateFireball(center, capR);
                 CreateStem(center, stemR, height, riseTime);
@@ -59,7 +62,7 @@ namespace MissileDisaster.Game.Effects
             var go = NewSystem("MushroomStem", center, _smokeMat);
             var ps = go.GetComponent<ParticleSystem>();
             var main = ps.main;
-            main.startLifetime = riseTime + 8f; // 立ち上った煙柱が長く残る
+            main.startLifetime = riseTime + 8f; // the stem stays up well after it has risen
             main.startSpeed = stemR * 0.12f;
             main.startSize = stemR * 1.1f;
             main.startColor = new ParticleSystem.MinMaxGradient(new Color(0.16f, 0.15f, 0.14f, 0.7f));
@@ -72,7 +75,8 @@ namespace MissileDisaster.Game.Effects
 
             Sphere(ps, stemR);
 
-            // 上昇（ワールド空間で一定の上向き速度）。riseTime が長いほどゆっくり昇る。
+            // The climb, at a constant upward speed in world space. A longer riseTime makes it
+            // slower.
             var vel = ps.velocityOverLifetime;
             vel.enabled = true;
             vel.space = ParticleSystemSimulationSpace.World;
@@ -89,20 +93,20 @@ namespace MissileDisaster.Game.Effects
             var go = NewSystem("MushroomCap", top, _smokeMat);
             var ps = go.GetComponent<ParticleSystem>();
             var main = ps.main;
-            main.startDelay = riseTime * 0.55f; // 煙柱が頂部へ到達する頃に膨らみ始める
-            main.startLifetime = 18f;           // 成層圏で長く滞留
-            main.startSpeed = capR * 0.35f;     // 外側へ吹き出して傘（キャノピー）を形成
+            main.startDelay = riseTime * 0.55f; // starts to swell about when the stem reaches the top
+            main.startLifetime = 18f;           // lingers at the top for a long time
+            main.startSpeed = capR * 0.35f;     // blows outwards to form the canopy
             main.startSize = capR * 0.7f;
             main.startColor = new ParticleSystem.MinMaxGradient(
                 new Color(0.18f, 0.16f, 0.15f, 0.7f), new Color(0.1f, 0.09f, 0.085f, 0.7f));
             main.maxParticles = 500;
-            main.gravityModifier = 0.015f;      // 縁がわずかに垂れて笠のロールオーバー感
+            main.gravityModifier = 0.015f;      // the rim droops slightly, giving the cap its rollover
 
             Burst(ps, 100);
-            ConeUp(ps, capR * 0.35f, 62f);      // 上向き広角コーンで外側へ傘状に展開
-            DampenRise(ps, capR * 0.22f, 0.2f); // 上昇を頭打ちにして水平展開・滞留させる
+            ConeUp(ps, capR * 0.35f, 62f);      // a wide upward cone spreads it outwards into the canopy
+            DampenRise(ps, capR * 0.22f, 0.2f); // caps the climb so it spreads sideways and lingers
             AlphaFadeSlow(ps);
-            SizeCurve(ps, 0.7f, 2.5f);          // 大きく横へ広がる
+            SizeCurve(ps, 0.7f, 2.5f);          // grows considerably as it spreads
             ps.Play();
             UnityEngine.Object.Destroy(go, riseTime * 0.55f + 20f);
         }
@@ -157,7 +161,7 @@ namespace MissileDisaster.Game.Effects
                 new AnimationCurve(new Keyframe(0f, from), new Keyframe(1f, to)));
         }
 
-        /// <summary>長めに視認できてからゆっくり消えるアルファ（滞留感）。</summary>
+        /// <summary>An alpha curve that stays visible for a while and then fades slowly, which is what makes it linger.</summary>
         private static void AlphaFadeSlow(ParticleSystem ps)
         {
             var col = ps.colorOverLifetime;
@@ -173,7 +177,7 @@ namespace MissileDisaster.Game.Effects
             col.color = new ParticleSystem.MinMaxGradient(grad);
         }
 
-        /// <summary>上向きの広角コーンから放出（頂部で外側へ傘状に広がる）。Cone(+Z)を上へ向ける。</summary>
+        /// <summary>Emits from a wide upward cone, spreading into the canopy at the top. The cone's +Z is turned upwards.</summary>
         private static void ConeUp(ParticleSystem ps, float radius, float angle)
         {
             var shape = ps.shape;
@@ -184,7 +188,7 @@ namespace MissileDisaster.Game.Effects
             ps.transform.rotation = Quaternion.Euler(-90f, 0f, 0f);
         }
 
-        /// <summary>上昇速度を頭打ちにして水平展開・滞留させる。</summary>
+        /// <summary>Caps the upward speed so it spreads horizontally and lingers.</summary>
         private static void DampenRise(ParticleSystem ps, float limit, float dampen)
         {
             var lv = ps.limitVelocityOverLifetime;
@@ -224,7 +228,7 @@ namespace MissileDisaster.Game.Effects
             if (mat.HasProperty("_TintColor")) mat.SetColor("_TintColor", Color.white);
             if (mat.HasProperty("_Color")) mat.SetColor("_Color", Color.white);
             mat.color = Color.white;
-            RenderAssets.ApplyDepthOcclusion(mat); // 手前の建物に遮蔽させる（透過防止）
+            RenderAssets.ApplyDepthOcclusion(mat); // let buildings in front occlude it, instead of showing through
             return mat;
         }
 

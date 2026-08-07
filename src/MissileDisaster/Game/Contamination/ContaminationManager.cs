@@ -6,26 +6,29 @@ using UnityEngine;
 namespace MissileDisaster.Game.Contamination
 {
     /// <summary>
-    /// 放射能汚染ゾーンの台帳と、土壌汚染グリッド(NaturalResourceManager.m_pollution)への適用/維持/除去。
-    /// 基本設定は NuclearMeltdown 準拠（濃度255・50年で期限切れ・自然減衰対策の reassert・セーブ永続）。
-    /// <b>汚水処理場では除染されない</b>。専用の「Decontamination facility」建物がゾーン付近で稼働している場合のみ、
-    /// そのゾーンの濃度をゲーム内1か月あたり DecontaminationMonthlyFraction 相対除去し、恒久的に軽減する。
-    /// すべて sim スレッドから呼ぶこと。
+    /// The ledger of radioactive contamination zones, and applying, holding and clearing them
+    /// on the ground pollution grid (NaturalResourceManager.m_pollution).
+    /// The basic settings follow NuclearMeltdown: an intensity of 255, expiry after 50 years,
+    /// reasserting against the game's natural decay, and persistence in the save.
+    /// <b>A water treatment plant does not decontaminate.</b> Only a dedicated "Decontamination
+    /// facility" operating near a zone does, removing DecontaminationMonthlyFraction of what
+    /// remains per in-game month, permanently.
+    /// Everything here must be called from the simulation thread.
     /// </summary>
     public static class ContaminationManager
     {
         private static List<ContaminationZone> _zones = new List<ContaminationZone>();
         private static int _maintainCounter;
         private static long _lastMaintainTicks;
-        private static readonly List<Vector3> _facilities = new List<Vector3>(); // 稼働中の除染施設の位置
+        private static readonly List<Vector3> _facilities = new List<Vector3>(); // positions of the operating decontamination facilities
 
-        /// <summary>ゾーン台帳のスナップショット（セーブ用）。</summary>
+        /// <summary>A snapshot of the zone ledger, for saving.</summary>
         public static List<ContaminationZone> Zones
         {
             get { return new List<ContaminationZone>(_zones); }
         }
 
-        /// <summary>レベル切替時に呼ぶ（メモリ上の台帳を破棄。土壌汚染自体はゲームのセーブに含まれる）。</summary>
+        /// <summary>Called on a level change; drops the in-memory ledger. The pollution itself is part of the game's own save.</summary>
         public static void Reset()
         {
             _zones = new List<ContaminationZone>();
@@ -34,14 +37,14 @@ namespace MissileDisaster.Game.Contamination
             _facilities.Clear();
         }
 
-        /// <summary>ロード時に台帳を差し替え、各ゾーンをグリッドへ再適用する。</summary>
+        /// <summary>Replaces the ledger on load and reapplies every zone to the grid.</summary>
         public static void ReplaceAll(List<ContaminationZone> zones)
         {
             _zones = zones ?? new List<ContaminationZone>();
             for (int i = 0; i < _zones.Count; i++) ReassertZone(_zones[i]);
         }
 
-        /// <summary>着弾時に汚染ゾーンを追加してグリッドへ書き込む。radius&lt;=0 は無視（空中爆発など）。</summary>
+        /// <summary>Adds a contamination zone on impact and writes it to the grid. A radius of zero or less is ignored, as for an airburst.</summary>
         public static void AddZone(ContaminationZone zone)
         {
             if (zone.Radius <= 0f) return;
@@ -57,15 +60,18 @@ namespace MissileDisaster.Game.Contamination
         }
 
         /// <summary>
-        /// sim スレッドから毎tick呼ぶ（内部で間引き）。期限切れ消去、除染施設付近は濃度を相対除去、
-        /// それ以外は reassert で維持する。汚水処理場では除染しない。
+        /// Call every tick from the simulation thread; it spaces the work out internally.
+        /// Expired zones are cleared, zones near a decontamination facility have their intensity
+        /// reduced, and the rest are reasserted to hold them in place. A water treatment plant
+        /// decontaminates nothing.
         /// </summary>
         public static void Maintain(long nowTicks)
         {
             if (++_maintainCounter < ModConfig.ContaminationMaintainInterval) return;
             _maintainCounter = 0;
 
-            // 経過月は処理サイクル間で測る。ゾーンが無くても時刻は前進させる（新ゾーンに空白期間を課さない=P2対策）。
+            // Elapsed months are measured between passes. The clock advances even with no
+            // zones, so a newly created zone is not charged for the time before it existed.
             double deltaMonths = _lastMaintainTicks == 0
                 ? 0.0
                 : ContaminationDecay.MonthsBetween(_lastMaintainTicks, nowTicks);
@@ -90,7 +96,8 @@ namespace MissileDisaster.Game.Contamination
 
                 if (decayFactor < 1.0 && IsDecontaminated(zone))
                 {
-                    // float 濃度に係数を掛け続けるので微小間隔でも端数が失われず着実に減衰する。
+                    // Multiplying a float intensity by the factor means even very short
+                    // intervals lose nothing to rounding, so the decay stays steady.
                     zone.Intensity = (float)(zone.Intensity * decayFactor);
                     if (zone.Intensity <= ModConfig.DecontaminationMinIntensity)
                     {
@@ -101,17 +108,17 @@ namespace MissileDisaster.Game.Contamination
                     else
                     {
                         _zones[i] = zone;
-                        SetZone(zone); // 下げた濃度をグリッドへ反映（上書き）
+                        SetZone(zone); // write the lowered intensity over the grid
                     }
                 }
                 else
                 {
-                    ReassertZone(zone); // 自然減衰対策で維持（現在の濃度に戻す）
+                    ReassertZone(zone); // hold it against the natural decay, back up to its current intensity
                 }
             }
         }
 
-        /// <summary>float 濃度を土壌汚染セルの上限濃度(byte)へ丸める。</summary>
+        /// <summary>Rounds the float intensity to the byte a ground pollution cell holds.</summary>
         private static byte ToByteIntensity(float intensity)
         {
             int v = (int)(intensity + 0.5f);
@@ -120,16 +127,16 @@ namespace MissileDisaster.Game.Contamination
             return (byte)v;
         }
 
-        /// <summary>汚染を維持する（自然減衰で下がったセルを zone.Intensity まで引き上げる）。変化があった時だけ再描画。</summary>
+        /// <summary>Holds the contamination in place, raising cells the natural decay pulled down back to zone.Intensity. Redraws only on a change.</summary>
         public static void ReassertZone(ContaminationZone zone)
         {
             List<CellDose> doses = PollutionGrid.CellsInRadius(zone.CenterX, zone.CenterZ, zone.Radius, ToByteIntensity(zone.Intensity));
             bool changed = false;
             for (int i = 0; i < doses.Count; i++) changed |= PollutionField.ApplyDose(doses[i]);
-            if (changed) RefreshZoneTexture(zone); // 定常状態(無変化)では再描画しない＝オーバーレイの点滅を防ぐ
+            if (changed) RefreshZoneTexture(zone); // not redrawing in the steady state is what stops the overlay flickering
         }
 
-        /// <summary>汚染を上書き設定する（除染で下げた濃度を反映）。変化があった時だけ再描画。</summary>
+        /// <summary>Writes the contamination over the grid, to apply an intensity lowered by decontamination. Redraws only on a change.</summary>
         private static void SetZone(ContaminationZone zone)
         {
             List<CellDose> doses = PollutionGrid.CellsInRadius(zone.CenterX, zone.CenterZ, zone.Radius, ToByteIntensity(zone.Intensity));
@@ -146,7 +153,7 @@ namespace MissileDisaster.Game.Contamination
             if (changed) RefreshZoneTexture(zone);
         }
 
-        /// <summary>ゾーン付近に稼働中の除染施設があるか（ゾーン半径＋施設効果範囲内）。</summary>
+        /// <summary>Whether an operating decontamination facility stands near the zone, within its radius plus the facility's range.</summary>
         private static bool IsDecontaminated(ContaminationZone zone)
         {
             float reach = zone.Radius + ModConfig.DecontaminationFacilityRange;
@@ -160,7 +167,7 @@ namespace MissileDisaster.Game.Contamination
             return false;
         }
 
-        /// <summary>BuildingManager を走査し、稼働中の除染施設（名称に Decontamination を含む）の位置を集める。</summary>
+        /// <summary>Walks BuildingManager and collects the positions of operating decontamination facilities, identified by name.</summary>
         private static void ScanFacilities()
         {
             _facilities.Clear();

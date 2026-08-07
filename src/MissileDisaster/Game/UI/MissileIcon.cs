@@ -4,17 +4,18 @@ using UnityEngine;
 namespace MissileDisaster.Game.UI
 {
     /// <summary>
-    /// タブ内アイコンのテクスチャを用意する。Mod配置フォルダに icon.png があればそれを読み込み、
-    /// 無ければ上向きミサイルの簡易アイコン（透明背景）を手続き生成する。
+    /// Supplies the texture for the icon in the panel. If icon.png is present in the mod folder
+    /// it is loaded; otherwise a simple upward missile is generated procedurally, on a
+    /// transparent background.
     /// </summary>
     public static class MissileIcon
     {
         private static string _modDir;
 
-        /// <summary>Mod配置フォルダを設定する（Mod.OnEnabled から）。icon.png の探索に使う。</summary>
+        /// <summary>Sets the mod folder, from Mod.OnEnabled. Used to look for icon.png.</summary>
         public static void SetModDirectory(string dir) { _modDir = dir; }
 
-        /// <summary>icon.png があれば読み込んで返す。無ければ null。</summary>
+        /// <summary>Loads icon.png if it exists, otherwise null.</summary>
         private static Texture2D TryLoadPng()
         {
             try
@@ -25,7 +26,7 @@ namespace MissileDisaster.Game.UI
                 var t = new Texture2D(2, 2, TextureFormat.ARGB32, false);
                 t.wrapMode = TextureWrapMode.Clamp;
                 if (!t.LoadImage(File.ReadAllBytes(path))) { Object.Destroy(t); return null; }
-                ModConfig.Log("タブアイコンに icon.png を使用します");
+                ModConfig.Log("using icon.png for the panel icon");
                 return t;
             }
             catch (System.Exception e)
@@ -56,22 +57,22 @@ namespace MissileDisaster.Game.UI
                 for (int xx = 0; xx < size; xx++)
                 {
                     float fx = (xx - cx) / size;  // -0.5..0.5
-                    float fy = (float)yy / size;  // 0(下)..1(上)
+                    float fy = (float)yy / size;  // 0 at the bottom .. 1 at the top
                     Color c = clear;
 
-                    if (fy >= 0.20f && fy <= 0.72f && Mathf.Abs(fx) <= bodyHalf) c = body; // 機体
-                    if (fy > 0.72f && fy <= 0.95f)                                          // ノーズ(赤)
+                    if (fy >= 0.20f && fy <= 0.72f && Mathf.Abs(fx) <= bodyHalf) c = body; // the body
+                    if (fy > 0.72f && fy <= 0.95f)                                          // the nose, in red
                     {
                         float t = (0.95f - fy) / (0.95f - 0.72f);
                         if (Mathf.Abs(fx) <= bodyHalf * t) c = nose;
                     }
-                    if (fy >= 0.18f && fy <= 0.40f)                                         // フィン
+                    if (fy >= 0.18f && fy <= 0.40f)                                         // the fins
                     {
                         float t = (0.40f - fy) / (0.40f - 0.18f);
                         float finHalf = bodyHalf + 0.14f * t;
                         if (Mathf.Abs(fx) <= finHalf && Mathf.Abs(fx) > bodyHalf) c = fin;
                     }
-                    if (fy >= 0.05f && fy < 0.20f)                                          // 噴射炎
+                    if (fy >= 0.05f && fy < 0.20f)                                          // the exhaust flame
                     {
                         float t = (fy - 0.05f) / (0.20f - 0.05f);
                         if (Mathf.Abs(fx) <= bodyHalf * t) c = flame;

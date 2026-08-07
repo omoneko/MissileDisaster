@@ -6,10 +6,12 @@ using UnityEngine;
 namespace MissileDisaster.Game.Models
 {
     /// <summary>
-    /// Core が解析した ObjData/MtlColor から、実行時に Unity の Mesh/Material を構築する。
-    /// Alien Invasion の ObjMeshBuilder を縮小移植したもの（夜間発光・透過登録は持ち込まない）。
-    /// Mesh/Material/Shader の生成は Unity のメインスレッドでのみ許可されるため、必ず
-    /// メインスレッド（GameObject を生成する箇所と同じスレッド）から呼ぶこと。
+    /// Builds Unity Meshes and Materials at runtime from the ObjData and MtlColor that Core
+    /// parsed.
+    /// This is a cut-down port of Alien Invasion's ObjMeshBuilder, without the night-time glow
+    /// or the transparency registration.
+    /// Unity only allows Meshes, Materials and Shaders to be created on the main thread, so this
+    /// must always be called from there - the same thread that creates the GameObjects.
     /// </summary>
     public static class MissileMeshBuilder
     {
@@ -64,8 +66,9 @@ namespace MissileDisaster.Game.Models
         }
 
         /// <summary>
-        /// 全サブメッシュの三角形を単一サブメッシュへ統合した Mesh を構築する（マテリアル1枚運用）。
-        /// CS の建物レンダラは m_mesh + 単一 m_material を素直に描くため、建物用途に使う。
+        /// Builds a Mesh with every submesh's triangles merged into one, so a single material
+        /// covers it. The CS building renderer simply draws m_mesh with one m_material, which is
+        /// what this is for.
         /// </summary>
         public static bool TryBuildMergedMesh(ObjData obj, out Mesh mesh)
         {
@@ -111,8 +114,10 @@ namespace MissileDisaster.Game.Models
             }
         }
 
-        /// <summary>破損/範囲外インデックスの三角形を除去する。Unity の SetTriangles は範囲外
-        /// インデックスがあると例外を投げるため、必ずこのフィルタを通してから渡す。</summary>
+        /// <summary>
+        /// Drops triangles with damaged or out-of-range indices. Unity's SetTriangles throws on
+        /// an out-of-range index, so everything must go through this filter first.
+        /// </summary>
         private static List<int> FilterValidTriangles(List<int> triangles, int vertexCount)
         {
             if (triangles == null || triangles.Count == 0) return new List<int>();

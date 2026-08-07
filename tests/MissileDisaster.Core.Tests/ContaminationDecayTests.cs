@@ -30,19 +30,20 @@ public class ContaminationDecayTests
     [Fact]
     public void Tiny_intervals_accumulate_via_float_intensity_no_stall()
     {
-        // 微小間隔でも float 濃度に係数を掛け続ければ着実に減衰し、丸めで停滞しない。
+        // Multiplying a float intensity by the factor decays steadily even over very short
+        // intervals; rounding never stalls it.
         float intensity = 255f;
-        for (int i = 0; i < 100; i++) // 0.02か月×100 = 2か月相当
+        for (int i = 0; i < 100; i++) // 0.02 months a hundred times, i.e. two months
         {
             intensity *= (float)ContaminationDecay.DecayFactor(0.02, 0.05);
         }
-        Assert.True(intensity < 255f, "微小間隔でも減衰する");
-        Assert.True(intensity < 235f, "2か月相当で約9%以上減る"); // 255×0.95^2≈230
+        Assert.True(intensity < 255f, "it decays even over tiny intervals");
+        Assert.True(intensity < 235f, "two months removes about 9% or more"); // 255 * 0.95^2 is about 230
     }
 
     [Theory]
     [InlineData(0L, 0L, 0.0)]
-    [InlineData(0L, 25920000000000L, 1.0)] // 30日 = 1か月（TimeSpan.FromDays(30).Ticks）
+    [InlineData(0L, 25920000000000L, 1.0)] // 30 days is one month, i.e. TimeSpan.FromDays(30).Ticks
     public void MonthsBetween_measures_game_months(long start, long end, double expected)
     {
         Assert.Equal(expected, ContaminationDecay.MonthsBetween(start, end), 3);

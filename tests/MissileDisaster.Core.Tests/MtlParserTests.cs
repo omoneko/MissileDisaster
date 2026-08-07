@@ -38,16 +38,18 @@ public class MtlParserTests
     public void NonAscii_material_names_are_kept()
     {
         string mtl =
-            "newmtl マテリアル\n" +
+            // A non-ASCII material name, the Japanese default Blender gives a new material.
+            // Kept as test data because the parser has to survive UTF-8 names.
+            "newmtl \u30de\u30c6\u30ea\u30a2\u30eb\n" +
             "Kd 0.035 0.035 0.035\n" +
-            "newmtl マテリアル.001\n" +
+            "newmtl \u30de\u30c6\u30ea\u30a2\u30eb.001\n" +
             "Kd 0.536 0.536 0.536\n";
 
         Dictionary<string, MtlColor> map = MtlParser.Parse(mtl);
 
         Assert.Equal(2, map.Count);
-        Assert.Equal(0.035f, map["マテリアル"].R, 3);
-        Assert.Equal(0.536f, map["マテリアル.001"].R, 3);
+        Assert.Equal(0.035f, map["\u30de\u30c6\u30ea\u30a2\u30eb"].R, 3);
+        Assert.Equal(0.536f, map["\u30de\u30c6\u30ea\u30a2\u30eb.001"].R, 3);
     }
 
     [Fact]

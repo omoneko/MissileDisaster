@@ -23,7 +23,7 @@ public class WarheadSpecTests
         Assert.Equal(0f, s.SpreadRadius, 3);
         Assert.False(s.RaiseCraterEdges);
         Assert.False(s.Contaminates);
-        // 大型 HE 弾頭 ~1t 相当の実被害規模（核より桁違いに小さい）。
+        // The real damage of a large HE warhead of about 1 t, orders of magnitude below nuclear.
         Assert.InRange(s.DestructionRadius, 40f, 150f);
         Assert.True(s.CraterRadius > 0f && s.CraterRadius < 30f);
     }
@@ -33,9 +33,9 @@ public class WarheadSpecTests
     {
         var conv = WarheadSpec.For(WarheadType.Conventional);
         var nuke = WarheadSpec.For(WarheadType.Nuclear);
-        // 150kt 基準の 5psi 実半径 ~3.7km は通常弾の数十倍。
-        Assert.True(nuke.DestructionRadius > conv.DestructionRadius * 20f, "核は通常弾の20倍超の破壊半径");
-        Assert.True(nuke.BurnRadius > nuke.DestructionRadius, "熱線/延焼は破壊より広い");
+        // The real 5 psi radius at 150 kt, about 3.7 km, is tens of times a conventional one.
+        Assert.True(nuke.DestructionRadius > conv.DestructionRadius * 20f, "nuclear destroys over 20 times the radius of conventional");
+        Assert.True(nuke.BurnRadius > nuke.DestructionRadius, "thermal radiation and fires reach further than the destruction");
     }
 
     [Theory]
@@ -45,9 +45,9 @@ public class WarheadSpecTests
     {
         var s = WarheadSpec.For(type);
         Assert.Equal(type, s.Type);
-        Assert.True(s.SubmunitionCount > 1, "子弾は複数");
-        Assert.True(s.SpreadRadius > 0f, "散布半径は正");
-        // 子弾1発あたりのクレーターは通常弾より小さい。
+        Assert.True(s.SubmunitionCount > 1, "there is more than one submunition");
+        Assert.True(s.SpreadRadius > 0f, "the scatter radius is positive");
+        // One submunition leaves a smaller crater than a conventional warhead.
         Assert.True(s.CraterRadius < WarheadSpec.For(WarheadType.Conventional).CraterRadius);
     }
 
@@ -67,7 +67,7 @@ public class WarheadSpecTests
     {
         var thermo = WarheadSpec.For(WarheadType.Thermobaric);
         var conv = WarheadSpec.For(WarheadType.Conventional);
-        Assert.True(thermo.DestructionRadius > conv.DestructionRadius, "過圧は広域破壊");
+        Assert.True(thermo.DestructionRadius > conv.DestructionRadius, "the overpressure destroys a wider area");
         Assert.False(thermo.Contaminates);
     }
 
@@ -91,10 +91,10 @@ public class WarheadSpecTests
         Assert.Equal(0f, a.CraterRadius, 3);
         Assert.Equal(0f, a.CraterDepth, 3);
         Assert.False(a.RaiseCraterEdges);
-        Assert.False(a.Contaminates, "空中爆発は降下物ほぼ無し");
+        Assert.False(a.Contaminates, "an airburst leaves almost no fallout");
         Assert.Equal(0f, a.ContaminationRadius, 3);
-        Assert.True(a.DestructionRadius > s.DestructionRadius, "空中爆発は破壊が広がる");
-        Assert.True(a.BurnRadius > s.BurnRadius, "空中爆発は延焼が広がる");
+        Assert.True(a.DestructionRadius > s.DestructionRadius, "an airburst destroys a wider area");
+        Assert.True(a.BurnRadius > s.BurnRadius, "an airburst spreads fires further");
     }
 
     [Fact]
@@ -149,7 +149,7 @@ public class WarheadSpecTests
     {
         foreach (WarheadType t in System.Enum.GetValues(typeof(WarheadType)))
         {
-            Assert.True(WarheadSpec.For(t).BurnRadius >= 0f, $"{t} の延焼半径は非負");
+            Assert.True(WarheadSpec.For(t).BurnRadius >= 0f, $"{t} has a non-negative burn radius");
         }
     }
 
@@ -157,7 +157,7 @@ public class WarheadSpecTests
     public void WhitePhosphorus_is_incendiary_burn_exceeds_destruction()
     {
         var wp = WarheadSpec.For(WarheadType.WhitePhosphorus);
-        Assert.True(wp.BurnRadius > wp.DestructionRadius, "焼夷弾は延焼が破壊を上回る");
+        Assert.True(wp.BurnRadius > wp.DestructionRadius, "an incendiary burns further than it destroys");
     }
 
     [Fact]
@@ -175,14 +175,14 @@ public class WarheadSpecTests
         foreach (WarheadType t in new[] { WarheadType.Conventional, WarheadType.Cluster,
             WarheadType.WhitePhosphorus, WarheadType.Thermobaric })
         {
-            Assert.True(nuke > WarheadSpec.For(t).BurnRadius, $"核が {t} より広い延焼");
+            Assert.True(nuke > WarheadSpec.For(t).BurnRadius, $"nuclear burns further than {t}");
         }
     }
 
     [Fact]
     public void Only_nuclear_has_a_positive_contamination_radius()
     {
-        Assert.True(WarheadSpec.For(WarheadType.Nuclear).ContaminationRadius > 0f, "核は汚染半径>0");
+        Assert.True(WarheadSpec.For(WarheadType.Nuclear).ContaminationRadius > 0f, "nuclear has a contamination radius above zero");
         foreach (WarheadType t in new[] { WarheadType.Conventional, WarheadType.Cluster,
             WarheadType.WhitePhosphorus, WarheadType.Thermobaric })
         {
@@ -194,14 +194,14 @@ public class WarheadSpecTests
     public void Nuclear_is_the_largest_and_only_contaminating_warhead()
     {
         var nuke = WarheadSpec.For(WarheadType.Nuclear);
-        Assert.True(nuke.Contaminates, "核のみ汚染");
+        Assert.True(nuke.Contaminates, "only nuclear contaminates");
         foreach (WarheadType t in new[] { WarheadType.Conventional, WarheadType.Cluster,
             WarheadType.WhitePhosphorus, WarheadType.Thermobaric })
         {
             var other = WarheadSpec.For(t);
-            Assert.False(other.Contaminates, $"{t} は汚染しない");
-            Assert.True(nuke.CraterRadius > other.CraterRadius, $"核が {t} より大クレーター");
-            Assert.True(nuke.DestructionRadius >= other.DestructionRadius, $"核が {t} 以上の破壊範囲");
+            Assert.False(other.Contaminates, $"{t} does not contaminate");
+            Assert.True(nuke.CraterRadius > other.CraterRadius, $"nuclear leaves a larger crater than {t}");
+            Assert.True(nuke.DestructionRadius >= other.DestructionRadius, $"nuclear destroys at least as far as {t}");
         }
     }
 }

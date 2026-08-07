@@ -18,7 +18,7 @@ public class BallisticMathTests
     [InlineData(0f, 100f, 0f, 0f)]
     [InlineData(0f, 100f, 1f, 100f)]
     [InlineData(0f, 100f, 0.25f, 25f)]
-    [InlineData(0f, 100f, 2f, 100f)]   // クランプされる
+    [InlineData(0f, 100f, 2f, 100f)]   // clamped
     public void Lerp_interpolates_and_clamps(float a, float b, float t, float expected)
     {
         Assert.Equal(expected, BallisticMath.Lerp(a, b, t), 4);
@@ -27,7 +27,7 @@ public class BallisticMathTests
     [Theory]
     [InlineData(0f, 0f)]
     [InlineData(1f, 0f)]
-    [InlineData(0.5f, 700f)]  // 頂点で arcHeight
+    [InlineData(0.5f, 700f)]  // arcHeight at the apex
     public void ArcHeightAt_is_zero_at_ends_and_peaks_at_mid(float t, float expected)
     {
         Assert.Equal(expected, BallisticMath.ArcHeightAt(t, 700f), 3);
@@ -43,7 +43,7 @@ public class BallisticMathTests
     [Fact]
     public void AdvanceT_progresses_by_speed_over_distance()
     {
-        // 距離1000, 速度500, dt=1 → +0.5
+        // A distance of 1000 at a speed of 500 over dt=1 advances t by 0.5.
         Assert.Equal(0.5f, BallisticMath.AdvanceT(0f, 1000f, 500f, 1f), 4);
     }
 
@@ -51,6 +51,6 @@ public class BallisticMathTests
     public void AdvanceT_handles_zero_distance_without_divide_by_zero()
     {
         float result = BallisticMath.AdvanceT(0.4f, 0f, 500f, 1f);
-        Assert.True(result >= 1f); // 距離0なら即着弾扱い(=1到達)
+        Assert.True(result >= 1f); // zero distance counts as an immediate impact, so t reaches 1
     }
 }

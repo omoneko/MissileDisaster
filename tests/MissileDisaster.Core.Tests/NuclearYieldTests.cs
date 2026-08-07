@@ -12,7 +12,8 @@ public class NuclearYieldTests
     [Fact]
     public void Multiplier_follows_cube_root_of_yield_ratio()
     {
-        // 爆風半径 ∝ 威力^(1/3)。150kt を基準に cbrt(kt/150)。
+        // The blast radius goes as the cube root of the yield: cbrt(kt/150) against the 150 kt
+        // baseline.
         float expected = (float)System.Math.Pow(1000.0 / 150.0, 1.0 / 3.0);
         Assert.Equal(expected, NuclearYields.Multiplier(1000), 3);
     }

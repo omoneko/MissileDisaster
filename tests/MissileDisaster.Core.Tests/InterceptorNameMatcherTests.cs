@@ -10,7 +10,8 @@ public class InterceptorNameMatcherTests
     [InlineData("thaad", InterceptorKind.Sam)]
     [InlineData("Aegis", InterceptorKind.Arrow)]
     [InlineData("aegis", InterceptorKind.Arrow)]
-    [InlineData("イージス", InterceptorKind.Arrow)]
+    // Japanese for "Aegis"; the matcher has to recognise assets named in other languages.
+    [InlineData("\u30a4\u30fc\u30b8\u30b9", InterceptorKind.Arrow)]
     public void TryMatchTier_matches_exact_asset_names_case_insensitive(string name, InterceptorKind expected)
     {
         InterceptorKind kind;
@@ -49,7 +50,8 @@ public class InterceptorNameMatcherTests
     [Fact]
     public void TryMatchTier_prefers_Aegis_over_other_keywords_when_ambiguous()
     {
-        // "Aegis THAAD Hybrid" は両方のキーワードを含むが、判定順序(Aegis→THAAD→PAC3)により Arrow を返す。
+        // "Aegis THAAD Hybrid" contains both keywords, but the order - Aegis, then THAAD, then
+        // PAC3 - means it comes back as Arrow.
         InterceptorKind kind;
         bool matched = InterceptorNameMatcher.TryMatchTier("Aegis THAAD Hybrid", out kind);
 
@@ -60,7 +62,8 @@ public class InterceptorNameMatcherTests
     [Theory]
     [InlineData("Radar Site")]
     [InlineData("radar site")]
-    [InlineData("レーダーサイト")]
+    // Japanese for "radar site".
+    [InlineData("\u30ec\u30fc\u30c0\u30fc\u30b5\u30a4\u30c8")]
     [InlineData("111.Radar_Data")]
     public void IsRadar_matches_radar_asset_names_case_insensitive(string name)
     {

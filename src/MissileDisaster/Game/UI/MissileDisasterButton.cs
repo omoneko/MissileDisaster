@@ -4,14 +4,18 @@ using UnityEngine;
 namespace MissileDisaster.Game.UI
 {
     /// <summary>
-    /// バニラ災害パネル(DisastersPanel)の「災害アイコン列」(UIScrollablePanel)の中に、
-    /// ミサイル起動アイコンをバニラ災害アイコンと並べて追加する。列の自動レイアウトに乗るため
-    /// 他MOD(UFO等)や既存アイコンと重ならず、パネルにも見切れない。
+    /// Adds the launch icon into the row of disaster icons (a UIScrollablePanel) in the vanilla
+    /// DisastersPanel, alongside the vanilla ones. Because it joins that row's automatic layout,
+    /// it cannot overlap the existing icons or another mod's, and it cannot end up clipped by
+    /// the panel.
     ///
-    /// 注意: DisastersPanel はタブを開く度に列を再生成する(RefreshPanel)ため、追加したボタンが
-    /// 消えることがある。EnsureAttached() を毎フレーム(メインスレッド)呼び、_button が消えていたら
-    /// 貼り直す。列が見つからない環境(例: Natural Disasters DLC 未所持)は猶予後に右上フォールバック。
-    /// クリックで発射パネル(MissilePanel)を開閉する。CreateButton/DestroyButton はレベルロード/アンロードで呼ぶ。
+    /// Note that DisastersPanel rebuilds the row every time the tab is opened (RefreshPanel),
+    /// which can take the button with it. EnsureAttached() therefore runs every frame on the
+    /// main thread and re-attaches _button if it has gone. Where the row never appears at all -
+    /// without the Natural Disasters DLC, for instance - it falls back after a grace period to a
+    /// button in the top-right corner.
+    /// Clicking it opens and closes MissilePanel. CreateButton and DestroyButton are called on
+    /// level load and unload.
     /// </summary>
     public static class MissileDisasterButton
     {
@@ -19,8 +23,8 @@ namespace MissileDisaster.Game.UI
 
         private static UIButton _button;
         private static Texture2D _iconTex;
-        private static bool _rowFound;   // 一度でも災害列に取り付けたか（以後フォールバックしない）
-        private static bool _fallback;   // 右上フォールバックを作ったか
+        private static bool _rowFound;   // whether it ever made it into the disaster row; after that it never falls back
+        private static bool _fallback;   // whether the top-right fallback was created
         private static int _waitFrames;
 
         public static void CreateButton()
@@ -32,14 +36,17 @@ namespace MissileDisaster.Game.UI
             EnsureAttached();
         }
 
-        /// <summary>OnUpdate(メインスレッド)から毎フレーム呼ぶ。列再生成で消えたら貼り直す。
-        /// バグ修正（KAIJU側のユーザー報告「災害タブからアイコンが消えた」と同系）: 旧実装は
-        /// フォールバック（右上ボタン）へ一度移行すると恒久的に列への取り付けを止めていた。
-        /// フォールバック表示中も列への取り付けを試み続け、列が見つかり次第フォールバックを破棄して
-        /// 災害タブへ移行する（GodzillaButton/InvasionUIと同じ修正）。</summary>
+        /// <summary>
+        /// Call every frame from OnUpdate on the main thread; re-attaches the icon whenever the
+        /// row is rebuilt.
+        /// This also fixes the same bug reported against KAIJU, where the icon vanished from the
+        /// disasters tab. The old code stopped trying the row for good as soon as it fell back
+        /// to the top-right button. It now keeps trying even while the fallback is showing, and
+        /// moves to the disasters tab - discarding the fallback - the moment the row exists.
+        /// </summary>
         public static void EnsureAttached()
         {
-            if (_rowFound && _button != null) return; // 災害列に取り付け済み（列再生成で消えたら再試行される）
+            if (_rowFound && _button != null) return; // already in the row; a rebuild clears this and it retries
 
             UIButton fallbackButton = _fallback ? _button : null;
             if (TryAttachToRow())
@@ -49,13 +56,13 @@ namespace MissileDisaster.Game.UI
                 {
                     try { Object.Destroy(fallbackButton.gameObject); }
                     catch (System.Exception e) { ModConfig.LogError("MissileDisasterButton: fallback cleanup error: " + e); }
-                    ModConfig.Log("ミサイル発射ボタンを右上フォールバックから災害アイコン列へ移行しました");
+                    ModConfig.Log("moved the launch button from the top-right fallback into the disaster icon row");
                 }
                 _fallback = false;
                 return;
             }
 
-            if (_button != null) return; // フォールバック表示中で、列はまだ見つからない
+            if (_button != null) return; // the fallback is showing and the row is still not there
             if (!_rowFound && ++_waitFrames >= ModConfig.TabButtonFallbackFrames) CreateFallbackButton();
         }
 
@@ -74,7 +81,7 @@ namespace MissileDisaster.Game.UI
                 UIButton button = row.AddUIComponent<UIButton>();
                 StyleTile(button, row);
                 _button = button;
-                ModConfig.Log("ミサイルアイコンを災害アイコン列に追加しました");
+                ModConfig.Log("added the missile icon to the disaster icon row");
                 return true;
             }
             catch (System.Exception e)
@@ -84,7 +91,7 @@ namespace MissileDisaster.Game.UI
             }
         }
 
-        /// <summary>災害列の既存タイルに寄せてスタイルし、中央にミサイルアイコンを載せる。</summary>
+        /// <summary>Styles it after the existing tiles in the row and centres the missile icon on it.</summary>
         private static void StyleTile(UIButton button, UIScrollablePanel row)
         {
             button.name = ButtonName;
@@ -119,7 +126,7 @@ namespace MissileDisaster.Game.UI
             icon.isInteractive = false;
         }
 
-        /// <summary>列の中の、自分以外の既存ボタン(バニラ災害タイル)を1つ返す。</summary>
+        /// <summary>One existing button from the row other than our own, i.e. a vanilla disaster tile.</summary>
         private static UIButton FirstOtherButton(UIScrollablePanel row)
         {
             UIButton[] bs = row.GetComponentsInChildren<UIButton>();
@@ -137,14 +144,15 @@ namespace MissileDisaster.Game.UI
                 UIView view = UIView.GetAView();
                 if (view == null) { _fallback = true; return; }
 
-                // バグ修正: 既存ボタン（前レベルの取り残し等）は_buttonへ採用して再利用する
-                // （旧実装はフラグだけ立てて戻り「サイレント消失」になっていた。GodzillaButtonと同じ修正）。
+                // Part of the same fix: an existing button - left over from a previous level,
+                // say - is adopted into _button and reused. The old code merely set the flag and
+                // returned, after which the icon was nowhere to be seen.
                 UIButton stale = view.FindUIComponent<UIButton>(ButtonName);
                 if (stale != null)
                 {
                     _button = stale;
                     _fallback = true;
-                    ModConfig.Log("既存のミサイル発射ボタンを再利用しました(フォールバック)");
+                    ModConfig.Log("reused the existing launch button (fallback)");
                     return;
                 }
 
@@ -154,7 +162,7 @@ namespace MissileDisaster.Game.UI
                 button.relativePosition = FindTopRightSlot(view, button);
                 _button = button;
                 _fallback = true;
-                ModConfig.Log("災害列が見つからないため、ミサイル起動ボタンを画面右上に生成しました(フォールバック)");
+                ModConfig.Log("the disaster row was not found, so the launch button was created in the top-right corner (fallback)");
             }
             catch (System.Exception e)
             {
@@ -243,13 +251,14 @@ namespace MissileDisaster.Game.UI
 
         private static void OnButtonClick(UIComponent component, UIMouseEventParameter eventParam)
         {
-            // 災害列のクリック処理にバニラ災害を選ばせない：イベント消費＋選択解除してからミサイル照準を起動。
+            // Stop the click from also selecting a vanilla disaster in the row: consume the
+            // event and clear the selection before opening the aiming tool.
             try { if (eventParam != null) eventParam.Use(); } catch { }
             ClearDisasterSelection();
             MissilePanel.ShowAndStartTargeting();
         }
 
-        /// <summary>災害パネルの選択(ハイライト/武装)を解除する（別の災害が選択されたままになるのを防ぐ）。</summary>
+        /// <summary>Clears the disasters panel's selection, both the highlight and the armed state, so no other disaster stays selected.</summary>
         private static void ClearDisasterSelection()
         {
             try

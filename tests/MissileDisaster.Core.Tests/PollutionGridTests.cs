@@ -55,7 +55,7 @@ public class PollutionGridTests
         {
             if (d.Index == centerIndex) { centerIntensity = d.Intensity; found = true; }
         }
-        Assert.True(found, "中心セルが含まれる");
+        Assert.True(found, "the centre cell is included");
         Assert.Equal(255, centerIntensity);
     }
 
@@ -64,7 +64,7 @@ public class PollutionGridTests
     {
         int small = PollutionGrid.CellsInRadius(0f, 0f, 100f, 255).Count;
         int large = PollutionGrid.CellsInRadius(0f, 0f, 400f, 255).Count;
-        Assert.True(large > small, "半径が大きいほど多くのセル");
+        Assert.True(large > small, "a larger radius covers more cells");
     }
 
     [Fact]
@@ -73,6 +73,6 @@ public class PollutionGridTests
         List<CellDose> doses = PollutionGrid.CellsInRadius(0f, 0f, 300f, 255);
         bool anyBelowMax = false;
         foreach (CellDose d in doses) if (d.Intensity < 255) { anyBelowMax = true; break; }
-        Assert.True(anyBelowMax, "端に向かって減衰したセルが存在する");
+        Assert.True(anyBelowMax, "some cells have fallen off towards the edge");
     }
 }
