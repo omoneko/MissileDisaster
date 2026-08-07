@@ -17,3 +17,6 @@ Thumbs.db
 スクリーンショット*.png
 レコーディング*
 画像*.png
+
+# Claude Code / superpowers workflow artifacts - not part of the published mod
+.superpowers/
