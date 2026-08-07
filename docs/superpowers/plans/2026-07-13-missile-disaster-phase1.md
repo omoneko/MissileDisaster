@@ -1,50 +1,50 @@
-# ミサイル災害 Mod — Phase 1 実装計画（基盤＋通常弾頭 1 発）
+# Missile Disaster mod - Phase 1 implementation plan (the foundation plus one conventional warhead)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** クリックした地点へ通常弾頭ミサイルを 1 発、放物線で飛翔させ、着弾でクレーター＋範囲破壊を起こす最小構成を作る。
+**Goal:** the smallest thing that works - one conventional missile flying a parabola to the point you clicked, leaving a crater and destroying the area around it.
 
-**Architecture:** 新規・独立 Mod `MissileDisaster`。Alien Invasion の「メインスレッド＝Transform 補間（`simulationTimeDelta` 駆動）／シミュレーションスレッド＝`DisasterHelpers` で着弾ダメージ」という二段構えを踏襲。純粋数学は `Core`（UnityEngine 非依存・float のみ）に置き xUnit でテスト。ゲーム型依存部は実機確認。
+**Architecture:** a new, self-contained mod, `MissileDisaster`, following Alien Invasion's two-tier split - Transform interpolation on the main thread driven by `simulationTimeDelta`, and impact damage through `DisasterHelpers` on the simulation thread. The pure maths lives in `Core` with no UnityEngine dependency, floats only, and is covered by xUnit; anything depending on game types is verified in game.
 
-**Tech Stack:** C# (LangVersion 7.3)、mod 本体は .NET Framework 3.5（Cities: Skylines / Unity 5.6）、テストは net8.0 + xUnit。参照 DLL は CS インストール配下の `Cities_Data\Managed`。
+**Tech stack:** C# with LangVersion 7.3; the mod targets .NET Framework 3.5 (Cities: Skylines on Unity 5.6) and the tests net8.0 with xUnit. The referenced DLLs come from `Cities_Data\Managed` in the game's installation.
 
 ## Global Constraints
 
-- Mod 本体ターゲット: `TargetFrameworkVersion=v3.5`、`LangVersion=7.3`。UnityEngine 4.5+ API 禁止（`IReadOnlyList` 等不可、`string.IndexOf(string, StringComparison)` は可）。
-- `Core/**/*.cs` は UnityEngine を参照しない（float/組込型のみ）。テストプロジェクトが net8.0 で同ソースをリンクするため。
-- CS Managed DLL パス: `C:\Program Files (x86)\Steam\steamapps\common\Cities_Skylines\Cities_Data\Managed`（`ManagedDLLPath` プロパティで一元化）。
-- スレッド境界厳守: GameObject/Transform/Effects/状態書込み＝メインスレッド、`DisasterHelpers`/汚染書込み＝シミュレーションスレッド。`ThreadingExtensionBase.OnAfterSimulationTick` から Transform を触らない。
-- テスト構成は既存 2 Mod と同一（テスト csproj が `..\..\src\MissileDisaster\Core\**\*.cs` を `LinkBase="Core"` でリンク）。
-- ログ接頭辞: `[MissileDisaster] `。
-- 名前空間ルート: `MissileDisaster`（`MissileDisaster.Core` / `MissileDisaster.Game` / `MissileDisaster.Game.Simulation` / `MissileDisaster.Game.UI`）。
-- Mod デプロイ先: `%LOCALAPPDATA%\Colossal Order\Cities_Skylines\Addons\Mods\MissileDisaster`。
+- The mod targets `TargetFrameworkVersion=v3.5` with `LangVersion=7.3`. No .NET 4.5 or later APIs - `IReadOnlyList` and the like are out, though `string.IndexOf(string, StringComparison)` is fine.
+- `Core/**/*.cs` never references UnityEngine, using floats and built-in types only, because the test project links the same sources under net8.0.
+- The managed DLL path is kept in one place, the `ManagedDLLPath` property, pointing at the game's `Cities_Data\Managed`.
+- The thread boundary is absolute: GameObjects, Transforms, effects and writing state on the main thread; `DisasterHelpers` and the contamination writes on the simulation thread. Never touch a Transform from `ThreadingExtensionBase.OnAfterSimulationTick`.
+- The test layout matches the two existing mods: the test csproj links `..\..\src\MissileDisaster\Core\**\*.cs` with `LinkBase="Core"`.
+- The log prefix is `[MissileDisaster] `.
+- The root namespace is `MissileDisaster`, with `MissileDisaster.Core`, `MissileDisaster.Game`, `MissileDisaster.Game.Simulation` and `MissileDisaster.Game.UI`.
+- The mod deploys to `%LOCALAPPDATA%\Colossal Order\Cities_Skylines\Addons\Mods\MissileDisaster`.
 
 ---
 
-## ファイル構成（Phase 1 で作成するファイル）
+## Files created in Phase 1
 
 | File | Responsibility |
 |---|---|
-| `MissileDisaster.sln` | ソリューション（mod + テスト） |
-| `src/MissileDisaster/MissileDisaster.csproj` | mod 本体プロジェクト（v3.5・CS DLL 参照） |
-| `src/MissileDisaster/Properties/AssemblyInfo.cs` | アセンブリ情報 |
-| `src/MissileDisaster/Core/BallisticMath.cs` | 放物線・補間・進行の純粋数学 |
-| `src/MissileDisaster/Core/WarheadType.cs` | 弾頭種別 enum（Phase 1 は Conventional のみ使用） |
-| `src/MissileDisaster/Core/WarheadSpec.cs` | 弾頭別パラメータ表（Phase 1 は Conventional の係数） |
-| `src/MissileDisaster/Game/ModConfig.cs` | 定数・ログ |
-| `src/MissileDisaster/Game/Missile.cs` | 1 発の状態＋飛翔補間＋着弾 |
-| `src/MissileDisaster/Game/MissileManager.cs` | 発射・追跡（メイン＝飛翔／sim＝着弾） |
-| `src/MissileDisaster/Game/ImpactResolver.cs` | クレーター＋範囲破壊（sim スレッド） |
-| `src/MissileDisaster/Game/UI/MissileTool.cs` | 着弾点クリック指定ツール |
-| `src/MissileDisaster/Game/Simulation/MissileThreadingExtension.cs` | 発動・進行・着弾の駆動 |
-| `src/MissileDisaster/Game/Mod.cs` | IUserMod エントリ |
-| `tests/MissileDisaster.Core.Tests/MissileDisaster.Core.Tests.csproj` | テストプロジェクト |
-| `tests/MissileDisaster.Core.Tests/BallisticMathTests.cs` | BallisticMath のテスト |
-| `build.ps1` | ビルド＆デプロイ |
+| `MissileDisaster.sln` | the solution, holding the mod and the tests |
+| `src/MissileDisaster/MissileDisaster.csproj` | the mod project, targeting v3.5 and referencing the CS DLLs |
+| `src/MissileDisaster/Properties/AssemblyInfo.cs` | the assembly information |
+| `src/MissileDisaster/Core/BallisticMath.cs` | the pure maths of the parabola, the interpolation and the progress |
+| `src/MissileDisaster/Core/WarheadType.cs` | the warhead enum; Phase 1 uses Conventional only |
+| `src/MissileDisaster/Core/WarheadSpec.cs` | the parameter table per warhead; Phase 1 has the conventional figures |
+| `src/MissileDisaster/Game/ModConfig.cs` | the constants and logging |
+| `src/MissileDisaster/Game/Missile.cs` | one missile: its state, its flight interpolation and its impact |
+| `src/MissileDisaster/Game/MissileManager.cs` | launching and tracking - flight on the main thread, impact on the simulation thread |
+| `src/MissileDisaster/Game/ImpactResolver.cs` | the crater and the area destruction, on the simulation thread |
+| `src/MissileDisaster/Game/UI/MissileTool.cs` | the tool for clicking where it should land |
+| `src/MissileDisaster/Game/Simulation/MissileThreadingExtension.cs` | drives the triggering, the flight and the impact |
+| `src/MissileDisaster/Game/Mod.cs` | the IUserMod entry point |
+| `tests/MissileDisaster.Core.Tests/MissileDisaster.Core.Tests.csproj` | the test project |
+| `tests/MissileDisaster.Core.Tests/BallisticMathTests.cs` | the BallisticMath tests |
+| `build.ps1` | builds and deploys |
 
 ---
 
-## Task 1: プロジェクト基盤（コンパイルが通る空 Mod ＋テスト土台）
+## Task 1: the project foundation (an empty mod that compiles, plus the test scaffolding)
 
 **Files:**
 - Create: `src/MissileDisaster/MissileDisaster.csproj`
@@ -56,9 +56,9 @@
 - Create: `build.ps1`
 
 **Interfaces:**
-- Produces: `MissileDisaster.Game.ModConfig.Log(string)` / `LogError(string)` / `LogPrefix`。IUserMod `MissileDisaster.Game.Mod`。
+- Produces `MissileDisaster.Game.ModConfig.Log(string)`, `LogError(string)` and `LogPrefix`, plus the IUserMod `MissileDisaster.Game.Mod`.
 
-- [ ] **Step 1: mod 本体 csproj を作成**
+- [ ] **Step 1: create the mod csproj.**
 
 `src/MissileDisaster/MissileDisaster.csproj`:
 ```xml
@@ -112,7 +112,7 @@
 </Project>
 ```
 
-- [ ] **Step 2: AssemblyInfo を作成**
+- [ ] **Step 2: create AssemblyInfo.**
 
 `src/MissileDisaster/Properties/AssemblyInfo.cs`:
 ```csharp
@@ -127,7 +127,7 @@ using System.Runtime.InteropServices;
 [assembly: Guid("d3a1b3d0-0000-4000-8000-000000000010")]
 ```
 
-- [ ] **Step 3: ModConfig を作成（Phase 1 の定数）**
+- [ ] **Step 3: create ModConfig with the Phase 1 constants.**
 
 `src/MissileDisaster/Game/ModConfig.cs`:
 ```csharp
@@ -135,20 +135,20 @@ using UnityEngine;
 
 namespace MissileDisaster.Game
 {
-    /// <summary>Mod 全体の定数と共通ログ。</summary>
+    /// <summary>Mod-wide constants and shared logging.</summary>
     public static class ModConfig
     {
         public const string LogPrefix = "[MissileDisaster] ";
 
-        // 手動発射ツールを起動するキー（Alien の F7 と衝突しないよう F9）。
+        // Hotkey that opens the manual launch tool; F9, to avoid Alien's F7.
         public const KeyCode ManualTriggerKey = KeyCode.F9;
 
         // Flight, driven on the main thread by simulationTimeDelta.
-        public const float MissileSpeed = 900f;   // 地表投影距離に対する m/秒 相当
-        public const float MissileArcHeight = 700f; // 放物線の頂点高さ（m）
-        public const float MissileStartAltitude = 1200f; // 発射点の高さ
+        public const float MissileSpeed = 900f;   // metres per second against the horizontal distance
+        public const float MissileArcHeight = 700f; // height of the parabola's apex (m)
+        public const float MissileStartAltitude = 1200f; // height of the launch point
 
-        // 着弾（通常弾頭・sim スレッドで DisasterHelpers を呼ぶ）。
+        // Impact of a conventional warhead; DisasterHelpers is called on the simulation thread.
         public const float SinkholeRadius = 60f;
         public const float SinkholeDepth = 16f;
         public const float DestructionRadius = 120f;
@@ -159,7 +159,7 @@ namespace MissileDisaster.Game
 }
 ```
 
-- [ ] **Step 4: IUserMod エントリを作成**
+- [ ] **Step 4: create the IUserMod entry point.**
 
 `src/MissileDisaster/Game/Mod.cs`:
 ```csharp
@@ -177,7 +177,7 @@ namespace MissileDisaster.Game
 }
 ```
 
-- [ ] **Step 5: テストプロジェクトを作成**
+- [ ] **Step 5: create the test project.**
 
 `tests/MissileDisaster.Core.Tests/MissileDisaster.Core.Tests.csproj`:
 ```xml
@@ -189,7 +189,7 @@ namespace MissileDisaster.Game
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <!-- Core の実ソースを直接コンパイルしてテスト（別ビルド不要） -->
+    <!-- Compile the real Core sources straight into the test assembly, so no separate build is needed -->
     <Compile Include="..\..\src\MissileDisaster\Core\**\*.cs" LinkBase="Core" />
   </ItemGroup>
   <ItemGroup>
@@ -200,17 +200,17 @@ namespace MissileDisaster.Game
 </Project>
 ```
 
-- [ ] **Step 6: ソリューションを作成しプロジェクトを追加**
+- [ ] **Step 6: create the solution and add the projects.**
 
 Run:
 ```bash
-cd "C:/Users/omone/Desktop/G/ミサイル災害プロジェクト"
+cd <repository root>
 dotnet new sln -n MissileDisaster
 dotnet sln add tests/MissileDisaster.Core.Tests/MissileDisaster.Core.Tests.csproj
 ```
-Expected: sln 作成、テストプロジェクト追加成功（mod 本体 v3.5 は `dotnet sln add` すると SDK 差異の警告が出るため sln には追加せず、`build.ps1`（msbuild）でビルドする）。
+Expected: the sln is created and the test project added. The v3.5 mod project is deliberately left out of the sln, since `dotnet sln add` warns about the SDK difference; it is built with `build.ps1` through msbuild instead.
 
-- [ ] **Step 7: build.ps1 を作成**
+- [ ] **Step 7: create build.ps1.**
 
 `build.ps1`:
 ```powershell
@@ -229,26 +229,26 @@ Copy-Item $dll $modDir -Force
 Write-Host "Deploy complete: $modDir"
 ```
 
-- [ ] **Step 8: mod 本体がコンパイルできることを確認**
+- [ ] **Step 8: confirm the mod compiles.**
 
 Run: `powershell -ExecutionPolicy Bypass -File build.ps1`
-Expected: `MissileDisaster -> ...\bin\Release\MissileDisaster.dll` と「配置完了」。エラー無し。
+Expected: `MissileDisaster -> ...\bin\Release\MissileDisaster.dll` followed by the deployment message, with no errors.
 
-- [ ] **Step 9: テストプロジェクトがビルド/実行できることを確認（テスト 0 件）**
+- [ ] **Step 9: confirm the test project builds and runs, with zero tests.**
 
 Run: `dotnet test tests/MissileDisaster.Core.Tests/MissileDisaster.Core.Tests.csproj --nologo`
-Expected: ビルド成功、合計 0 件（Core にまだテスト対象が無い）。
+Expected: the build succeeds with a total of 0 tests, since Core has nothing to test yet.
 
 - [ ] **Step 10: Commit**
 
 ```bash
 git add -A
-git commit -m "chore: MissileDisaster プロジェクト基盤 (空Mod+テスト土台)"
+git commit -m "chore: scaffold the MissileDisaster project (empty mod plus test scaffolding)"
 ```
 
 ---
 
-## Task 2: BallisticMath（Core・TDD）
+## Task 2: BallisticMath (Core, test-first)
 
 **Files:**
 - Create: `src/MissileDisaster/Core/BallisticMath.cs`
@@ -257,9 +257,9 @@ git commit -m "chore: MissileDisaster プロジェクト基盤 (空Mod+テスト
 **Interfaces:**
 - Produces:
   - `float BallisticMath.Clamp01(float t)`
-  - `float BallisticMath.Lerp(float a, float b, float t)` — t を 0..1 にクランプして補間
-  - `float BallisticMath.ArcHeightAt(float t, float arcHeight)` — 放物線の高さ成分。t=0,1 で 0、t=0.5 で arcHeight
-  - `float BallisticMath.AdvanceT(float t, float groundDistance, float speed, float dt)` — 進行度 t を速度・経過時間で進める（距離 0 でも例外を出さない）
+  - `float BallisticMath.Lerp(float a, float b, float t)` - interpolates, clamping t into 0..1
+  - `float BallisticMath.ArcHeightAt(float t, float arcHeight)` - the height component of the arc: 0 at t=0 and t=1, and arcHeight at t=0.5
+  - `float BallisticMath.AdvanceT(float t, float groundDistance, float speed, float dt)` - advances t by the speed and the elapsed time, without throwing at zero distance
 
 - [ ] **Step 1: write the failing tests.**
 
@@ -285,7 +285,7 @@ public class BallisticMathTests
     [InlineData(0f, 100f, 0f, 0f)]
     [InlineData(0f, 100f, 1f, 100f)]
     [InlineData(0f, 100f, 0.25f, 25f)]
-    [InlineData(0f, 100f, 2f, 100f)]   // クランプされる
+    [InlineData(0f, 100f, 2f, 100f)]   // clamped
     public void Lerp_interpolates_and_clamps(float a, float b, float t, float expected)
     {
         Assert.Equal(expected, BallisticMath.Lerp(a, b, t), 4);
@@ -294,7 +294,7 @@ public class BallisticMathTests
     [Theory]
     [InlineData(0f, 0f)]
     [InlineData(1f, 0f)]
-    [InlineData(0.5f, 700f)]  // 頂点で arcHeight
+    [InlineData(0.5f, 700f)]  // arcHeight at the apex
     public void ArcHeightAt_is_zero_at_ends_and_peaks_at_mid(float t, float expected)
     {
         Assert.Equal(expected, BallisticMath.ArcHeightAt(t, 700f), 3);
@@ -310,7 +310,7 @@ public class BallisticMathTests
     [Fact]
     public void AdvanceT_progresses_by_speed_over_distance()
     {
-        // 距離1000, 速度500, dt=1 → +0.5
+        // A distance of 1000 at a speed of 500 over dt=1 advances t by 0.5.
         Assert.Equal(0.5f, BallisticMath.AdvanceT(0f, 1000f, 500f, 1f), 4);
     }
 
@@ -318,7 +318,7 @@ public class BallisticMathTests
     public void AdvanceT_handles_zero_distance_without_divide_by_zero()
     {
         float result = BallisticMath.AdvanceT(0.4f, 0f, 500f, 1f);
-        Assert.True(result >= 1f); // 距離0なら即着弾扱い(=1到達)
+        Assert.True(result >= 1f); // zero distance counts as an immediate impact, so t reaches 1
     }
 }
 ```
@@ -326,7 +326,7 @@ public class BallisticMathTests
 - [ ] **Step 2: confirm the tests fail.**
 
 Run: `dotnet test tests/MissileDisaster.Core.Tests/MissileDisaster.Core.Tests.csproj --nologo`
-Expected: コンパイルエラー（`BallisticMath` 未定義）で FAIL。
+Expected: FAIL with a compile error, since `BallisticMath` does not exist yet.
 
 - [ ] **Step 3: write the minimum implementation.**
 
@@ -335,8 +335,9 @@ Expected: コンパイルエラー（`BallisticMath` 未定義）で FAIL。
 namespace MissileDisaster.Core
 {
     /// <summary>
-    /// ミサイル飛翔（放物線）の純粋数学。UnityEngine 非依存（float のみ）で単体テスト可能。
-    /// ゲーム側は x/z を Lerp、y を Lerp + ArcHeightAt で合成して Vector3 を作る。
+    /// Pure maths for a missile's parabolic flight. No UnityEngine dependency - floats only -
+    /// so it is unit testable. The Game layer builds the Vector3 by lerping x and z, and
+    /// composing y from a lerp plus ArcHeightAt.
     /// </summary>
     public static class BallisticMath
     {
@@ -353,17 +354,17 @@ namespace MissileDisaster.Core
             return a + (b - a) * t;
         }
 
-        /// <summary>放物線の高さ成分。t=0,1 で 0、t=0.5 で arcHeight。</summary>
+        /// <summary>The height component of the arc: 0 at t=0 and t=1, and arcHeight at t=0.5.</summary>
         public static float ArcHeightAt(float t, float arcHeight)
         {
             t = Clamp01(t);
             return arcHeight * 4f * t * (1f - t);
         }
 
-        /// <summary>進行度 t を「地表投影距離 groundDistance を speed で進む」ぶんだけ加算。</summary>
+        /// <summary>Advances t by however far speed carries it along groundDistance, the distance projected on the ground.</summary>
         public static float AdvanceT(float t, float groundDistance, float speed, float dt)
         {
-            if (groundDistance <= 0.0001f) return 1f; // 距離0は即着弾扱い
+            if (groundDistance <= 0.0001f) return 1f; // zero distance counts as an immediate impact
             return t + (speed * dt) / groundDistance;
         }
     }
@@ -373,18 +374,18 @@ namespace MissileDisaster.Core
 - [ ] **Step 4: confirm the tests pass.**
 
 Run: `dotnet test tests/MissileDisaster.Core.Tests/MissileDisaster.Core.Tests.csproj --nologo`
-Expected: PASS（全 15 ケース合格）。
+Expected: PASS, all 15 cases.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add src/MissileDisaster/Core/BallisticMath.cs tests/MissileDisaster.Core.Tests/BallisticMathTests.cs
-git commit -m "feat(core): 放物線飛翔の純粋数学 BallisticMath (TDD)"
+git commit -m "feat(core): BallisticMath, the pure maths of the parabolic flight (TDD)"
 ```
 
 ---
 
-## Task 3: WarheadType / WarheadSpec（Core・TDD、Phase 1 は Conventional）
+## Task 3: WarheadType and WarheadSpec (Core, test-first; Phase 1 covers Conventional)
 
 **Files:**
 - Create: `src/MissileDisaster/Core/WarheadType.cs`
@@ -395,7 +396,7 @@ git commit -m "feat(core): 放物線飛翔の純粋数学 BallisticMath (TDD)"
 - Produces:
   - `enum MissileDisaster.Core.WarheadType { Conventional, Cluster, WhitePhosphorus, Thermobaric, Nuclear }`
   - `struct WarheadSpec { float CraterRadius; float CraterDepth; float DestructionRadius; bool Contaminates; }`
-  - `WarheadSpec WarheadSpec.For(WarheadType type)` — Phase 1 は Conventional のみ実値、他は Conventional と同値の暫定（後続 Phase で差別化）
+  - `WarheadSpec WarheadSpec.For(WarheadType type)` - only Conventional has real figures in Phase 1; the rest provisionally return the same, and a later phase differentiates them
 
 - [ ] **Step 1: write the failing tests.**
 
@@ -436,7 +437,7 @@ public class WarheadSpecTests
 - [ ] **Step 2: confirm the tests fail.**
 
 Run: `dotnet test tests/MissileDisaster.Core.Tests/MissileDisaster.Core.Tests.csproj --nologo`
-Expected: コンパイルエラー（`WarheadType`/`WarheadSpec` 未定義）で FAIL。
+Expected: FAIL with a compile error, since `WarheadType` and `WarheadSpec` do not exist yet.
 
 - [ ] **Step 3: write the minimum implementation.**
 
@@ -444,7 +445,7 @@ Expected: コンパイルエラー（`WarheadType`/`WarheadSpec` 未定義）で
 ```csharp
 namespace MissileDisaster.Core
 {
-    /// <summary>弾頭種別。Phase 1 は Conventional のみ挙動を実装する。</summary>
+    /// <summary>The kinds of warhead. Phase 1 implements the behaviour of Conventional only.</summary>
     public enum WarheadType
     {
         Conventional,
@@ -461,9 +462,10 @@ namespace MissileDisaster.Core
 namespace MissileDisaster.Core
 {
     /// <summary>
-    /// 弾頭ごとの着弾パラメータ（UnityEngine 非依存の数値表）。
-    /// Phase 1 は Conventional のみ実値。他種別は暫定で Conventional と同値を返し、
-    /// 後続 Phase（弾頭分岐・核）で差別化する。
+    /// Impact parameters per warhead, as a plain table of numbers with no UnityEngine
+    /// dependency.
+    /// Only Conventional has real figures in Phase 1; the others provisionally return the same,
+    /// and a later phase - the warhead types and the nuclear one - differentiates them.
     /// </summary>
     public struct WarheadSpec
     {
@@ -474,7 +476,7 @@ namespace MissileDisaster.Core
 
         public static WarheadSpec For(WarheadType type)
         {
-            // Phase 1: すべて通常弾頭相当（後続 Phase で type ごとに分岐）。
+            // Phase 1: everything behaves as a conventional warhead; a later phase branches on the type.
             return new WarheadSpec
             {
                 CraterRadius = 60f,
@@ -501,16 +503,16 @@ git commit -m "feat(core): WarheadType/WarheadSpec (Phase1=Conventional)"
 
 ---
 
-## Task 4: ImpactResolver（sim スレッドのクレーター＋破壊）
+## Task 4: ImpactResolver (the crater and the destruction, on the simulation thread)
 
 **Files:**
 - Create: `src/MissileDisaster/Game/ImpactResolver.cs`
 
 **Interfaces:**
 - Consumes: `MissileDisaster.Core.WarheadSpec`
-- Produces: `void ImpactResolver.Resolve(UnityEngine.Vector3 target, WarheadSpec spec)` — シミュレーションスレッド専用。`DisasterHelpers.MakeCrater` と `DisasterHelpers.DestroyStuff` を 1 回ずつ呼ぶ。
+- Produces `void ImpactResolver.Resolve(UnityEngine.Vector3 target, WarheadSpec spec)`, simulation thread only, calling `DisasterHelpers.MakeCrater` and `DisasterHelpers.DestroyStuff` once each.
 
-- [ ] **Step 1: 実装を書く（Alien の ResolveBombardDamage を通常弾頭向けに簡約）**
+- [ ] **Step 1: write the implementation**, a simplification of Alien's ResolveBombardDamage for a conventional warhead.
 
 `src/MissileDisaster/Game/ImpactResolver.cs`:
 ```csharp
@@ -520,17 +522,17 @@ using UnityEngine;
 namespace MissileDisaster.Game
 {
     /// <summary>
-    /// 着弾ダメージ解決。DisasterHelpers はシミュレーションスレッドから呼ぶ契約のため、
-    /// このメソッドは MissileManager.UpdateSimulation（sim スレッド）からのみ呼ぶこと。
+    /// Resolves the damage of an impact. DisasterHelpers is contracted to the simulation
+    /// thread, so this must only be called from MissileManager.UpdateSimulation.
     /// </summary>
     public static class ImpactResolver
     {
         public static void Resolve(Vector3 target, WarheadSpec spec)
         {
-            // クレーター（バニラ SinkholeAI と同じ MakeCrater 呼び出し。1 回だけ）。
+            // The crater, using the same MakeCrater call as the vanilla SinkholeAI, exactly once.
             DisasterHelpers.MakeCrater(new Vector2(target.x, target.z), spec.CraterRadius, spec.CraterDepth, false);
 
-            // 範囲破壊。preRadius=totalRadius にする（0 だと何も壊れない既知の罠を回避）。
+            // Area destruction. preRadius has to equal totalRadius; passing 0 is the known trap where nothing is destroyed.
             int seed = (int)SimulationManager.instance.m_randomizer.Int32(1000000u);
             float r = spec.DestructionRadius;
             DisasterHelpers.DestroyStuff(seed, null, target, r, r, 0f, r * 0.5f, r, r * 0.3f, r * 0.6f);
@@ -541,43 +543,43 @@ namespace MissileDisaster.Game
 }
 ```
 
-- [ ] **Step 2: コンパイル確認**
+- [ ] **Step 2: confirm it compiles.**
 
 Run: `powershell -ExecutionPolicy Bypass -File build.ps1`
-Expected: ビルド成功（`DisasterHelpers.MakeCrater`/`DestroyStuff` が解決される）。
+Expected: the build succeeds, with `DisasterHelpers.MakeCrater` and `DestroyStuff` resolving.
 
 - [ ] **Step 3: Commit**
 
 ```bash
 git add src/MissileDisaster/Game/ImpactResolver.cs
-git commit -m "feat: 着弾クレーター+範囲破壊 ImpactResolver (simスレッド)"
+git commit -m "feat: ImpactResolver, the impact crater and area destruction (simulation thread)"
 ```
 
 ---
 
-## Task 5: Missile / MissileManager（飛翔＝メイン、着弾＝sim）
+## Task 5: Missile and MissileManager (flight on the main thread, impact on the simulation thread)
 
 **Files:**
-- Modify: `src/MissileDisaster/Game/ModConfig.cs`（`MissileLaunchOffset` 定数を追加）
+- Modify `src/MissileDisaster/Game/ModConfig.cs` to add the `MissileLaunchOffset` constant.
 - Create: `src/MissileDisaster/Game/Missile.cs`
 - Create: `src/MissileDisaster/Game/MissileManager.cs`
 
 **Interfaces:**
-- Consumes: `BallisticMath`、`WarheadType`、`WarheadSpec.For`、`ImpactResolver.Resolve`、`ModConfig`
+- Consumes `BallisticMath`, `WarheadType`, `WarheadSpec.For`, `ImpactResolver.Resolve` and `ModConfig`
 - Produces:
-  - `MissileManager.Launch(Vector3 target, WarheadType type)` — メインスレッド。発射点を target から水平 `MissileLaunchOffset`・高さ `MissileStartAltitude` オフセットした位置に生成。
-  - `MissileManager.UpdateVisual(float simTimeDelta)` — メインスレッド。飛翔体の位置を進める。
-  - `MissileManager.UpdateSimulation()` — sim スレッド。着弾保留中のミサイルのダメージを解決。
+  - `MissileManager.Launch(Vector3 target, WarheadType type)` - main thread. Creates the missile at a launch point offset from the target by `MissileLaunchOffset` horizontally and `MissileStartAltitude` vertically.
+  - `MissileManager.UpdateVisual(float simTimeDelta)` - main thread. Advances the missiles' positions.
+  - `MissileManager.UpdateSimulation()` - simulation thread. Resolves the damage of the missiles waiting to land.
   - `bool MissileManager.HasActive { get; }`
 
-- [ ] **Step 0: ModConfig に発射オフセット定数を追加**
+- [ ] **Step 0: add the launch offset constant to ModConfig.**
 
-`src/MissileDisaster/Game/ModConfig.cs` の飛翔ブロック（`MissileStartAltitude` の行の直後）に 1 行追加する:
+Add one line to the flight block in `src/MissileDisaster/Game/ModConfig.cs`, just after `MissileStartAltitude`:
 ```csharp
-        public const float MissileLaunchOffset = 1500f; // 発射点をターゲットから水平にずらす距離(m)。放物線の弧を成立させる
+        public const float MissileLaunchOffset = 1500f; // how far the launch point is offset horizontally from the target (m), which is what gives the parabola its arc
 ```
 
-- [ ] **Step 1: Missile を実装**
+- [ ] **Step 1: implement Missile.**
 
 `src/MissileDisaster/Game/Missile.cs`:
 ```csharp
@@ -587,8 +589,10 @@ using UnityEngine;
 namespace MissileDisaster.Game
 {
     /// <summary>
-    /// 飛翔中の 1 発。位置補間はすべてメインスレッドで行う（sim スレッドはこのオブジェクトに触れない）。
-    /// 可視表現は Phase 1 では簡易プリミティブ（球）。後続 Phase でトレイル/モデルに差し替え。
+    /// One missile in flight. All of the position interpolation happens on the main thread; the
+    /// simulation thread never touches this object.
+    /// It is drawn as a simple sphere in Phase 1; a later phase replaces that with a trail and a
+    /// model.
     /// </summary>
     public class Missile
     {
@@ -606,11 +610,13 @@ namespace MissileDisaster.Game
         {
             _target = target;
             _spec = WarheadSpec.For(type);
-            // 発射点はターゲットから水平にオフセットした高所にする。
-            // 真上（オフセット0）だと地表投影距離が0になり、AdvanceT のゼロ距離ガードで
-            // t が初フレームに即1へ跳ね、ミサイルが飛ばず即着弾してしまう。
-            // 水平オフセットを与えることで斜めに飛来する放物線の弧になり、迎撃(後続Phase)の
-            // 飛行フェーズも成立する。方向はメインスレッドセーフな UnityEngine.Random で毎回ランダム。
+            // The launch point is high above and offset horizontally from the target.
+            // Directly overhead, with no offset, the horizontal distance is zero, AdvanceT's
+            // zero-distance guard jumps t straight to 1 on the first frame, and the missile
+            // lands without ever flying.
+            // The horizontal offset gives it a parabolic arc coming in at an angle, which also
+            // gives the interception in a later phase a flight to work with. The direction is
+            // drawn each time from UnityEngine.Random, which is main-thread safe.
             float ang = Random.Range(0f, 2f * Mathf.PI);
             float ox = Mathf.Cos(ang) * ModConfig.MissileLaunchOffset;
             float oz = Mathf.Sin(ang) * ModConfig.MissileLaunchOffset;
@@ -628,8 +634,8 @@ namespace MissileDisaster.Game
         }
 
         /// <summary>
-        /// メインスレッド。位置を進める。戻り値 true = このフレームで着弾（t&gt;=1 到達）。
-        /// 着弾後の処理（ダメージの enqueue と GameObject 破棄）は MissileManager 側が行う。
+        /// Main thread. Advances the position; returning true means it landed on this frame.
+        /// Queuing the damage and destroying the GameObject afterwards is MissileManager's job.
         /// </summary>
         public bool UpdateVisual(float simTimeDelta)
         {
@@ -650,7 +656,7 @@ namespace MissileDisaster.Game
 }
 ```
 
-- [ ] **Step 2: MissileManager を実装**
+- [ ] **Step 2: implement MissileManager.**
 
 `src/MissileDisaster/Game/MissileManager.cs`:
 ```csharp
@@ -661,14 +667,16 @@ using UnityEngine;
 namespace MissileDisaster.Game
 {
     /// <summary>
-    /// 発射・追跡の静的コーディネータ。
-    /// スレッド境界（重要）:
-    ///  - _missiles（飛翔中リスト）はメインスレッドのみが触る（Launch/UpdateVisual/Reset）。
-    ///    sim スレッドはこのリストに一切アクセスしない。
-    ///  - 着弾ダメージは DisasterHelpers を使うため sim スレッドで実行が必要。そこでメインスレッドは
-    ///    着弾時に ImpactJob（座標＋弾頭スペックの値）を _impactQueue に積み、sim スレッド
-    ///    （UpdateSimulation）はロック下でキューを排出して解決する。
-    ///  これにより List&lt;Missile&gt; をスレッド跨ぎで共有せず、境界はロック保護した小さな値キューのみになる。
+    /// Static coordinator for launching and tracking missiles.
+    /// The thread boundary matters here:
+    ///  - _missiles, the list of missiles in flight, is touched by the main thread alone,
+    ///    through Launch, UpdateVisual and Reset. The simulation thread never reads it.
+    ///  - Impact damage goes through DisasterHelpers and therefore has to run on the simulation
+    ///    thread. So on impact the main thread pushes an ImpactJob - the position plus the
+    ///    warhead spec, all plain values - onto _impactQueue, and the simulation thread drains
+    ///    and resolves that queue under a lock in UpdateSimulation.
+    ///  The upshot is that List&lt;Missile&gt; is never shared across threads: the only thing that
+    ///  crosses the boundary is a small, lock-protected queue of values.
     /// </summary>
     public static class MissileManager
     {
@@ -678,21 +686,21 @@ namespace MissileDisaster.Game
             public WarheadSpec Spec;
         }
 
-        private static readonly List<Missile> _missiles = new List<Missile>();        // メインスレッド専用
-        private static readonly List<ImpactJob> _impactQueue = new List<ImpactJob>();  // 受け渡し(ロック保護)
+        private static readonly List<Missile> _missiles = new List<Missile>();        // main thread only
+        private static readonly List<ImpactJob> _impactQueue = new List<ImpactJob>();  // crosses threads, lock-protected
         private static readonly object _impactLock = new object();
 
-        /// <summary>メインスレッドから読む。</summary>
+        /// <summary>Read from the main thread.</summary>
         public static bool HasActive => _missiles.Count > 0;
 
-        /// <summary>メインスレッド専用。</summary>
+        /// <summary>Main thread only.</summary>
         public static void Launch(Vector3 target, WarheadType type)
         {
             _missiles.Add(new Missile(target, type));
             ModConfig.Log("Missile launched at " + target + " (" + type + ")");
         }
 
-        /// <summary>メインスレッド専用。飛翔を進め、着弾したものはダメージを enqueue して破棄・除去。</summary>
+        /// <summary>Main thread only. Advances the flight; anything that lands has its damage queued and is then destroyed and removed.</summary>
         public static void UpdateVisual(float simTimeDelta)
         {
             for (int i = _missiles.Count - 1; i >= 0; i--)
@@ -711,7 +719,7 @@ namespace MissileDisaster.Game
             }
         }
 
-        /// <summary>シミュレーションスレッド専用。着弾キューを排出し DisasterHelpers で解決する。</summary>
+        /// <summary>Simulation thread only. Drains the impact queue and resolves it through DisasterHelpers.</summary>
         public static void UpdateSimulation()
         {
             List<ImpactJob> jobs = null;
@@ -730,7 +738,7 @@ namespace MissileDisaster.Game
             }
         }
 
-        /// <summary>メインスレッド専用。全飛翔体を破棄し、キューも空にする。</summary>
+        /// <summary>Main thread only. Destroys every missile in flight and empties the queue.</summary>
         public static void Reset()
         {
             for (int i = 0; i < _missiles.Count; i++) _missiles[i].DestroyVisual();
@@ -741,7 +749,7 @@ namespace MissileDisaster.Game
 }
 ```
 
-- [ ] **Step 3: コンパイル確認**
+- [ ] **Step 3: confirm it compiles.**
 
 Run: `powershell -ExecutionPolicy Bypass -File build.ps1`
 Expected: the build succeeds.
@@ -750,12 +758,12 @@ Expected: the build succeeds.
 
 ```bash
 git add src/MissileDisaster/Game/Missile.cs src/MissileDisaster/Game/MissileManager.cs
-git commit -m "feat: Missile/MissileManager (飛翔=メイン, 着弾=sim)"
+git commit -m "feat: Missile and MissileManager (flight on main, impact on sim)"
 ```
 
 ---
 
-## Task 6: MissileTool ＋ ThreadingExtension ＋ Mod 登録（実機で発射）
+## Task 6: MissileTool, the ThreadingExtension and registering the mod - launching in game
 
 **Files:**
 - Create: `src/MissileDisaster/Game/UI/MissileTool.cs`
@@ -763,10 +771,10 @@ git commit -m "feat: Missile/MissileManager (飛翔=メイン, 着弾=sim)"
 - Modify: `src/MissileDisaster/Game/Mod.cs`
 
 **Interfaces:**
-- Consumes: `MissileManager.Launch/UpdateVisual/UpdateSimulation`、`ModConfig.ManualTriggerKey`、`WarheadType`
-- Produces: `MissileTool`（`ToolBase`）、`MissileThreadingExtension`（`ThreadingExtensionBase`）。`Mod` は `IUserModThreading` ではなく、CS の自動検出で `ThreadingExtensionBase` を拾わせる（Alien と同じく別クラスで実装）。
+- Consumes `MissileManager.Launch`, `UpdateVisual` and `UpdateSimulation`, `ModConfig.ManualTriggerKey` and `WarheadType`
+- Produces `MissileTool` (a `ToolBase`) and `MissileThreadingExtension` (a `ThreadingExtensionBase`). `Mod` does not implement any threading interface; CS discovers the `ThreadingExtensionBase` on its own, exactly as in Alien, which keeps it in its own class.
 
-- [ ] **Step 1: 着弾点クリックツールを実装（Alien の配置ツールを踏襲）**
+- [ ] **Step 1: implement the click-to-place tool**, following Alien's placement tool.
 
 `src/MissileDisaster/Game/UI/MissileTool.cs`:
 ```csharp
@@ -777,12 +785,14 @@ using UnityEngine;
 namespace MissileDisaster.Game.UI
 {
     /// <summary>
-    /// 着弾点をクリック指定するツール。バニラ災害と同じ「狙って左クリックで確定」。
-    /// ToolBase のライフサイクルはメイン/レンダースレッドなので Launch を直接呼んでよい。
+    /// The tool for clicking where the missile should land, with the same feel as the vanilla
+    /// disasters: aim, then left click to confirm.
+    /// A ToolBase lifecycle runs on the main/render thread, so calling Launch directly from here
+    /// is safe.
     /// </summary>
     public class MissileTool : ToolBase
     {
-        // Phase 1 は通常弾頭固定。後続 Phase で選択 UI から差し替える。
+        // Phase 1 is fixed to the conventional warhead; a later phase takes it from the selection UI.
         public WarheadType SelectedWarhead = WarheadType.Conventional;
 
         private Vector3 m_cachedPosition;
@@ -845,7 +855,7 @@ namespace MissileDisaster.Game.UI
 }
 ```
 
-- [ ] **Step 2: ThreadingExtension を実装（F9 でツール起動、飛翔=メイン、着弾=sim）**
+- [ ] **Step 2: implement the ThreadingExtension** - the hotkey opens the tool, the flight runs on the main thread and the impact on the simulation thread.
 
 `src/MissileDisaster/Game/Simulation/MissileThreadingExtension.cs`:
 ```csharp
@@ -855,9 +865,11 @@ using UnityEngine;
 namespace MissileDisaster.Game.Simulation
 {
     /// <summary>
-    /// 発動・進行・着弾を駆動する。
-    /// OnUpdate（メイン）: F9 でツール起動、飛翔を simulationTimeDelta で進める（速度連動・一時停止で凍結）。
-    /// OnAfterSimulationTick（sim）: 着弾ダメージ解決のみ（DisasterHelpers）。
+    /// Drives triggering, flight and impact.
+    /// OnUpdate, on the main thread, opens the tool on the hotkey and advances the flight by
+    /// simulationTimeDelta, so it follows the game speed and freezes while paused.
+    /// OnAfterSimulationTick, on the simulation thread, does nothing but resolve the impact
+    /// damage through DisasterHelpers.
     /// </summary>
     public class MissileThreadingExtension : ThreadingExtensionBase
     {
@@ -897,45 +909,45 @@ namespace MissileDisaster.Game.Simulation
 }
 ```
 
-- [ ] **Step 3: Mod.cs はそのまま（説明文で F9 を案内済み）確認のみ**
+- [ ] **Step 3: leave Mod.cs alone** - its description already mentions the hotkey. Just check it.
 
-`src/MissileDisaster/Game/Mod.cs` は Task 1 の内容で変更不要。CS は同一アセンブリ内の `ThreadingExtensionBase` 派生（`MissileThreadingExtension`）と `ToolBase` 派生（`MissileTool`）を自動的に検出・利用する。
+`src/MissileDisaster/Game/Mod.cs` needs no change from Task 1. CS finds and uses the `ThreadingExtensionBase` subclass (`MissileThreadingExtension`) and the `ToolBase` subclass (`MissileTool`) in the same assembly on its own.
 
-- [ ] **Step 4: ビルド＆デプロイ**
+- [ ] **Step 4: build and deploy.**
 
 Run: `powershell -ExecutionPolicy Bypass -File build.ps1`
-Expected: ビルド成功、`...\Addons\Mods\MissileDisaster` に DLL 配置。
+Expected: the build succeeds and the DLL is deployed to `...\Addons\Mods\MissileDisaster`.
 
-- [ ] **Step 5: 実機で動作確認（手動）**
+- [ ] **Step 5: check it works in game, by hand.**
 
-手順:
-1. Cities: Skylines 起動 → Content Manager → Mods で「Missile Disaster」を有効化。
-2. 任意の街をロード。
-3. `F9` を押す → カーソルにオレンジの着弾円が出る。
-4. 地面をクリック → 着弾点の真上からミサイル（球）が放物線を描いて落下 → 着弾でクレーター＋周囲の建物破壊。
-5. ゲーム速度 2x/3x で飛翔が速くなること、一時停止で飛翔が止まることを確認。
-6. ログ（`%LOCALAPPDATA%\...\Cities_Skylines\output_log.txt` 等）に `[MissileDisaster] Missile launched ...` → `Impact resolved ...` が出ることを確認。
+Steps:
+1. Start Cities: Skylines and enable "Missile Disaster" under Content Manager -> Mods.
+2. Load any city.
+3. Press `F9`; an orange impact circle follows the cursor.
+4. Click the ground; the missile - a sphere - falls along a parabola from above the impact point, leaving a crater and destroying the buildings around it.
+5. Confirm the flight speeds up at 2x and 3x, and stops while paused.
+6. Confirm the log contains `[MissileDisaster] Missile launched ...` followed by `Impact resolved ...`.
 
-Expected: クリック地点にクレーターと破壊が発生。速度連動・一時停止凍結が効く。
+Expected: a crater and destruction where you clicked, following the game speed and freezing while paused.
 
 - [ ] **Step 6: Commit**
 
 ```bash
 git add src/MissileDisaster/Game/UI/MissileTool.cs src/MissileDisaster/Game/Simulation/MissileThreadingExtension.cs src/MissileDisaster/Game/Mod.cs
-git commit -m "feat: 着弾点クリックツール+F9駆動 (通常弾頭MVP完成)"
+git commit -m "feat: the click-to-place tool and its hotkey (the conventional warhead MVP)"
 ```
 
 ---
 
-## Phase 1 完了の定義（Definition of Done）
+## Phase 1 definition of done
 
-- `dotnet test` が全 Core テスト合格（BallisticMath / WarheadSpec）。
-- `build.ps1` がビルド＆デプロイ成功。
-- 実機で「F9 → クリック → 放物線飛翔 → 着弾クレーター＋破壊」が動作し、ゲーム速度連動・一時停止凍結が効く。
+- `dotnet test` passes every Core test, for BallisticMath and WarheadSpec.
+- `build.ps1` builds and deploys successfully.
+- In game, the hotkey then a click produces the parabolic flight and the impact crater and destruction, following the game speed and freezing while paused.
 
-## 次フェーズ予告（別計画で作成）
+## The phases after this (planned separately)
 
-- Phase 2: 弾頭分岐（クラスター分裂／白リン延焼／気化爆弾の広域破壊）＋ WarheadSpec 差別化。
-- Phase 3: 核プリセット（NukeScaling/NukePresets）＋放射能（RadiationManager/RadiationGrid/RadDecontaminationAI）＋ガイガー音。
-- Phase 4: バラージ 1〜200（BarrageScheduler＋負荷分散）＋単一/ミックストグル。
-- Phase 5: 迎撃施設（InterceptResolver＋MissileDefenseAI＋CustomBuildingFactory）。
+- Phase 2: the warhead types - the cluster split, the white phosphorus fires and the thermobaric's wide destruction - and differentiating WarheadSpec.
+- Phase 3: the nuclear presets (NukeScaling and NukePresets), the radioactivity (RadiationManager, RadiationGrid and RadDecontaminationAI) and the Geiger sound.
+- Phase 4: the 1 to 200 barrage (BarrageScheduler plus spreading the load) and the single-or-mixed toggle.
+- Phase 5: the interceptor sites (InterceptResolver, MissileDefenseAI and CustomBuildingFactory).
