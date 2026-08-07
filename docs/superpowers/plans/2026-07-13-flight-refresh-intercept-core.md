@@ -1,42 +1,42 @@
-# 飛来刷新＋迎撃Coreロジック 実装計画（モデル非依存・先行）
+# Reworked arrival plus the interception core logic - implementation plan (independent of the models, done first)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax.
 
-**Goal:** 飛来ミサイルを固定方位・高高度 apex からの降下枝のみに刷新（モデルは球のまま）し、3層迎撃の純粋判定ロジック（高度帯・射程・確率）をテスト付きで用意する。建物・実モデルは別プラン（model.blend 完成後）。
+**Goal:** rework the incoming missile so it descends only, from a high apex on a fixed bearing, still drawn as a sphere; and provide the pure decision logic for the three interception layers - the altitude bands, the ranges and the probabilities - with tests. The buildings and the real models are a separate plan, once model.blend is finished.
 
-**Architecture:** Phase 1 の上に積む。`Core` に UnityEngine 非依存の純粋関数（`LaunchGeometry`/`InterceptorTiers`/`InterceptDecision`）を追加し xUnit でテスト。`Missile` は apex→着弾の降下補間へ変更（既存の main/sim スレッド境界は不変）。
+**Architecture:** built on Phase 1. Pure functions with no UnityEngine dependency are added to `Core` - `LaunchGeometry`, `InterceptorTiers` and `InterceptDecision` - and covered by xUnit. `Missile` changes to interpolating the descent from the apex to the impact; the existing main and simulation thread boundary is unchanged.
 
-**Tech Stack:** C# 7.3 / .NET 3.5（mod 本体）、net8.0 + xUnit（テスト）。CS DLL 参照は既存。
+**Tech stack:** C# 7.3 on .NET 3.5 for the mod itself, net8.0 with xUnit for the tests. The CS DLL references are already in place.
 
 ## Global Constraints
 
-- Mod 本体 `TargetFrameworkVersion=v3.5`、`LangVersion=7.3`。.NET 4.5+ API 禁止。
-- `Core/**/*.cs` は UnityEngine 非依存（`Mathf` 不可 → `System.Math` を使い float へキャスト）。float/組込型のみ。
-- 名前空間 `MissileDisaster.Core` / `MissileDisaster.Game`。ログ接頭辞 `[MissileDisaster] `。
-- テスト構成: テスト csproj が `..\..\src\MissileDisaster\Core\**\*.cs` を自動リンク（新規 Core ファイルは追記不要で拾われる）。
-- 方位規約: **0°=+Z(北)、時計回りに増加**（90°=+X)。
-- スレッド境界不変: 飛翔/GameObject はメイン、着弾ダメージは sim。本プランは Missile の補間内容のみ変更し境界は変えない。
-- ビルド: `powershell -ExecutionPolicy Bypass -File build.ps1`。テスト: `dotnet test tests/MissileDisaster.Core.Tests/MissileDisaster.Core.Tests.csproj --nologo`。
-- コミット時は該当ファイルのみ `git add`（未追跡の .blend/.mp3 は含めない）。ローカル Codex コミットレビューフックが P1 でブロックし得る。
+- The mod targets `TargetFrameworkVersion=v3.5` with `LangVersion=7.3`; no .NET 4.5 or later APIs.
+- `Core/**/*.cs` has no UnityEngine dependency, so no `Mathf` - use `System.Math` and cast to float. Floats and built-in types only.
+- The namespaces are `MissileDisaster.Core` and `MissileDisaster.Game`, and the log prefix is `[MissileDisaster] `.
+- The test csproj links `..\..\src\MissileDisaster\Core\**\*.cs` automatically, so a new Core file is picked up without editing it.
+- Bearings: **0 degrees is +Z, north, increasing clockwise**, so 90 is +X.
+- The thread boundary is unchanged: flight and GameObjects on the main thread, impact damage on the simulation thread. This plan changes only what Missile interpolates, not where anything runs.
+- Build with `powershell -ExecutionPolicy Bypass -File build.ps1`; test with `dotnet test tests/MissileDisaster.Core.Tests/MissileDisaster.Core.Tests.csproj --nologo`.
+- Commit by `git add`ing only the files concerned, leaving untracked `.blend` and `.mp3` files out. The local commit review hook may block on a priority-one finding.
 
 ---
 
-## ファイル構成（本プランで作成・変更）
+## Files created and changed by this plan
 
 | File | Kind | Responsibility |
 |---|---|---|
-| `src/MissileDisaster/Core/LaunchGeometry.cs` | 新規 | 固定方位→(X,Z)オフセット（apex 水平位置） |
-| `tests/.../LaunchGeometryTests.cs` | 新規 | 上のテスト |
-| `src/MissileDisaster/Core/InterceptorTier.cs` | 新規 | 迎撃層データ（ARROW/SAM/PAC の帯・射程・確率・CD） |
-| `tests/.../InterceptorTierTests.cs` | 新規 | 帯の連続性・順序テスト |
-| `src/MissileDisaster/Core/InterceptDecision.cs` | 新規 | 交戦圏判定＋確率（乱数注入） |
-| `tests/.../InterceptDecisionTests.cs` | 新規 | 上のテスト |
-| `src/MissileDisaster/Game/ModConfig.cs` | 変更 | 飛翔定数を apex 方式へ差し替え |
-| `src/MissileDisaster/Game/Missile.cs` | 変更 | apex→着弾の降下補間へ |
+| `src/MissileDisaster/Core/LaunchGeometry.cs` | new | a fixed bearing into an (X, Z) offset: the apex's horizontal position |
+| `tests/.../LaunchGeometryTests.cs` | new | its tests |
+| `src/MissileDisaster/Core/InterceptorTier.cs` | new | the layer data: each band, range, probability and cooldown |
+| `tests/.../InterceptorTierTests.cs` | new | tests that the bands are contiguous and ordered |
+| `src/MissileDisaster/Core/InterceptDecision.cs` | new | the engagement envelope plus the probability, with the random number injected |
+| `tests/.../InterceptDecisionTests.cs` | new | its tests |
+| `src/MissileDisaster/Game/ModConfig.cs` | changed | the flight constants move to the apex approach |
+| `src/MissileDisaster/Game/Missile.cs` | changed | interpolates the descent from the apex to the impact |
 
 ---
 
-## Task 1: LaunchGeometry（Core・TDD）
+## Task 1: LaunchGeometry (Core, test-first)
 
 **Files:**
 - Create: `src/MissileDisaster/Core/LaunchGeometry.cs`
@@ -45,7 +45,7 @@
 **Interfaces:**
 - Produces:
   - `struct MissileDisaster.Core.Offset2 { float X; float Z; }`
-  - `Offset2 LaunchGeometry.BearingOffset(float bearingDeg, float horizontalDistance)` — 0°=+Z, 90°=+X, 時計回り。
+  - `Offset2 LaunchGeometry.BearingOffset(float bearingDeg, float horizontalDistance)` - 0 degrees is +Z and 90 is +X, increasing clockwise.
 
 - [ ] **Step 1: write the failing tests.**
 
@@ -57,10 +57,10 @@ using Xunit;
 public class LaunchGeometryTests
 {
     [Theory]
-    [InlineData(0f, 100f, 0f, 100f)]     // 北=+Z
-    [InlineData(90f, 100f, 100f, 0f)]    // 東=+X
-    [InlineData(180f, 100f, 0f, -100f)]  // 南=-Z
-    [InlineData(270f, 100f, -100f, 0f)]  // 西=-X
+    [InlineData(0f, 100f, 0f, 100f)]     // north is +Z
+    [InlineData(90f, 100f, 100f, 0f)]    // east is +X
+    [InlineData(180f, 100f, 0f, -100f)]  // south is -Z
+    [InlineData(270f, 100f, -100f, 0f)]  // west is -X
     public void BearingOffset_maps_compass_directions(float deg, float dist, float ex, float ez)
     {
         Offset2 o = LaunchGeometry.BearingOffset(deg, dist);
@@ -83,7 +83,7 @@ public class LaunchGeometryTests
 - [ ] **Step 2: confirm the tests fail.**
 
 Run: `dotnet test tests/MissileDisaster.Core.Tests/MissileDisaster.Core.Tests.csproj --nologo`
-Expected: コンパイルエラー（`Offset2`/`LaunchGeometry` 未定義）で FAIL。
+Expected: FAIL with a compile error, since `Offset2` and `LaunchGeometry` do not exist yet.
 
 - [ ] **Step 3: implement.**
 
@@ -91,7 +91,7 @@ Expected: コンパイルエラー（`Offset2`/`LaunchGeometry` 未定義）で 
 ```csharp
 namespace MissileDisaster.Core
 {
-    /// <summary>水平方位オフセット(X,Z)。UnityEngine 非依存。</summary>
+    /// <summary>A horizontal bearing offset as (X, Z). No UnityEngine dependency.</summary>
     public struct Offset2
     {
         public float X;
@@ -99,8 +99,9 @@ namespace MissileDisaster.Core
     }
 
     /// <summary>
-    /// 固定方位から飛来する弾道の apex(頂点)水平位置を算出する純粋ロジック。
-    /// 方位規約: 0°=+Z(北), 90°=+X(東), 時計回りに増加。UnityEngine 非依存。
+    /// Works out the horizontal position of a trajectory's apex for a missile arriving from a
+    /// fixed bearing. Bearings run clockwise, with 0 degrees as +Z (north) and 90 as +X (east).
+    /// No UnityEngine dependency.
     /// </summary>
     public static class LaunchGeometry
     {
@@ -120,18 +121,18 @@ namespace MissileDisaster.Core
 - [ ] **Step 4: confirm the tests pass.**
 
 Run: `dotnet test tests/MissileDisaster.Core.Tests/MissileDisaster.Core.Tests.csproj --nologo`
-Expected: PASS（新規6ケース＋既存18ケース）。
+Expected: PASS, the 6 new cases plus the 18 existing ones.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add src/MissileDisaster/Core/LaunchGeometry.cs tests/MissileDisaster.Core.Tests/LaunchGeometryTests.cs
-git commit -m "feat(core): 固定方位→apex水平オフセット LaunchGeometry (TDD)"
+git commit -m "feat(core): LaunchGeometry, a fixed bearing to the apex horizontal offset (TDD)"
 ```
 
 ---
 
-## Task 2: InterceptorTier（Core・TDD）
+## Task 2: InterceptorTier (Core, test-first)
 
 **Files:**
 - Create: `src/MissileDisaster/Core/InterceptorTier.cs`
@@ -141,7 +142,7 @@ git commit -m "feat(core): 固定方位→apex水平オフセット LaunchGeomet
 - Produces:
   - `enum MissileDisaster.Core.InterceptorKind { Arrow, Sam, Pac }`
   - `struct InterceptorTier { InterceptorKind Kind; float AltitudeMin; float AltitudeMax; float HorizontalRange; float InterceptChance; float CooldownSeconds; }`
-  - `static class InterceptorTiers` with fields `Arrow`, `Sam`, `Pac` and `InterceptorTier[] Ordered`（高い帯から順）。
+  - `static class InterceptorTiers` with fields `Arrow`, `Sam`, `Pac` and `InterceptorTier[] Ordered`, from the highest band down.
 
 - [ ] **Step 1: write the failing tests.**
 
@@ -199,7 +200,7 @@ namespace MissileDisaster.Core
 {
     public enum InterceptorKind { Arrow, Sam, Pac }
 
-    /// <summary>迎撃層の担当高度帯・水平射程・迎撃確率・クールダウン。UnityEngine 非依存。</summary>
+    /// <summary>An interception layer: the altitude band it covers, its horizontal range, its hit probability and its cooldown. No UnityEngine dependency.</summary>
     public struct InterceptorTier
     {
         public InterceptorKind Kind;
@@ -210,7 +211,7 @@ namespace MissileDisaster.Core
         public float CooldownSeconds;
     }
 
-    /// <summary>ARROW(超高高度)→SAM(高高度)→PAC(終端)の3層。帯は地面から連続。数値は暫定(実機調整)。</summary>
+    /// <summary>Three layers from the top down: exo-atmospheric, high altitude, then terminal. The bands are contiguous from the ground up, and the figures are provisional, to be tuned in game.</summary>
     public static class InterceptorTiers
     {
         public static readonly InterceptorTier Pac = new InterceptorTier
@@ -229,7 +230,7 @@ namespace MissileDisaster.Core
             HorizontalRange = 6000f, InterceptChance = 0.5f, CooldownSeconds = 8f
         };
 
-        /// <summary>迎撃試行順(高い帯から)。</summary>
+        /// <summary>The order interception is attempted in, from the highest band down.</summary>
         public static readonly InterceptorTier[] Ordered = { Arrow, Sam, Pac };
     }
 }
@@ -244,12 +245,12 @@ Expected: PASS.
 
 ```bash
 git add src/MissileDisaster/Core/InterceptorTier.cs tests/MissileDisaster.Core.Tests/InterceptorTierTests.cs
-git commit -m "feat(core): 迎撃3層データ InterceptorTiers (ARROW/SAM/PAC, TDD)"
+git commit -m "feat(core): InterceptorTiers, the three interception layers (TDD)"
 ```
 
 ---
 
-## Task 3: InterceptDecision（Core・TDD）
+## Task 3: InterceptDecision (Core, test-first)
 
 **Files:**
 - Create: `src/MissileDisaster/Core/InterceptDecision.cs`
@@ -259,7 +260,7 @@ git commit -m "feat(core): 迎撃3層データ InterceptorTiers (ARROW/SAM/PAC, 
 - Consumes: `InterceptorTier`
 - Produces:
   - `bool InterceptDecision.InEngagementZone(float missileAltitude, float horizontalDistance, InterceptorTier tier)`
-  - `bool InterceptDecision.ShouldIntercept(float missileAltitude, float horizontalDistance, InterceptorTier tier, float roll)` — roll(0..1) を注入。
+  - `bool InterceptDecision.ShouldIntercept(float missileAltitude, float horizontalDistance, InterceptorTier tier, float roll)`, with the roll in [0,1) injected.
 
 - [ ] **Step 1: write the failing tests.**
 
@@ -273,21 +274,21 @@ public class InterceptDecisionTests
     private static readonly InterceptorTier Sam = InterceptorTiers.Sam; // alt[800,2500) range 4000 chance 0.6
 
     [Theory]
-    [InlineData(1500f, 1000f, true)]   // 帯内・射程内
-    [InlineData(800f, 1000f, true)]    // 下端(含む)
-    [InlineData(2500f, 1000f, false)]  // 上端(含まない)
-    [InlineData(500f, 1000f, false)]   // 帯下
-    [InlineData(1500f, 4001f, false)]  // 射程外
-    [InlineData(1500f, 4000f, true)]   // 射程端(含む)
+    [InlineData(1500f, 1000f, true)]   // inside the band and in range
+    [InlineData(800f, 1000f, true)]    // the lower bound, which is inclusive
+    [InlineData(2500f, 1000f, false)]  // the upper bound, which is exclusive
+    [InlineData(500f, 1000f, false)]   // below the band
+    [InlineData(1500f, 4001f, false)]  // out of range
+    [InlineData(1500f, 4000f, true)]   // exactly at the range limit, which is inclusive
     public void InEngagementZone_checks_band_and_range(float alt, float dist, bool expected)
     {
         Assert.Equal(expected, InterceptDecision.InEngagementZone(alt, dist, Sam));
     }
 
     [Theory]
-    [InlineData(0.0f, true)]    // roll < 0.6 → 迎撃
+    [InlineData(0.0f, true)]    // a roll under 0.6 intercepts
     [InlineData(0.59f, true)]
-    [InlineData(0.6f, false)]   // roll == chance → 失敗(未満のみ成功)
+    [InlineData(0.6f, false)]   // a roll equal to the chance fails; only under it succeeds
     [InlineData(0.9f, false)]
     public void ShouldIntercept_rolls_within_zone(float roll, bool expected)
     {
@@ -297,8 +298,8 @@ public class InterceptDecisionTests
     [Fact]
     public void ShouldIntercept_false_outside_zone_regardless_of_roll()
     {
-        Assert.False(InterceptDecision.ShouldIntercept(5000f, 1000f, Sam, 0.0f)); // 帯外
-        Assert.False(InterceptDecision.ShouldIntercept(1500f, 9999f, Sam, 0.0f)); // 射程外
+        Assert.False(InterceptDecision.ShouldIntercept(5000f, 1000f, Sam, 0.0f)); // outside the band
+        Assert.False(InterceptDecision.ShouldIntercept(1500f, 9999f, Sam, 0.0f)); // out of range
     }
 }
 ```
@@ -315,8 +316,10 @@ Expected: FAIL, with a compile error.
 namespace MissileDisaster.Core
 {
     /// <summary>
-    /// 迎撃可否の純粋判定。乱数は引数(roll)注入でテスト可能に。UnityEngine 非依存。
-    /// altitude はミサイルの対地高度、horizontalDistance は迎撃建物までの水平距離。
+    /// Pure decision on whether an interception succeeds. The random number is injected as the
+    /// roll argument so it can be tested. No UnityEngine dependency.
+    /// altitude is the missile's height above the ground and horizontalDistance is how far away
+    /// the interceptor building is.
     /// </summary>
     public static class InterceptDecision
     {
@@ -345,38 +348,38 @@ Expected: PASS.
 
 ```bash
 git add src/MissileDisaster/Core/InterceptDecision.cs tests/MissileDisaster.Core.Tests/InterceptDecisionTests.cs
-git commit -m "feat(core): 交戦圏+確率の迎撃判定 InterceptDecision (TDD)"
+git commit -m "feat(core): InterceptDecision, the engagement envelope plus the probability (TDD)"
 ```
 
 ---
 
-## Task 4: 飛来ミサイルを apex 降下へ刷新（ModConfig＋Missile）
+## Task 4: rework the incoming missile into an apex descent (ModConfig and Missile)
 
 **Files:**
-- Modify: `src/MissileDisaster/Game/ModConfig.cs`（飛翔定数を差し替え）
-- Modify: `src/MissileDisaster/Game/Missile.cs`（apex→着弾の降下補間へ）
+- Modify `src/MissileDisaster/Game/ModConfig.cs`, replacing the flight constants.
+- Modify `src/MissileDisaster/Game/Missile.cs` to interpolate the descent from the apex to the impact.
 
 **Interfaces:**
-- Consumes: `LaunchGeometry.BearingOffset`、`BallisticMath.AdvanceT/Lerp`、新 `ModConfig` 定数。
-- Produces: 変更なし（`MissileManager` から見た `Missile(target,type)` / `UpdateVisual(float)` / `Target` / `Spec` / `DestroyVisual` は不変）。
+- Consumes `LaunchGeometry.BearingOffset`, `BallisticMath.AdvanceT` and `Lerp`, and the new `ModConfig` constants.
+- Produces no API change: `Missile(target,type)`, `UpdateVisual(float)`, `Target`, `Spec` and `DestroyVisual` are all unchanged as far as `MissileManager` is concerned.
 
-ゲーム DLL コード（ユニットテスト無し）。検証はビルド成功＋実機確認。
+This is game DLL code with no unit tests; it is verified by the build succeeding and by checking it in game.
 
-- [ ] **Step 1: ModConfig の飛翔定数を差し替える**
+- [ ] **Step 1: replace the flight constants in ModConfig.**
 
-`src/MissileDisaster/Game/ModConfig.cs` の飛翔ブロック（`MissileSpeed` / `MissileArcHeight` / `MissileStartAltitude` / `MissileLaunchOffset` の4定数）を、以下へ置き換える（`MissileSpeed` は残す）:
+Replace the flight block in `src/MissileDisaster/Game/ModConfig.cs` - the four constants `MissileSpeed`, `MissileArcHeight`, `MissileStartAltitude` and `MissileLaunchOffset` - with the following, keeping `MissileSpeed`:
 ```csharp
         // Flight, driven on the main thread by simulationTimeDelta.
-        // 弾道は固定方位・高高度の apex(頂点)から着弾までの「降下枝のみ」。
-        public const float MissileSpeed = 900f;              // 降下ペース(水平投影距離に対する m/秒 相当)
-        public const float IncomingBearingDegrees = 315f;    // 飛来方位(0=北,時計回り)。全弾同一方位。315=北西
-        public const float ApexHorizontalOffset = 2200f;     // apex の水平オフセット(m)。大きいほど浅い角度
-        public const float ApexAltitude = 4000f;             // apex の対地高度(m)。高いほど急角度で高高度から飛来
+        // The trajectory is the descending half only, from a high apex on a fixed bearing to the impact.
+        public const float MissileSpeed = 900f;              // descent pace, in metres per second against the horizontal distance
+        public const float IncomingBearingDegrees = 315f;    // bearing they arrive from, clockwise from north; 315 is north-west, and every missile shares it
+        public const float ApexHorizontalOffset = 2200f;     // horizontal offset of the apex in metres; larger means a shallower angle
+        public const float ApexAltitude = 4000f;             // height of the apex above the ground in metres; higher means a steeper dive from further up
 ```
 
-- [ ] **Step 2: Missile を apex 降下へ書き換える**
+- [ ] **Step 2: rewrite Missile for the apex descent.**
 
-`src/MissileDisaster/Game/Missile.cs` の全内容を以下へ置き換える:
+Replace the whole of `src/MissileDisaster/Game/Missile.cs` with:
 ```csharp
 using MissileDisaster.Core;
 using UnityEngine;
@@ -384,9 +387,10 @@ using UnityEngine;
 namespace MissileDisaster.Game
 {
     /// <summary>
-    /// 飛翔中の 1 発。固定方位・高高度の apex(頂点)から着弾までの「降下枝のみ」を、
-    /// すべてメインスレッドで補間する（sim スレッドはこのオブジェクトに触れない）。
-    /// 可視表現は本プランでは簡易プリミティブ（球）。実モデル化は別プラン。
+    /// One missile in flight. Only the descending half of the trajectory is interpolated -
+    /// from a high apex on a fixed bearing down to the impact - and all of it happens on the
+    /// main thread; the simulation thread never touches this object.
+    /// It is drawn as a simple sphere for now; the real model is a separate plan.
     /// </summary>
     public class Missile
     {
@@ -404,7 +408,8 @@ namespace MissileDisaster.Game
         {
             _target = target;
             _spec = WarheadSpec.For(type);
-            // 固定方位・高高度の apex から降下する。上昇枝は存在しない(=終端のみ描画)。
+            // It descends from a high apex on a fixed bearing. There is no ascent, so only the
+            // terminal phase is drawn.
             Offset2 off = LaunchGeometry.BearingOffset(ModConfig.IncomingBearingDegrees, ModConfig.ApexHorizontalOffset);
             _apex = new Vector3(target.x + off.X, target.y + ModConfig.ApexAltitude, target.z + off.Z);
             float dx = target.x - _apex.x;
@@ -420,8 +425,9 @@ namespace MissileDisaster.Game
         }
 
         /// <summary>
-        /// メインスレッド。apex→着弾を直線降下で補間する。戻り値 true = このフレームで着弾(t&gt;=1)。
-        /// 着弾後の処理(ダメージ enqueue と破棄)は MissileManager 側が行う。
+        /// Main thread. Interpolates the straight descent from the apex to the impact.
+        /// Returning true means it landed on this frame. Queuing the damage and destroying the
+        /// missile afterwards is MissileManager's job.
         /// </summary>
         public bool UpdateVisual(float simTimeDelta)
         {
@@ -442,34 +448,34 @@ namespace MissileDisaster.Game
 }
 ```
 
-注: `BallisticMath.ArcHeightAt` は本プランでは未使用になる（テスト済み Core ユーティリティとして残置。将来の曲線降下チューニング用）。dead code ではなく保持で問題ない。
+Note that `BallisticMath.ArcHeightAt` goes unused here. It stays as a tested Core utility for tuning a curved descent later; keeping it is fine and it is not dead code.
 
-- [ ] **Step 3: ビルド＆デプロイ**
+- [ ] **Step 3: build and deploy.**
 
 Run: `powershell -ExecutionPolicy Bypass -File build.ps1`
-Expected: ビルド成功、DLL 配置。
+Expected: the build succeeds and the DLL is deployed.
 
-- [ ] **Step 4: 実機で見た目確認（手動・ユーザー）**
+- [ ] **Step 4: check how it looks in game (by hand, by the user).**
 
-Cities: Skylines で F9 → クリック。ミサイル(球)が **同一方位（北西）から高高度 apex を起点に、急角度の降下枝のみ** を描いて着弾すること、複数撃っても全部同じ方向から来ること、速度連動・一時停止を確認。
+In Cities: Skylines, press the hotkey and click. Confirm that the sphere arrives **from the same bearing - north-west - starting at the high apex and drawing only the steep descending half**, that several launches all come from that direction, and that it follows the game speed and stops while paused.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add src/MissileDisaster/Game/ModConfig.cs src/MissileDisaster/Game/Missile.cs
-git commit -m "feat: 飛来ミサイルを固定方位・高高度apexの降下枝のみに刷新"
+git commit -m "feat: incoming missiles now descend only, from a high apex on a fixed bearing"
 ```
 
 ---
 
 ## Definition of done
 
-- 全 Core テスト合格（既存18＋新規: LaunchGeometry6/InterceptorTier3/InterceptDecision12 目安）。
-- ビルド＆デプロイ成功。
-- 実機で「固定方位・高高度から降下枝のみ」を確認（ユーザー）。
+- Every Core test passes: the existing 18 plus roughly 6 for LaunchGeometry, 3 for InterceptorTier and 12 for InterceptDecision.
+- The build and deployment succeed.
+- The user confirms in game that it descends only, from high up and on a fixed bearing.
 
-## 次（model.blend 完成後の別プラン）
+## Next (a separate plan, once model.blend is finished)
 
-- Plan 2B: 弾頭＋ARROW/SAM/PAC＋建物メッシュの OBJ 化・読込、飛来弾の実モデル化＋機首向き。
-- Plan 2D: 新規建物3種（`CustomBuildingFactory`）＋`InterceptorAI`＋`InterceptorRegistry`、迎撃判定を `MissileManager`（メイン）へ配線。
-- Plan 2E: 迎撃弾の会合飛翔＋爆発演出。
+- Plan 2B: export and load the warhead, the ARROW, SAM and PAC models and the building meshes as OBJ, and give the incoming missile its real model and nose direction.
+- Plan 2D: the three new buildings through `CustomBuildingFactory`, plus `InterceptorAI` and `InterceptorRegistry`, wiring the interception decision into `MissileManager` on the main thread.
+- Plan 2E: the interceptors flying to the meeting point and the explosion.
