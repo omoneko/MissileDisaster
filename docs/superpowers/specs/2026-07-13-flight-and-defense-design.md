@@ -1,131 +1,192 @@
-# ミサイル災害 Mod — 飛来弾道刷新＋3層迎撃防衛 設計書
+# Missile Disaster mod - reworked incoming trajectory and three-layer interception - design
 
-- 日付: 2026-07-13
-- 位置づけ: Phase 1（通常弾頭 MVP・master 済み）の上に積む増分。実機テストで得た改善要望＋③迎撃を前倒しで詳細化。
-- ステータス: 設計確定（実装計画待ち）
+- Date: 2026-07-13
+- Where this sits: an increment on top of Phase 1 (the conventional warhead MVP, already on
+  master). It covers the improvements identified from playing it, plus feature 3, interception,
+  brought forward and worked out in detail.
+- Status: design settled, awaiting the implementation plan
 
-## 1. 目的
+## 1. Purpose
 
-実機で判明した飛来演出の改善と、3層迎撃防衛の導入。
+Improving how the missiles arrive, as identified in game, and introducing three-layer
+interception.
 
-1. 飛来ミサイルを **固定方位** から飛来させる（現状はランダム方位）。
-2. **高高度から飛来**し、弾道のうち **降下枝（頂点→着弾）のみ描画**する。
-3. **model.blend のモデル**を使用（球プレースホルダを置換）。
-4. **ARROW（超高高度）/ SAM（高高度）/ PAC（終端）** の3層迎撃を、各1種の建物として導入。
+1. Have missiles arrive **from a fixed bearing** rather than a random one.
+2. Have them **arrive from high altitude**, drawing **only the descending half** of the
+   trajectory, from the apex to the impact.
+3. Use **the models in model.blend**, replacing the placeholder spheres.
+4. Introduce three layers of interception - **exo-atmospheric, high altitude and terminal** - as
+   one building each.
 
-## 2. 確定した設計方針（ブレインストーミングの結論）
+## 2. Decisions from the brainstorming
 
-| 項目 | 決定 |
+| Item | Decision |
 |---|---|
-| 飛来方位 | ワールド固定方位（定数）。全弾同じ向きから飛来 |
-| 弾道・描画 | ロジックを「頂点(apex)→着弾」で t=0→1 と定義。apex を高高度・水平オフセット位置に置き、**降下枝のみ描画**（上昇は描かない） |
-| 弾頭表示 | `弾道ミサイル弾頭` モデル（OBJ）。機首を進行方向へ向ける |
-| 迎撃機構 | 高度帯レイヤー防衛（自動・確率）。ARROW最上→SAM→PAC終端の順に、担当高度帯∩水平射程で確率ロール。すり抜けたら着弾 |
-| 迎撃演出 | 成功時、迎撃弾（ARROW/SAM/PACモデル）が建物→会合点へ飛翔→爆発フラッシュで両者消滅 |
-| 建物 | コスト・電力ありの**新規建物**3種（バニラ複製ではなく独立作成。メッシュ/AI/名前/コスト/電力は独自。エンジン配管の最小テンプレートのみ流用）。専用建物メッシュは model.blend で作成中（ユーザー提供予定） |
-| 迎撃判定スレッド | メインスレッド（飛来ミサイル位置が主管の側）で判定・解決。建物はレジストリに自己登録 |
+| Bearing | A fixed world bearing, as a constant. Every missile arrives from the same direction. |
+| Trajectory and drawing | The logic is defined as apex to impact, t=0 to t=1. The apex sits at high altitude with a horizontal offset, and **only the descending half is drawn** - the ascent is not. |
+| Warhead model | The ballistic warhead model, as OBJ, with its nose pointed along the flight path. |
+| Interception | Layered defence by altitude band, automatic and probabilistic. Working down from the top layer, each rolls where its band and horizontal range both cover the missile. Anything that gets through lands. |
+| Interception presentation | On success an interceptor - the model for that layer - flies from the building to the meeting point, and a flash destroys both. |
+| Buildings | Three **new buildings** with a cost and a power draw, created independently rather than cloned from vanilla. The mesh, AI, name, cost and power are all our own; only the minimum engine plumbing is reused. The building meshes are being made in model.blend and will be supplied. |
+| Which thread decides | The main thread, since that is where the incoming missiles' positions live. The buildings register themselves in a registry. |
 
-## 3. model.blend のモデル在庫
+## 3. What is in model.blend
 
-| メッシュ名 | 用途 | 頂点数 |
+| Mesh name | Purpose | Vertices |
 |---|---|---|
-| `弾道ミサイル弾頭` | 飛来ミサイル本体 | 161 |
-| `ARROW` | 超高高度迎撃弾 | 769 |
-| `SAM` | 高高度迎撃弾 | 1121 |
-| `PAC` | 終端迎撃弾 | 1569 |
+| ballistic warhead | the incoming missile itself | 161 |
+| `ARROW` | exo-atmospheric interceptor | 769 |
+| `SAM` | high-altitude interceptor | 1121 |
+| `PAC` | terminal interceptor | 1569 |
 
-現時点で建物メッシュは含まれない。ARROW/SAM/PAC モデルは**迎撃弾（飛翔体）**として使う。迎撃建物用の**専用メッシュ3種はユーザーが model.blend に作成中**（完成後に追記・エクスポート）。
+There are no building meshes yet. The ARROW, SAM and PAC models are used as the
+**interceptors in flight**. The **three dedicated building meshes are being made in
+model.blend** and will be added and exported once finished.
 
-## 4. アーキテクチャ（追加・変更ファイル）
+## 4. Architecture (files added and changed)
 
 ```
 src/MissileDisaster/
 ├── Core/
-│   ├── BallisticMath.cs           # 変更: apex降下用ヘルパ追加（既存は不変）
-│   ├── LaunchGeometry.cs          # 新規: 固定方位からの apex 位置算出（純粋・テスト可能）
-│   └── InterceptDecision.cs       # 新規: 高度帯∩射程∩確率の迎撃判定（純粋・テスト可能）
+│   ├── BallisticMath.cs           # changed: helpers for the apex descent; the existing code is untouched
+│   ├── LaunchGeometry.cs          # new: the apex position for a fixed bearing (pure, testable)
+│   └── InterceptDecision.cs       # new: the band, range and probability test (pure, testable)
 ├── Game/
-│   ├── ModConfig.cs               # 変更: 方位/高度帯/迎撃パラメータ定数
-│   ├── Missile.cs                 # 変更: apex降下・固定方位・モデル表示・機首向き・被迎撃
-│   ├── MissileManager.cs          # 変更: 迎撃判定を飛翔ループ内(メイン)で実行
+│   ├── ModConfig.cs               # changed: constants for the bearing, the bands and the interception
+│   ├── Missile.cs                 # changed: apex descent, fixed bearing, the model, the nose direction, being intercepted
+│   ├── MissileManager.cs          # changed: the interception test runs inside the flight loop, on the main thread
 │   ├── Models/
-│   │   ├── ModelLoader.cs         # 新規: OBJ/MTL 読込（Alien の ObjParser/MtlParser/ObjMeshBuilder 流用）
-│   │   └── MissileModels.cs       # 新規: 4モデルのロード＆GameObject 生成facade
+│   │   ├── ModelLoader.cs         # new: loads OBJ and MTL (reusing Alien's ObjParser, MtlParser and ObjMeshBuilder)
+│   │   └── MissileModels.cs       # new: a facade loading the four models and creating GameObjects
 │   ├── Defense/
-│   │   ├── InterceptorRegistry.cs # 新規: 稼働中迎撃建物の位置/帯/射程/確率/クールダウン（メイン読取）
-│   │   ├── InterceptorAI.cs       # 新規: PlayerBuildingAI 派生。電力/維持＋レジストリ登録
-│   │   ├── InterceptorTier.cs     # 新規: ARROW/SAM/PAC の帯・射程・確率定義
-│   │   ├── InterceptorShot.cs     # 新規: 迎撃弾の飛翔体（建物→会合点→爆発）
-│   │   └── CustomBuildingFactory.cs # 新規: バニラ電力建物を複製し3建物を登録
+│   │   ├── InterceptorRegistry.cs # new: the operating interceptor buildings - position, band, range, probability, cooldown - read from the main thread
+│   │   ├── InterceptorAI.cs       # new: a PlayerBuildingAI subclass; power and upkeep plus registering itself
+│   │   ├── InterceptorTier.cs     # new: the bands, ranges and probabilities of the three layers
+│   │   ├── InterceptorShot.cs     # new: the interceptor in flight, from the building to the meeting point to the explosion
+│   │   └── CustomBuildingFactory.cs # new: registers the three buildings
 │   └── Effects/
-│       └── InterceptFx.cs         # 新規: 会合点の爆発フラッシュ
-├── Models/                        # OBJ/MTL 配置先（build.ps1 が配布）
+│       └── InterceptFx.cs         # new: the flash at the meeting point
+├── Models/                        # where the OBJ and MTL live; build.ps1 deploys them
 tests/MissileDisaster.Core.Tests/
-├── LaunchGeometryTests.cs         # 新規
-└── InterceptDecisionTests.cs      # 新規
+├── LaunchGeometryTests.cs         # new
+└── InterceptDecisionTests.cs      # new
 ```
 
-Alien Invasion からの流用: `ObjParser` / `MtlParser` / `ObjMeshBuilder`（OBJ 読込）、`RenderAssets`（シェーダ探索）、`Effects`（LineRenderer/フラッシュ）。
+Reused from Alien Invasion: `ObjParser`, `MtlParser` and `ObjMeshBuilder` for loading OBJ,
+`RenderAssets` for finding shaders, and `Effects` for the LineRenderer and the flash.
 
-## 5. 機能別設計
+## 5. Feature by feature
 
-### A. 飛来ミサイルの刷新
+### A. Reworking the incoming missile
 
-- **固定方位**: `ModConfig.IncomingBearingDegrees`（例: 315°=北西）。apex の水平オフセットはこの方位ベクトル×`ApexHorizontalOffset`。全弾同一方位。
-- **高高度 apex 降下**: `_apex = target + bearingVec * ApexHorizontalOffset + up * ApexAltitude`（`ApexAltitude` は高め、例 4000）。`t=0` を apex、`t=1` を着弾とする**降下のみ**。放物線の弧は「降下枝」に限定（apex が最高点なので追加の弧成分は小さめ〜0にして急降下＋わずかな重力弧）。
-  - `LaunchGeometry.ApexPosition(target, bearingDeg, horizOffset, altitude)` を純粋関数化（Core・テスト可能）。
-- **描画範囲**: apex→着弾のみ生成・描画。上昇枝は存在しない（apex 始点）。「終端のみ描画・高高度から飛来」を満たす。
-- **モデル**: 球を `弾道ミサイル弾頭` モデルに置換。**機首を速度ベクトル方向へ向ける**（`Quaternion.LookRotation(velocity)`）。
-- **高度帯通過**: 降下中に ARROW帯→SAM帯→PAC帯を順に通過（帯境界は高度定数）。
+- **Fixed bearing**: `ModConfig.IncomingBearingDegrees`, for instance 315 degrees for
+  north-west. The apex's horizontal offset is that bearing vector times
+  `ApexHorizontalOffset`. Every missile shares the bearing.
+- **Descending from a high apex**:
+  `_apex = target + bearingVec * ApexHorizontalOffset + up * ApexAltitude`, with `ApexAltitude`
+  set high, around 4000. `t=0` is the apex and `t=1` is the impact, so **only the descent
+  exists**. The parabola is limited to that descending half; since the apex is the highest
+  point, the extra arc term is small or zero, giving a steep dive with a slight gravitational
+  curve.
+  - `LaunchGeometry.ApexPosition(target, bearingDeg, horizOffset, altitude)` is a pure function
+    in Core, and therefore testable.
+- **What is drawn**: only apex to impact is created and drawn. There is no ascent, because the
+  apex is the start. That satisfies both "only the terminal phase is drawn" and "arrives from
+  high altitude".
+- **The model**: the sphere is replaced by the ballistic warhead model, with **the nose pointed
+  along the velocity vector**, through `Quaternion.LookRotation(velocity)`.
+- **Passing through the bands**: on the way down it passes through the exo-atmospheric band, then
+  the high-altitude band, then the terminal band, whose boundaries are altitude constants.
 
-### B. 3層迎撃防衛（ARROW / SAM / PAC）
+### B. Three-layer interception
 
-- **建物3種（新規作成）**: `CustomBuildingFactory` が **新規 BuildingInfo** を構築（エンジン配管の最小テンプレートのみ流用し、メッシュ・AI・名前・コスト・電力・維持費は独自設定）。建物メッシュは model.blend の専用モデル（作成中・提供待ち）を使用。バニラ建物の appearance/behavior は流用しない。
-- **`InterceptorAI : PlayerBuildingAI`**: バニラの電力/維持挙動は基底に委譲。稼働中（電力供給あり）は自身を `InterceptorRegistry` に登録、非稼働/破棄で解除。
-- **`InterceptorTier`**（Core 定数）: 各層の `AltitudeMin/Max`・`HorizontalRange`・`InterceptChance`・`CooldownSeconds`。
-  - ARROW=最上帯・広射程・低〜中確率、SAM=中帯・中確率、PAC=終端帯・高確率・狭め。バランスは定数で調整。
-- **判定（メインスレッド）**: `MissileManager` の飛翔更新（メイン）で、各飛来ミサイルについて高い帯から順に登録建物を走査。ミサイルが「その建物の高度帯 ∩ 水平射程内」かつ建物クールダウン明けなら `InterceptDecision.ShouldIntercept(...)` で確率ロール。成功→被迎撃（着弾enqueueせず消滅）、建物クールダウン開始、迎撃演出を生成。
-  - `InterceptDecision`（Core・テスト可能）: 高度帯判定・水平距離判定・確率の純粋ロジック（確率の乱数は引数注入でテスト可能に）。
-- **演出**: 成功時 `InterceptorShot`（対応モデル）を建物位置から会合点へ上昇飛翔させ、会合で `InterceptFx` の爆発フラッシュ＋両者消滅。
-- **すり抜け**: どの層でも迎撃されなければ既存 `ImpactResolver` で通常着弾。
+- **Three new buildings**: `CustomBuildingFactory` builds **new BuildingInfos**, reusing only the
+  minimum engine plumbing and setting the mesh, AI, name, cost, power and upkeep itself. The
+  building meshes come from the dedicated models being made in model.blend. Nothing about a
+  vanilla building's appearance or behaviour is reused.
+- **`InterceptorAI : PlayerBuildingAI`**: the vanilla power and upkeep behaviour is delegated to
+  the base class. While operating, i.e. powered, it registers itself in `InterceptorRegistry`,
+  and deregisters when it stops or is destroyed.
+- **`InterceptorTier`**, constants in Core: each layer's `AltitudeMin`/`Max`,
+  `HorizontalRange`, `InterceptChance` and `CooldownSeconds`.
+  - The exo-atmospheric layer has the highest band, the widest range and a low-to-medium
+    probability; the high-altitude layer sits in the middle; the terminal layer has the highest
+    probability over a narrower area. The balance is tuned through the constants.
+- **The decision, on the main thread**: during `MissileManager`'s flight update, each incoming
+  missile is checked against the registered buildings, highest layer first. Where the missile is
+  inside a building's altitude band and horizontal range, and that building is off cooldown,
+  `InterceptDecision.ShouldIntercept(...)` rolls. On success the missile is intercepted - it
+  disappears without queuing an impact - the building's cooldown starts, and the interception
+  presentation is created.
+  - `InterceptDecision` in Core, and therefore testable: the band test, the horizontal distance
+    test and the probability, all pure, with the random number injected as an argument so it can
+    be tested.
+- **The presentation**: on success an `InterceptorShot` with the matching model climbs from the
+  building to the meeting point, where `InterceptFx` flashes and both disappear.
+- **Getting through**: a missile no layer intercepts lands as usual, through the existing
+  `ImpactResolver`.
 
-### C. モデル読込パイプライン
+### C. The model loading pipeline
 
-- Blender MCP で model.blend の4メッシュを OBJ+MTL エクスポート（`bpy.ops.wm.obj_export`、各メッシュ個別ファイル）→ `src/MissileDisaster/Models/` に配置 → `build.ps1` が mod フォルダへ配布（Alien と同様）。
-- 起動時 `MissileModels` が4モデルをロードしメッシュ/マテリアルをキャッシュ。飛来弾・各迎撃弾はここから GameObject を生成。ゲーム内スケールは定数で調整。
-- CS Unity 5.6 のシェーダ制約は Alien の `RenderAssets` 流用で回避。
+- The four meshes in model.blend are exported as OBJ plus MTL, one file each, through
+  `bpy.ops.wm.obj_export`, into `src/MissileDisaster/Models/`. `build.ps1` deploys them into the
+  mod folder, as Alien does.
+- At startup `MissileModels` loads the four and caches their meshes and materials. The incoming
+  missile and each interceptor create their GameObjects from there. The in-game scale is a
+  constant.
+- The shader constraints of CS's Unity 5.6 are worked around by reusing Alien's `RenderAssets`.
 
-## 6. スレッド規律
+## 6. Thread discipline
 
-- 飛来ミサイル（`_missiles`）・迎撃演出 GameObject・**迎撃判定/解決**は全てメインスレッド。
-- `InterceptorRegistry` はメインスレッドが読む。建物 AI の登録/解除はメイン反映（`SimulationStep` は sim のため、登録はロック保護 or メインスレッド反映キュー経由）。
-- 着弾ダメージ（`ImpactResolver`）は従来どおり sim スレッド（`MissileManager.UpdateSimulation` のキュー排出）。
+- The incoming missiles (`_missiles`), the interception GameObjects and **the interception
+  decision and its resolution** are all on the main thread.
+- `InterceptorRegistry` is read by the main thread. Registering and deregistering from the
+  building AI is applied on the main thread; since `SimulationStep` runs on the simulation
+  thread, registration goes through a lock or a queue applied on the main thread.
+- Impact damage (`ImpactResolver`) stays on the simulation thread as before, drained from the
+  queue in `MissileManager.UpdateSimulation`.
 
-## 7. テスト戦略
+## 7. Testing
 
-Core 純粋ロジックを xUnit でテスト:
-- `LaunchGeometry`: apex 位置が方位・オフセット・高度どおり。着弾との水平距離＝horizOffset。
-- `InterceptDecision`: 高度帯内/外、射程内/外、確率境界（乱数注入）で期待どおり true/false。
-- 既存 `BallisticMath` 追加ヘルパのテスト。
+The pure Core logic is tested with xUnit:
+- `LaunchGeometry`: the apex lands where the bearing, offset and altitude say it should, and its
+  horizontal distance from the impact equals horizOffset.
+- `InterceptDecision`: true and false as expected inside and outside the band, inside and
+  outside the range, and at the probability boundaries, with the random number injected.
+- The new helpers added to `BallisticMath`.
 
-ゲーム型依存（AI/建物/モデル/演出）は実機確認。
+Anything depending on game types - the AI, the buildings, the models, the presentation - is
+verified in game.
 
-## 8. 実装順（各段が実機で確認できる単位＝別プランに分割）
+## 8. Implementation order (each step verifiable in game, split into separate plans)
 
-**モデル依存性で2グループに分ける。** 建物メッシュ（model.blend で作成中）と OBJ エクスポートの完成を待つ必要があるのは 2B/2D/2E。2A/2C はモデル非依存で先行実装する。
+**Two groups, split by their dependency on the models.** 2B, 2D and 2E have to wait for the
+building meshes being made in model.blend and their OBJ export; 2A and 2C do not depend on any
+model and go first.
 
-先行（モデル非依存・いま実装）:
-- **Plan 2A（飛来刷新）**: 固定方位＋apex降下＋高高度化（モデルは球のまま）。実機で「同方向・高高度から降下枝のみ」を確認。
-- **Plan 2C（迎撃Core）**: `LaunchGeometry`/`InterceptDecision`/`InterceptorTier`（TDD、純粋ロジックのみ）。
+First, independent of the models:
+- **Plan 2A (reworked arrival)**: the fixed bearing, the apex descent and the higher altitude,
+  still with the sphere. Verify in game that they descend from the same direction, from high up,
+  showing only the descending half.
+- **Plan 2C (interception core)**: `LaunchGeometry`, `InterceptDecision` and `InterceptorTier`,
+  test-first, pure logic only.
 
-モデル確定後（ユーザーが model.blend 完成を連絡後）:
-- **Plan 2B（モデル）**: model.blend の弾頭＋ARROW/SAM/PAC＋建物メッシュを OBJ 化＋読込。飛来弾を実モデル化＋機首向き。
-- **Plan 2D（建物＋AI）**: `CustomBuildingFactory`（新規建物）＋`InterceptorAI`＋`InterceptorRegistry`。3建物設置→高度帯∩射程で被迎撃（演出は簡易フラッシュ）。
-- **Plan 2E（迎撃演出）**: `InterceptorShot`（会合飛翔）＋`InterceptFx`（爆発）＋各モデル。
+Then, once the models are ready:
+- **Plan 2B (models)**: export the warhead, ARROW, SAM, PAC and the building meshes from
+  model.blend as OBJ and load them. Give the incoming missile its real model and point its nose.
+- **Plan 2D (buildings and AI)**: `CustomBuildingFactory` for the new buildings, plus
+  `InterceptorAI` and `InterceptorRegistry`. Place the three buildings and have missiles
+  intercepted where the band and range cover them, with a simple flash for now.
+- **Plan 2E (interception presentation)**: `InterceptorShot` flying to the meeting point,
+  `InterceptFx` for the explosion, and the models for each.
 
-## 9. 未決事項・リスク
+## 9. Open questions and risks
 
-- バニラ建物の複製で電力/コストを継承する際、複製元の選定と `InterceptorAI` への差し替え手順の実機検証（Phase 1 の `CustomBuildingFactory` 方針を踏襲）。
-- 高度帯境界・射程・確率・クールダウンはプレイしながら数値調整（バランス作業）。
-- 降下枝の弧成分（急降下 vs ゆるい弧）は見た目調整。
-- モデルのスケール・機首軸（モデルの前方がどの軸か）は実機で調整。
+- If power and cost are to be inherited by cloning a vanilla building, both the choice of source
+  and the procedure for swapping in `InterceptorAI` need verifying in game, following Phase 1's
+  `CustomBuildingFactory` approach.
+- The band boundaries, ranges, probabilities and cooldowns are a balancing exercise, to be tuned
+  while playing.
+- How much arc the descent should have - a steep dive or a gentler curve - is a matter of
+  appearance.
+- The models' scale and which axis their nose points along will be adjusted in game.
