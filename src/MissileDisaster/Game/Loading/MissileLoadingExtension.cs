@@ -3,9 +3,9 @@ using ICities;
 namespace MissileDisaster.Game.Loading
 {
     /// <summary>
-    /// レベルロード毎に MissileTool を ToolController へ登録する。
-    /// SetTool&lt;T&gt;() が機能するには事前登録が必須（UI.ToolRegistration 参照）。
-    /// これを行わないと F9 が空振りする。
+    /// Registers MissileTool with the ToolController on every level load.
+    /// SetTool&lt;T&gt;() only works once the tool is registered - see UI.ToolRegistration - and
+    /// without this the hotkey silently does nothing.
     /// </summary>
     public class MissileLoadingExtension : LoadingExtensionBase
     {
@@ -19,7 +19,7 @@ namespace MissileDisaster.Game.Loading
                 Defense.InterceptorRegistry.Reset();
                 UI.ToolRegistration.Register<UI.MissileTool>();
                 UI.MissilePanel.Create();
-                UI.MissileDisasterButton.CreateButton(); // 災害タブにミサイル起動ボタン（UFO!ボタンと同方式）
+                UI.MissileDisasterButton.CreateButton(); // the launch button in the disasters tab
             }
             catch (System.Exception e)
             {
@@ -34,7 +34,7 @@ namespace MissileDisaster.Game.Loading
             {
                 MissileDisaster.Game.MissileManager.Reset();
                 Defense.InterceptorRegistry.Reset();
-                Contamination.ContaminationManager.Reset(); // メモリ台帳を破棄（ロード時は OnLoadData が再投入）
+                Contamination.ContaminationManager.Reset(); // drop the in-memory ledger; OnLoadData repopulates it on load
                 UI.MissileDisasterButton.DestroyButton();
                 UI.MissilePanel.Destroy();
             }

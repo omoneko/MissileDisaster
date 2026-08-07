@@ -4,8 +4,8 @@ using UnityEngine;
 namespace MissileDisaster.Game
 {
     /// <summary>
-    /// 着弾ダメージ解決。DisasterHelpers はシミュレーションスレッドから呼ぶ契約のため、
-    /// このメソッドは MissileManager.UpdateSimulation（sim スレッド）からのみ呼ぶこと。
+    /// Resolves the damage of an impact. DisasterHelpers is contracted to the simulation
+    /// thread, so this must only be called from MissileManager.UpdateSimulation.
     /// </summary>
     public static class ImpactResolver
     {
@@ -13,12 +13,13 @@ namespace MissileDisaster.Game
         {
             if (spec.SubmunitionCount <= 1)
             {
-                // 単一着弾（Conventional/Thermobaric/Nuclear）。
+                // A single detonation: conventional, thermobaric or nuclear.
                 ApplyBlast(target, spec.CraterRadius, spec.CraterDepth, spec.DestructionRadius, spec.BurnRadius, spec.RaiseCraterEdges);
             }
             else
             {
-                // 子弾散布（Cluster/WhitePhosphorus）。散布点ごとに小被害を与える（決定論配置）。
+                // Scattering warheads - cluster and white phosphorus - do smaller damage at
+                // each submunition point, placed deterministically.
                 Offset2[] offsets = SubmunitionScatter.Offsets(spec.SubmunitionCount, spec.SpreadRadius);
                 for (int i = 0; i < offsets.Length; i++)
                 {
@@ -29,7 +30,8 @@ namespace MissileDisaster.Game
 
             if (spec.Contaminates)
             {
-                // 放射能汚染ゾーンを追加（台帳管理・50年で消滅・除染なし。sim スレッド）。
+                // Add the radioactive contamination zone: tracked in the ledger, lifting after
+                // 50 years, and not removed by anything else. Simulation thread.
                 long nowTicks = SimulationManager.instance.m_currentGameTime.Ticks;
                 Contamination.ContaminationManager.AddZone(
                     new MissileDisaster.Core.ContaminationZone(target.x, target.z, spec.ContaminationRadius, nowTicks));
@@ -38,14 +40,16 @@ namespace MissileDisaster.Game
             ModConfig.Log("Impact resolved: " + spec.Type + " x" + spec.SubmunitionCount + " at " + target);
         }
 
-        /// <summary>1 発ぶんのクレーター＋範囲破壊＋延焼を適用する（sim スレッド）。</summary>
+        /// <summary>Applies one detonation's crater, area destruction and fires. Simulation thread.</summary>
         private static void ApplyBlast(Vector3 pos, float craterRadius, float craterDepth,
             float destructionRadius, float burnRadius, bool raiseEdges)
         {
-            // 空中爆発は WithBurst で craterRadius=0 にされる。これで地上/空中を判別する。
+            // WithBurst sets craterRadius to 0 for an airburst, which is how ground and air
+            // bursts are told apart here.
             bool groundburst = craterRadius > 0f;
 
-            // クレーターは地上爆発のみ（バニラ MakeCrater。戦略核でも地形を過剰破壊しないよう上限で丸める）。
+            // Only a groundburst leaves a crater, dug with the game's own MakeCrater. It is
+            // capped so that even a strategic warhead does not wreck the terrain.
             if (groundburst)
             {
                 float cRadius = craterRadius > ModConfig.CraterRadiusMax ? ModConfig.CraterRadiusMax : craterRadius;
@@ -53,23 +57,30 @@ namespace MissileDisaster.Game
                 DisasterHelpers.MakeCrater(new Vector2(pos.x, pos.z), cRadius, cDepth, raiseEdges);
             }
 
-            // 範囲破壊＋延焼。DestroyStuff の末尾2引数 burnMin/burnMax が延焼帯（この帯の建物は着火）。
-            // preRadius/totalRadius は処理外周なので destMax と burnMax の大きい方に合わせる
-            // （小さいと外側が走査されない既知の罠を回避）。
+            // Area destruction and fires. The last two arguments to DestroyStuff, burnMin and
+            // burnMax, are the burn band, within which buildings catch fire.
+            // preRadius and totalRadius are the outer bound of the whole operation, so they take
+            // the larger of destMax and burnMax - passing anything smaller is the known trap
+            // where the outer area is never scanned.
             int seed = (int)SimulationManager.instance.m_randomizer.Int32(1000000u);
-            // 大威力核の実半径はマップを超えるため、DestroyStuff の極端な走査を避ける安全上限で丸める。
+            // A high-yield warhead's real radii exceed the map, so they are capped to keep
+            // DestroyStuff from an extreme scan.
             float destMax = destructionRadius > ModConfig.MaxEffectRadius ? ModConfig.MaxEffectRadius : destructionRadius;
             float burnMax = burnRadius > ModConfig.MaxEffectRadius ? ModConfig.MaxEffectRadius : burnRadius;
             float outer = destMax > burnMax ? destMax : burnMax;
-            // 距離減衰(同心円): 内側 core までは全壊、core→destMax で破壊確率が低下する（destMin=core）。
+            // Falloff in concentric rings: everything within core is destroyed, and from core
+            // out to destMax the probability drops off, with destMin equal to core.
             float core = destMax * ModConfig.DestructionCoreFraction;
-            // removeRadius 内は「土台ごと撤去」＝道路・橋・基礎まで破壊。
-            //  - 地上爆発: core 内をクレーター化して撤去（道路・橋・基礎を破壊）。外周は建物のみ確率破壊。
-            //  - 空中爆発: removeRadius=0。撤去せず建物倒壊のみで、基礎・道路・水道管・地下鉄は残す。
+            // Inside removeRadius everything goes, foundations included - roads, bridges and
+            // footings alike.
+            //  - Groundburst: the core becomes the crater and is removed entirely, while further
+            //    out only buildings are destroyed, by chance.
+            //  - Airburst: removeRadius is 0, so nothing is removed. Buildings collapse, but the
+            //    footings, roads, water pipes and metro tunnels survive.
             float removeRadius = groundburst ? core : 0f;
             float destMin = core;
             float burnMin = core;
-            if (burnMin > burnMax * 0.5f) burnMin = burnMax * 0.5f; // 延焼帯が反転しないよう内縁を抑える
+            if (burnMin > burnMax * 0.5f) burnMin = burnMax * 0.5f; // hold the inner edge back so the burn band cannot invert
             DisasterHelpers.DestroyStuff(seed, null, pos, outer, outer, removeRadius, destMin, destMax, burnMin, burnMax);
         }
     }

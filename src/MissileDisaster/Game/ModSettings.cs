@@ -4,33 +4,40 @@ using UnityEngine;
 namespace MissileDisaster.Game
 {
     /// <summary>
-    /// Mod 設定（キー割り当て・ランダム攻撃モード）。ColossalFramework の Saved* で設定ファイルへ永続化する。
-    /// Ensure() を OnEnabled / レベルロード / OnSettingsUI の先頭で呼んで初期化する（多重登録は防止）。
+    /// Mod settings - the hotkey and the random strike mode - persisted to the settings file
+    /// through ColossalFramework's Saved* types.
+    /// Ensure() initialises them and is called at the start of OnEnabled, on level load and in
+    /// OnSettingsUI; it guards against registering more than once.
     /// </summary>
     public static class ModSettings
     {
         public const string FileName = "MissileDisasterSettings";
 
-        // 発射ツール起動キーの候補（Mac で F9 等が OS に奪われるため選べるようにする）。
+        // Candidate hotkeys for the launch tool. macOS takes F9 and others for itself, so the
+        // key is made selectable.
         public static readonly KeyCode[] KeyOptions =
         {
             KeyCode.F5, KeyCode.F6, KeyCode.F7, KeyCode.F8, KeyCode.F9, KeyCode.F10, KeyCode.F11, KeyCode.F12,
             KeyCode.Insert, KeyCode.Home, KeyCode.End, KeyCode.Backslash,
         };
 
-        public static SavedInt LaunchKey;             // 起動キー（KeyCode を int で保存）
-        public static SavedInt RandomEnabled;         // ランダム攻撃 0/1
-        public static SavedInt StrikeFrequencyPct;    // 攻撃頻度（自然災害比のパーセント。25..300, 既定100=×1.0）
-        public static SavedInt AttackPattern;         // 着弾パターン 0=Single,1=MIRV,2=Random
-        public static SavedInt RandomWarhead;         // 0=ランダム, 1..5=固定(通常/クラスター/白リン/サーモ/核)
+        public static SavedInt LaunchKey;             // the hotkey, storing a KeyCode as an int
+        public static SavedInt RandomEnabled;         // random strikes, 0 or 1
+        public static SavedInt StrikeFrequencyPct;    // strike frequency as a percentage of the natural disaster rate; 25 to 300, with 100 meaning 1.0
+        public static SavedInt AttackPattern;         // impact pattern: 0 single, 1 MIRV, 2 random
+        public static SavedInt RandomWarhead;         // 0 picks at random; 1 to 5 fix it to conventional, cluster, white phosphorus, thermobaric or nuclear
 
-        // 優先照準の各層キーワード（カンマ区切り）。建物の内部名(info.name)に部分一致で判定。A>B>C。
+        // Keywords for each targeting tier, comma-separated, matched as substrings against the
+        // building's internal info.name. Tier A outranks B, which outranks C.
         public static SavedString PriorityKeywordsA;
         public static SavedString PriorityKeywordsB;
         public static SavedString PriorityKeywordsC;
 
-        // 既定キーワード（現状の優先目標）。C はランドマーク/モニュメントを MonumentAI で自動判定するため空。
-        public const string DefaultKeywordsA = "Nuclear, PAC3, THAAD, Aegis, イージス";
+        // The default keywords. Tier C is empty because landmarks and monuments are detected
+        // from MonumentAI instead.
+        // The last keyword is Japanese for "Aegis". Kept as matching data, not prose: Workshop
+        // authors name assets in their own language.
+        public const string DefaultKeywordsA = "Nuclear, PAC3, THAAD, Aegis, \u30a4\u30fc\u30b8\u30b9";
         public const string DefaultKeywordsB = "Airport, Train Station, Railway, Cargo Train, Harbor, Harbour";
         public const string DefaultKeywordsC = "";
 
@@ -71,13 +78,13 @@ namespace MissileDisaster.Game
             get { return RandomEnabled != null && RandomEnabled.value != 0; }
         }
 
-        /// <summary>攻撃頻度の乗数（自然災害比）。0.25〜3.0、既定1.0。</summary>
+        /// <summary>Strike frequency as a multiplier of the natural disaster rate, from 0.25 to 3.0, defaulting to 1.0.</summary>
         public static double StrikeFrequency
         {
             get { return StrikeFrequencyPct != null ? StrikeFrequencyPct.value / 100.0 : 1.0; }
         }
 
-        /// <summary>着弾パターン 0=Single,1=MIRV,2=Random。</summary>
+        /// <summary>Impact pattern: 0 single, 1 MIRV, 2 random.</summary>
         public static int AttackPatternValue
         {
             get { return AttackPattern != null ? AttackPattern.value : 0; }

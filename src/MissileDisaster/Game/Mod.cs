@@ -18,8 +18,9 @@ namespace MissileDisaster.Game
         public void OnEnabled()
         {
             ModSettings.Ensure();
-            // Assembly.GetExecutingAssembly().Location は CS の Mod 読み込み環境下で空文字等を返すことが
-            // あり例外の原因になる。ゲーム自身が管理する PluginManager から確実な modPath を取得する。
+            // Assembly.GetExecutingAssembly().Location can come back empty the way CS loads
+            // mods, which then throws. The mod path is taken from the game's own PluginManager
+            // instead, which is reliable.
             try
             {
                 PluginManager.PluginInfo info = Singleton<PluginManager>.instance.FindPluginInfo(Assembly.GetExecutingAssembly());
@@ -27,11 +28,11 @@ namespace MissileDisaster.Game
                 {
                     MissileModelProvider.Initialize(info.modPath);
                     Audio.SoundLibrary.Initialize(info.modPath);
-                    UI.MissileIcon.SetModDirectory(info.modPath); // タブアイコンに icon.png を使う
+                    UI.MissileIcon.SetModDirectory(info.modPath); // so the panel icon can use icon.png
                 }
                 else
                 {
-                    ModConfig.LogError("OnEnabled: PluginManager から modPath を取得できませんでした");
+                    ModConfig.LogError("OnEnabled: could not get modPath from PluginManager");
                 }
             }
             catch (System.Exception e)
@@ -40,7 +41,7 @@ namespace MissileDisaster.Game
             }
         }
 
-        /// <summary>Mod オプション画面（キー割り当て・ランダム攻撃）。ゲームが自動検出して呼ぶ。</summary>
+        /// <summary>The mod's options screen, covering the hotkey and the random strikes. The game finds and calls this itself.</summary>
         public void OnSettingsUI(UIHelperBase helper)
         {
             try
@@ -70,7 +71,8 @@ namespace MissileDisaster.Game
                 UIHelperBase rnd = helper.AddGroup("Random missile strikes");
                 rnd.AddCheckbox("Enable random strikes (occur between natural disasters)",
                     ModSettings.IsRandomEnabled, b => ModSettings.RandomEnabled.value = b ? 1 : 0);
-                // 頻度は自然災害頻度に対する倍率(0.25〜3.0)。内部は percent(25..300)で保存。
+                // The frequency is a multiplier of the natural disaster rate, 0.25 to 3.0,
+                // stored internally as a percentage from 25 to 300.
                 rnd.AddSlider("Strike frequency (x natural disaster rate)", 0.25f, 3f, 0.25f,
                     (float)ModSettings.StrikeFrequency,
                     v => ModSettings.StrikeFrequencyPct.value = (int)Math.Round(v * 100.0));
@@ -82,7 +84,8 @@ namespace MissileDisaster.Game
                     ModSettings.RandomWarhead != null ? ModSettings.RandomWarhead.value : 0,
                     i => { if (ModSettings.RandomWarhead != null) ModSettings.RandomWarhead.value = i; });
 
-                // 優先照準：各層のキーワード（カンマ区切り）を編集可能に。重みは表示のみ。
+                // Targeting: the keywords for each tier are editable, comma-separated. The
+                // weights are shown but not editable.
                 UIHelperBase prio = helper.AddGroup("Priority targeting (random strikes)");
                 prio.AddButton(
                     "Random strikes prefer these buildings. Weights (among tiers that have matches): A 50% / B 25% / C 15% / others 10%. " +

@@ -8,14 +8,16 @@ using UnityEngine;
 namespace MissileDisaster.Game
 {
     /// <summary>
-    /// 発射・追跡の静的コーディネータ。
-    /// スレッド境界（重要）:
-    ///  - _missiles（飛翔中リスト）はメインスレッドのみが触る（Launch/UpdateVisual/Reset）。
-    ///    sim スレッドはこのリストに一切アクセスしない。
-    ///  - 着弾ダメージは DisasterHelpers を使うため sim スレッドで実行が必要。そこでメインスレッドは
-    ///    着弾時に ImpactJob（座標＋弾頭スペックの値）を _impactQueue に積み、sim スレッド
-    ///    （UpdateSimulation）はロック下でキューを排出して解決する。
-    ///  これにより List&lt;Missile&gt; をスレッド跨ぎで共有せず、境界はロック保護した小さな値キューのみになる。
+    /// Static coordinator for launching and tracking missiles.
+    /// The thread boundary matters here:
+    ///  - _missiles, the list of missiles in flight, is touched by the main thread alone,
+    ///    through Launch, UpdateVisual and Reset. The simulation thread never reads it.
+    ///  - Impact damage goes through DisasterHelpers and therefore has to run on the simulation
+    ///    thread. So on impact the main thread pushes an ImpactJob - the position plus the
+    ///    warhead spec, all plain values - onto _impactQueue, and the simulation thread drains
+    ///    and resolves that queue under a lock in UpdateSimulation.
+    ///  The upshot is that List&lt;Missile&gt; is never shared across threads: the only thing that
+    ///  crosses the boundary is a small, lock-protected queue of values.
     /// </summary>
     public static class MissileManager
     {
@@ -25,17 +27,20 @@ namespace MissileDisaster.Game
             public WarheadSpec Spec;
         }
 
-        private static readonly List<Missile> _missiles = new List<Missile>();                    // メインスレッド専用
-        private static readonly List<InterceptorProjectile> _interceptors = new List<InterceptorProjectile>(); // メインスレッド専用
-        private static readonly List<ImpactJob> _impactQueue = new List<ImpactJob>();  // 受け渡し(ロック保護)
+        private static readonly List<Missile> _missiles = new List<Missile>();                    // main thread only
+        private static readonly List<InterceptorProjectile> _interceptors = new List<InterceptorProjectile>(); // main thread only
+        private static readonly List<ImpactJob> _impactQueue = new List<ImpactJob>();  // crosses threads, lock-protected
         private static readonly object _impactLock = new object();
 
-        /// <summary>メインスレッドから読む。</summary>
+        /// <summary>Read from the main thread.</summary>
         public static bool HasActive => _missiles.Count > 0;
 
         /// <summary>
-        /// メインスレッド専用。出力係数(yieldMultiplier)で効果半径をスケールし、爆発高度(burst)を反映した spec で発射する。
-        /// 係数は呼び出し側が弾頭に応じて算出（核=kt由来、非核=kg由来）。空中爆発はクレーター/汚染を無くし破壊・延焼を広げる。
+        /// Main thread only. Launches with a spec whose effect radii are scaled by
+        /// yieldMultiplier and adjusted for the burst height. The caller works the multiplier
+        /// out from the warhead - from kilotons for a nuclear one, from kilograms otherwise.
+        /// An airburst removes the crater and the contamination and widens the destruction and
+        /// the fires.
         /// </summary>
         public static void Launch(Vector3 target, WarheadType type, float yieldMultiplier, BurstType burst)
         {
@@ -48,7 +53,8 @@ namespace MissileDisaster.Game
             Missile missile = new Missile(target, spec);
             _missiles.Add(missile);
 
-            // 発射音（launcher2/launcher7 をランダム）。発射地点(apex)から距離で増減する3D音。
+            // The launch sound, chosen at random between two samples. It is 3D, placed at the
+            // apex it was launched from, so it fades with distance.
             string launcher = UnityEngine.Random.value < 0.5f ? SoundLibrary.Launcher2 : SoundLibrary.Launcher7;
             SoundPlayer.PlayAt(launcher, missile.LaunchPosition, ModConfig.SoundVolumeNormal,
                 ModConfig.SoundLaunchMinDistance, ModConfig.SoundLaunchMaxDistance);
@@ -58,8 +64,10 @@ namespace MissileDisaster.Game
         }
 
         /// <summary>
-        /// メインスレッド専用。迎撃施設の走査/クールダウン、迎撃ミサイルの飛翔と解決、飛来弾の飛翔と交戦を進める。
-        /// 着弾（未撃墜）弾はダメージを enqueue して破棄。命中確定弾は着弾させずダメージも出さない。
+        /// Main thread only. Advances the interceptor site scan and cooldowns, the interceptor
+        /// missiles and their resolution, and the incoming missiles and their engagements.
+        /// A missile that lands without being shot down has its damage queued and is destroyed;
+        /// one an interceptor is confirmed to hit never lands and does no damage.
         /// </summary>
         public static void UpdateVisual(float simTimeDelta)
         {
@@ -72,17 +80,20 @@ namespace MissileDisaster.Game
                 bool impacted = m.UpdateVisual(simTimeDelta);
                 if (impacted)
                 {
-                    // 命中確定(Doomed)弾は迎撃済み扱い＝ダメージ・爆発なし。未撃墜のみ着弾ダメージ＋爆発エフェクト。
+                    // A doomed missile counts as already intercepted: no damage and no
+                    // explosion. Only one that got through gets both.
                     if (!m.Doomed)
                     {
-                        ExplosionFx.Play(m.Target, m.Spec); // 隕石着弾エフェクト（規模連動・メインスレッド）
-                        PlayImpactSound(m.Target, m.Spec);  // 爆発音（核は atomic_bomb を2倍音量）
-                        // 核着弾点を疎結合ビーコンへ公開（外部Mod連携の隠し要素: Alien のトライポッド直撃転倒）。
+                        ExplosionFx.Play(m.Target, m.Spec); // the impact effect, scaled with the yield. Main thread.
+                        PlayImpactSound(m.Target, m.Spec);  // the blast; a nuclear one is twice as loud
+                        // Publish the nuclear impact to the loosely coupled beacon, which is
+                        // what lets Alien Invasion topple a tripod caught in a direct hit.
                         if (m.Spec.Type == WarheadType.Nuclear)
                         {
                             NuclearImpactBeacon.Publish(m.Target.x, m.Target.z);
                         }
-                        // 全弾種の着弾を汎用ビーコンへ公開（CS:WARFRONTが軍事ユニットへの被害判定に使う）。
+                        // Publish every impact to the general beacon, which CS:WARFRONT reads to
+                        // damage military units.
                         ImpactBeacon.Publish(m.Target.x, m.Target.z,
                             m.Spec.DestructionRadius, m.Spec.BurnRadius, m.Spec.Type == WarheadType.Nuclear);
                         lock (_impactLock)
@@ -94,9 +105,10 @@ namespace MissileDisaster.Game
                     continue;
                 }
 
-                if (m.Doomed) continue; // 迎撃弾が向かっている最中。再交戦しない。
+                if (m.Doomed) continue; // an interceptor is already on its way; do not engage again
 
-                // 交戦: 圏内で待機中の発射器が1基だけ実弾を発射する。命中確定なら弾に印を付ける。
+                // Engagement: exactly one launcher in range and off cooldown fires a real
+                // round. If it is going to hit, the missile is marked.
                 Vector3 launcher;
                 InterceptorKind kind;
                 bool isHit;
@@ -108,7 +120,7 @@ namespace MissileDisaster.Game
             }
         }
 
-        /// <summary>メインスレッド専用。迎撃ミサイルを前進させ、迎撃点到達で解決（撃墜=閃光、空振り=不発煙）。</summary>
+        /// <summary>Main thread only. Advances the interceptors and resolves them on reaching the intercept point: a flash for a kill, a puff of smoke for a miss.</summary>
         private static void UpdateInterceptors(float simTimeDelta)
         {
             for (int j = _interceptors.Count - 1; j >= 0; j--)
@@ -122,7 +134,7 @@ namespace MissileDisaster.Game
                 {
                     Missile prey = p.Prey;
                     int idx = _missiles.IndexOf(prey);
-                    if (idx >= 0) RemoveMissile(idx, prey); // 撃墜: ダメージ無しで消滅＋他の追尾弾の参照解除
+                    if (idx >= 0) RemoveMissile(idx, prey); // shot down: it vanishes without damage, and any other interceptor chasing it is released
                     InterceptFx.PlayFlash(point);
                     SoundPlayer.PlayAt(SoundLibrary.Intercept, point, ModConfig.SoundVolumeNormal,
                         ModConfig.SoundInterceptMinDistance, ModConfig.SoundInterceptMaxDistance);
@@ -137,7 +149,7 @@ namespace MissileDisaster.Game
             }
         }
 
-        /// <summary>着弾音（メインスレッド）。核は atomic_bomb を2倍音量＋広い可聴範囲、他は explosion1。</summary>
+        /// <summary>The impact sound, on the main thread. A nuclear blast is twice as loud and audible much further away than the others.</summary>
         private static void PlayImpactSound(Vector3 target, WarheadSpec spec)
         {
             if (spec.Type == WarheadType.Nuclear)
@@ -152,7 +164,7 @@ namespace MissileDisaster.Game
             }
         }
 
-        /// <summary>メインスレッド専用。飛来弾を破棄・除去し、それを追尾中の迎撃弾の参照を解く。</summary>
+        /// <summary>Main thread only. Destroys and removes an incoming missile, releasing any interceptor chasing it.</summary>
         private static void RemoveMissile(int index, Missile m)
         {
             m.DestroyVisual();
@@ -163,7 +175,7 @@ namespace MissileDisaster.Game
             }
         }
 
-        /// <summary>シミュレーションスレッド専用。着弾キューを排出し DisasterHelpers で解決する。</summary>
+        /// <summary>Simulation thread only. Drains the impact queue and resolves it through DisasterHelpers.</summary>
         public static void UpdateSimulation()
         {
             List<ImpactJob> jobs = null;
@@ -182,7 +194,7 @@ namespace MissileDisaster.Game
             }
         }
 
-        /// <summary>メインスレッド専用。全飛翔体（飛来弾・迎撃弾）を破棄し、キューも空にする。</summary>
+        /// <summary>Main thread only. Destroys every missile and interceptor in flight and empties the queue.</summary>
         public static void Reset()
         {
             for (int i = 0; i < _missiles.Count; i++) _missiles[i].DestroyVisual();
@@ -190,8 +202,8 @@ namespace MissileDisaster.Game
             for (int j = 0; j < _interceptors.Count; j++) _interceptors[j].Destroy();
             _interceptors.Clear();
             lock (_impactLock) { _impactQueue.Clear(); }
-            NuclearImpactBeacon.Reset(); // 核着弾ビーコンも空にする（レベル切替で持ち越さない）
-            ImpactBeacon.Reset(); // 汎用着弾ビーコンも同様
+            NuclearImpactBeacon.Reset(); // clear the nuclear beacon too, so nothing carries into the next level
+            ImpactBeacon.Reset(); // and the general beacon likewise
         }
     }
 }

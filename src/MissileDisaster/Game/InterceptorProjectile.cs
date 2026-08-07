@@ -6,21 +6,24 @@ using UnityEngine;
 namespace MissileDisaster.Game
 {
     /// <summary>
-    /// 発射器から飛来ミサイルへ向かう可視の迎撃ミサイル1発。すべてメインスレッドで進行する
-    /// （sim スレッドは触れない）。獲物(prey)の現在位置を毎フレーム追尾し、到達したら解決する。
-    /// isHit=true の弾が生存中の獲物へ到達すれば撃墜成立、false や獲物消失時は空振り(不発)。
-    /// モデル(Models/&lt;name&gt;.obj、+Z=機首)を進行方向へ向ける。噴煙は破棄後も少しの間残す。
+    /// One visible interceptor, flying from its launcher towards an incoming missile.
+    /// Everything happens on the main thread; the simulation thread never touches it. It
+    /// follows its prey's current position every frame and resolves on arrival.
+    /// If it was going to hit and the prey is still there when it arrives, the missile is shot
+    /// down; if it was not, or the prey has already gone, it simply fizzles.
+    /// The model (Models/&lt;name&gt;.obj, +Z as the nose) points along the flight path, and its
+    /// exhaust lingers for a moment after it is destroyed.
     /// </summary>
     public class InterceptorProjectile
     {
         private readonly GameObject _go;
         private readonly float _speed;
         private readonly bool _isHit;
-        private Missile _prey;              // 追尾対象。撃墜/着弾で消えたら null 化され最後の既知点へ向かう
+        private Missile _prey;              // what it is chasing; cleared once that missile is gone, after which it flies on to the last known point
         private Vector3 _lastPreyPos;
         private float _elapsed;
 
-        /// <summary>この迎撃弾が狙っている飛来ミサイル（撃墜処理用）。空振り・消失後は null。</summary>
+        /// <summary>The incoming missile this interceptor is after. Null once it has fizzled or the target has gone.</summary>
         public Missile Prey => _prey;
 
         public InterceptorProjectile(Vector3 origin, Missile prey, InterceptorKind kind, bool isHit)
@@ -36,7 +39,7 @@ namespace MissileDisaster.Game
             InterceptorTrail.Attach(_go);
         }
 
-        /// <summary>獲物が撃墜/着弾で消えた時、追尾を解いて最後の既知点へ向かわせる（メインスレッド）。</summary>
+        /// <summary>Releases the chase when the target is gone, sending it on to the last known point. Main thread.</summary>
         public void ClearPrey()
         {
             if (_prey != null) _lastPreyPos = _prey.CurrentPosition;
@@ -44,8 +47,10 @@ namespace MissileDisaster.Game
         }
 
         /// <summary>
-        /// メインスレッド。獲物へ向けて前進する。戻り値 true = 迎撃点に到達（解決すべき）。
-        /// connectedHit = 命中確定弾が生存中の獲物へ到達した（＝撃墜成立）。point = 迎撃点。
+        /// Main thread. Advances towards the target. Returning true means it reached the
+        /// intercept point and should be resolved. connectedHit means it was going to hit and
+        /// the target was still there, i.e. a kill, and point is where the interception
+        /// happened.
         /// </summary>
         public bool Update(float deltaSeconds, out bool connectedHit, out Vector3 point)
         {
@@ -80,7 +85,7 @@ namespace MissileDisaster.Game
             return false;
         }
 
-        /// <summary>メインスレッド。迎撃弾 GameObject を破棄する。噴煙は切り離して寿命まで残す。</summary>
+        /// <summary>Main thread. Destroys the interceptor's GameObject, detaching the exhaust so it lasts out its lifetime.</summary>
         public void Destroy()
         {
             if (_go == null) return;
@@ -105,9 +110,9 @@ namespace MissileDisaster.Game
                 return go;
             }
 
-            // フォールバック（モデル読込不可時の小さな球）。
+            // Fallback: a small sphere, when the model could not be loaded.
             GameObject sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            sphere.transform.localScale = new Vector3(4f, 4f, 4f); // 従来8の半分
+            sphere.transform.localScale = new Vector3(4f, 4f, 4f);
             Collider col = sphere.GetComponent<Collider>();
             if (col != null) Object.Destroy(col);
             return sphere;

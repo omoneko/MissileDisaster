@@ -5,13 +5,16 @@ using UnityEngine;
 namespace MissileDisaster.Game
 {
     /// <summary>
-    /// ランダム攻撃の優先照準。建物バッファを1回走査して優先度層ごとに位置を集め、
-    /// 重み付き(A>B>C>その他)で目標を抽選する。偏りは付けるが分散も残す。メインスレッド専用。
-    /// 分類は Core.TargetTierClassifier（名前ベース）＋ AI 型(MonumentAI)で TierC を補完。
+    /// Target selection for a random strike. It walks the building buffer once, collecting
+    /// positions by priority tier, then draws a target with weights favouring A over B over C
+    /// over everything else - biased, but still spread out. Main thread only.
+    /// Classification comes from Core.TargetTierClassifier, by name, with tier C filled in from
+    /// the AI type (MonumentAI).
     /// </summary>
     public sealed class StrikeTargeting
     {
-        // 層の抽選重み（存在する層のみで正規化）。[A, B, C, その他]。
+        // Draw weights per tier, normalised over the tiers that actually exist:
+        // [A, B, C, everything else].
         private static readonly float[] TierWeights = { 50f, 25f, 15f, 10f };
 
         private readonly List<Vector3> _a = new List<Vector3>();
@@ -24,7 +27,7 @@ namespace MissileDisaster.Game
             get { return _a.Count > 0 || _b.Count > 0 || _c.Count > 0 || _other.Count > 0; }
         }
 
-        /// <summary>建物バッファを走査して層別に位置を集める。</summary>
+        /// <summary>Walks the building buffer and collects positions by tier.</summary>
         public void Scan()
         {
             _a.Clear(); _b.Clear(); _c.Clear(); _other.Clear();
@@ -33,7 +36,7 @@ namespace MissileDisaster.Game
             Building[] buffer = bm.m_buildings.m_buffer;
             if (buffer == null) return;
 
-            // プレイヤー設定のキーワードを走査前に1回だけ展開する。
+            // Expand the player's keywords once, before the scan.
             string[] aKw = TargetTierClassifier.ParseKeywords(ModSettings.PriorityAText);
             string[] bKw = TargetTierClassifier.ParseKeywords(ModSettings.PriorityBText);
             string[] cKw = TargetTierClassifier.ParseKeywords(ModSettings.PriorityCText);
@@ -51,7 +54,7 @@ namespace MissileDisaster.Game
                 int tier = TargetTierClassifier.Classify(info.name, aKw, bKw, cKw);
                 if (tier == TargetTierClassifier.TierNone && info.m_buildingAI is MonumentAI)
                 {
-                    tier = TargetTierClassifier.TierC; // ランドマーク/モニュメントは AI 型で補完
+                    tier = TargetTierClassifier.TierC; // landmarks and monuments come from the AI type
                 }
 
                 Vector3 pos = buffer[i].m_position;
@@ -65,7 +68,7 @@ namespace MissileDisaster.Game
             }
         }
 
-        /// <summary>重み付きで目標を1つ抽選する。建物が1つも無ければ false。</summary>
+        /// <summary>Draws one target using the weights. False if there are no buildings at all.</summary>
         public bool TryPick(out Vector3 target)
         {
             target = Vector3.zero;
@@ -86,7 +89,7 @@ namespace MissileDisaster.Game
                     return true;
                 }
             }
-            // 数値誤差フォールバック：非空の最後の層から。
+            // Fallback against floating-point error: take the last non-empty tier.
             for (int i = tiers.Length - 1; i >= 0; i--)
             {
                 if (tiers[i].Count > 0)

@@ -4,7 +4,7 @@ using MissileDisaster.Core;
 
 namespace MissileDisaster.Game.Serialization
 {
-    /// <summary>放射能汚染ゾーン台帳をセーブデータへ永続化する。ゲームが自動検出して駆動する。</summary>
+    /// <summary>Persists the radioactive contamination zone ledger into the save game. The game finds and drives this itself.</summary>
     public class ContaminationDataExtension : SerializableDataExtensionBase
     {
         private const string DataId = "MissileDisaster.Contamination.v1";

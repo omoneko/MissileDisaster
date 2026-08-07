@@ -5,13 +5,17 @@ using UnityEngine;
 namespace MissileDisaster.Game.Defense
 {
     /// <summary>
-    /// 設置済みの迎撃施設（PAC3/THAAD/Aegis）と支援施設（レーダー）を名前で検出し、飛来ミサイルの
-    /// 迎撃を判定する。<b>すべてメインスレッド専用</b>（MissileManager.UpdateVisual と同じ側）。
+    /// Detects the interceptor sites (PAC3, THAAD, Aegis) and the supporting radar that have
+    /// been built, by name, and resolves interceptions against incoming missiles.
+    /// <b>All of it is main thread only</b>, the same side as MissileManager.UpdateVisual.
     ///
-    /// - 建物走査は毎フレームではなく InterceptorScanIntervalFrames 間隔で間引く（BuildingManager 全走査は重い）。
-    /// - クールダウンは毎 Tick 減算。再走査を跨いでも建物 ID で引き継ぐ。
-    /// - 迎撃可否は既存 Core（InterceptDecision / InterceptorTiers）で判定。レーダー稼働中は確率×倍率。
-    /// - コスト/電力/水はアセット側の設定に委ねる。ここでは一切上書きしない。
+    /// - The buildings are rescanned every InterceptorScanIntervalFrames rather than every
+    ///   frame, since walking all of BuildingManager is expensive.
+    /// - Cooldowns tick down every frame and are carried across a rescan by building ID.
+    /// - Whether an interception succeeds is decided by Core's InterceptDecision and
+    ///   InterceptorTiers, with the probability multiplied while a radar is operating.
+    /// - Cost, power and water are left entirely to the asset's own settings; nothing here
+    ///   overrides them.
     /// </summary>
     public static class InterceptorRegistry
     {
@@ -20,17 +24,17 @@ namespace MissileDisaster.Game.Defense
             public ushort Id;
             public Vector3 Position;
             public InterceptorTier Tier;
-            public float Cooldown; // 秒。>0 の間は交戦不可
+            public float Cooldown; // seconds; it cannot engage while this is above zero
         }
 
         private static readonly List<Interceptor> _interceptors = new List<Interceptor>();
         private static bool _radarActive;
-        private static int _framesSinceScan = int.MaxValue; // 初回 Tick で即走査
+        private static int _framesSinceScan = int.MaxValue; // forces a scan on the very first tick
         private static int _lastLoggedActive = -1;
         private static int _lastLoggedInactive = -1;
         private static bool _lastLoggedRadar;
 
-        /// <summary>メインスレッド専用。クールダウン減算と、間引かれた建物再走査を行う。</summary>
+        /// <summary>Main thread only. Ticks the cooldowns down and rescans the buildings on its interval.</summary>
         public static void Tick(float deltaSeconds)
         {
             for (int i = 0; i < _interceptors.Count; i++)
@@ -55,10 +59,14 @@ namespace MissileDisaster.Game.Defense
         }
 
         /// <summary>
-        /// メインスレッド専用。飛来ミサイル 1 発に対し、交戦圏内で待機中の発射器を「高い層から1基だけ」発射させる。
-        /// 発射は必ずクールダウンを消費する（＝1交戦につき1発）。命中可否(isHit)は single-shot Pk の 1 回抽選で決まる。
-        /// 発射したら true（launcherPosition=発射位置, kind=層, isHit=命中確定か）。撃てる発射器が無ければ false。
-        /// altitude は missilePos.y - targetGround.y（急降下なのでミサイル直下の地面高≒着弾地点の高さ）。
+        /// Main thread only. Against one incoming missile, fires exactly one launcher that is
+        /// in range and off cooldown, working from the highest layer down.
+        /// Firing always spends the cooldown, so an engagement is one round. Whether it hits is
+        /// a single draw against the single-shot kill probability.
+        /// Returns true if a launcher fired, with launcherPosition where it fired from, kind
+        /// being the layer and isHit whether it will connect; false if nothing could fire.
+        /// altitude is missilePos.y - targetGround.y, which works because the dive is steep
+        /// enough that the ground under the missile is about the height of the impact point.
         /// </summary>
         public static bool TryEngage(Vector3 missilePos, Vector3 targetGround,
             out Vector3 launcherPosition, out InterceptorKind kind, out bool isHit)
@@ -86,7 +94,8 @@ namespace MissileDisaster.Game.Defense
                     float horizontalDistance = Mathf.Sqrt(dx * dx + dz * dz);
                     if (!InterceptDecision.InEngagementZone(altitude, horizontalDistance, it.Tier)) continue;
 
-                    // 発射: 1基が1発だけ撃つ（クールダウン消費）。命中は single-shot Pk で1回だけ抽選。
+                    // Fire: one launcher, one round, spending its cooldown. Whether it hits is
+                    // a single draw against the single-shot kill probability.
                     it.Cooldown = it.Tier.CooldownSeconds;
                     _interceptors[i] = it;
                     float chance = Mathf.Clamp01(it.Tier.InterceptChance * multiplier);
@@ -102,7 +111,7 @@ namespace MissileDisaster.Game.Defense
             return false;
         }
 
-        /// <summary>メインスレッド専用。追跡状態を破棄する（レベル切替時）。</summary>
+        /// <summary>Main thread only. Discards the tracked state, on a level change.</summary>
         public static void Reset()
         {
             _interceptors.Clear();
@@ -113,7 +122,7 @@ namespace MissileDisaster.Game.Defense
             _lastLoggedRadar = false;
         }
 
-        /// <summary>BuildingManager を走査し、名前一致した稼働中の迎撃施設/レーダーを取り込む。</summary>
+        /// <summary>Walks BuildingManager and picks up the operating interceptor sites and radars whose names match.</summary>
         private static void Scan()
         {
             BuildingManager bm = BuildingManager.instance;
@@ -121,7 +130,7 @@ namespace MissileDisaster.Game.Defense
             Building[] buffer = bm.m_buildings.m_buffer;
             if (buffer == null) return;
 
-            // 再走査を跨いでクールダウンを引き継ぐため、旧状態を ID で退避。
+            // Keep the previous state by ID, so cooldowns carry across the rescan.
             Dictionary<ushort, float> priorCooldowns = null;
             if (_interceptors.Count > 0)
             {
@@ -134,8 +143,8 @@ namespace MissileDisaster.Game.Defense
 
             _interceptors.Clear();
             bool radar = false;
-            int inactiveMatches = 0; // 名前一致したが未完成/破壊済み（診断用）
-            Building.Flags firstInactiveFlags = 0; // 最初の非稼働建物のフラグ（原因診断用）
+            int inactiveMatches = 0; // matched by name but unfinished or destroyed; for diagnostics
+            Building.Flags firstInactiveFlags = 0; // flags of the first such building, to explain why
             string firstInactiveName = null;
 
             for (int i = 1; i < buffer.Length; i++)
@@ -182,7 +191,7 @@ namespace MissileDisaster.Game.Defense
             LogChangesIfAny(_interceptors.Count, inactiveMatches, radar, firstInactiveFlags, firstInactiveName);
         }
 
-        /// <summary>検出状況が前回から変わった時だけログを出す（実機での検出確認・毎走査のスパム防止）。</summary>
+        /// <summary>Logs only when what was detected changes, which makes it useful in game without flooding the log on every scan.</summary>
         private static void LogChangesIfAny(int active, int inactive, bool radar,
             Building.Flags firstInactiveFlags, string firstInactiveName)
         {
@@ -193,17 +202,18 @@ namespace MissileDisaster.Game.Defense
             string msg = "Interceptors detected: active=" + active + ", radar=" + radar;
             if (inactive > 0)
             {
-                // 非稼働の原因を特定するため、最初の該当建物のフラグを出力する。
-                msg += ", 名前一致だが非稼働=" + inactive
-                    + " [例 '" + firstInactiveName + "' flags=" + firstInactiveFlags + "]";
+                // Log the first such building's flags, to explain why it is not operating.
+                msg += ", matched by name but not operating=" + inactive
+                    + " [e.g. '" + firstInactiveName + "' flags=" + firstInactiveFlags + "]";
             }
             ModConfig.Log(msg);
         }
 
         /// <summary>
-        /// 建物が「稼働中」か（生成済み・完成・破壊されていない）。
-        /// 注: 一部のカスタムアセットは有電力でも Building.Flags.Active が立たない。Active 必須にすると
-        /// 迎撃が一切発動しないため要件から外し、Completed（完成済み）＋非破壊のみを条件とする。
+        /// Whether a building is operating: created, completed and not destroyed.
+        /// Note that some custom assets never get Building.Flags.Active even when they are
+        /// powered. Requiring Active would stop interception working at all, so the test is
+        /// Completed plus not destroyed.
         /// </summary>
         private static bool IsOperational(Building.Flags flags)
         {

@@ -4,26 +4,29 @@ using UnityEngine;
 namespace MissileDisaster.Game
 {
     /// <summary>
-    /// ランダム攻撃モード：発火タイミングは StrikeScheduler（sim スレッド）が決め、本クラスは
-    /// メインスレッドで実際の発射を行う。着弾パターン（Single/MIRV/Random）を設定で分岐する。
-    /// MIRV は複数弾を同一フレームで発射する＝全弾の飛翔時間が一定のため着弾も同時になる。
-    /// 目標は優先照準（StrikeTargeting：原発/迎撃施設＞交通拠点＞ランドマーク＞その他）で抽選し、
-    /// MIRV は各弾が独立に抽選されるため複数の重要施設へ同時着弾しうる。すべてメインスレッド。
+    /// The random strike mode. StrikeScheduler, on the simulation thread, decides when a strike
+    /// fires; this class does the actual launching on the main thread. The impact pattern -
+    /// single, MIRV or random - comes from the settings.
+    /// A MIRV launches every missile on the same frame, and since they all take the same time to
+    /// fall, they land together.
+    /// Targets are drawn by StrikeTargeting, which favours nuclear plants and interceptor sites,
+    /// then transport hubs, then landmarks, then everything else. Each MIRV missile draws
+    /// independently, so a salvo can hit several important sites at once. All main thread.
     /// </summary>
     public static class RandomStrike
     {
-        private const int MirvMin = 3;          // MIRV 発数の下限
-        private const int MirvMax = 6;          // MIRV 発数の上限（Random.Range 上端は排他なので +1 して使う）
-        private const float MirvChance = 0.30f; // Random パターンで MIRV になる確率（残り70%はSingle）
+        private const int MirvMin = 3;          // fewest missiles in a MIRV salvo
+        private const int MirvMax = 6;          // most missiles in a MIRV salvo; Random.Range excludes its upper bound, hence the +1 at the call site
+        private const float MirvChance = 0.30f; // chance the random pattern picks MIRV; the other 70% is a single missile
         private const float FallbackRange = 4500f;
 
-        /// <summary>設定の AttackPattern に従って攻撃を実行（メインスレッド専用）。</summary>
+        /// <summary>Carries out a strike according to the AttackPattern setting. Main thread only.</summary>
         public static void FireStrike()
         {
             try
             {
                 StrikeTargeting targeting = new StrikeTargeting();
-                targeting.Scan(); // 建物走査は1回だけ。MIRV でも使い回す。
+                targeting.Scan(); // scan the buildings once and reuse it, even for a MIRV salvo
 
                 int count = ResolveWarheadCount();
                 for (int i = 0; i < count; i++)
@@ -37,7 +40,7 @@ namespace MissileDisaster.Game
             }
         }
 
-        /// <summary>着弾パターンから今回の発射数を決める。Single=1, MIRV=3〜6, Random=70%Single/30%MIRV。</summary>
+        /// <summary>How many missiles this strike launches: 1 for single, 3 to 6 for MIRV, and 70/30 between them for random.</summary>
         private static int ResolveWarheadCount()
         {
             int pattern = ModSettings.AttackPatternValue;
@@ -45,7 +48,7 @@ namespace MissileDisaster.Game
             return mirv ? Random.Range(MirvMin, MirvMax + 1) : 1;
         }
 
-        /// <summary>1発を発射（優先照準で目標を抽選、無ければランダム座標）。メインスレッド専用。</summary>
+        /// <summary>Launches one missile, drawing a target by priority or falling back to a random position. Main thread only.</summary>
         private static void FireOne(StrikeTargeting targeting)
         {
             Vector3 target;
@@ -69,7 +72,7 @@ namespace MissileDisaster.Game
         {
             int w = ModSettings.RandomWarhead != null ? ModSettings.RandomWarhead.value : 0;
             if (w >= 1 && w <= 5) return (WarheadType)(w - 1); // 1..5 → Conventional..Nuclear
-            return (WarheadType)Random.Range(0, 5);            // 0 = ランダム
+            return (WarheadType)Random.Range(0, 5);            // the setting was 0, meaning pick at random
         }
     }
 }

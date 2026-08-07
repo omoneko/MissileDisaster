@@ -6,10 +6,11 @@ using UnityEngine;
 namespace MissileDisaster.Game
 {
     /// <summary>
-    /// 飛翔中の 1 発。固定方位・高高度の apex(頂点)から着弾までの「降下枝のみ」を、
-    /// すべてメインスレッドで直線補間する（sim スレッドはこのオブジェクトに触れない）。
-    /// 可視表現は弾頭モデル（Models/IncomingWarhead.obj）。読込不可時は球へフォールバックする。
-    /// 機首（モデルの +Z）は進行方向へ向ける。
+    /// One missile in flight. Only the descending half of the trajectory is interpolated -
+    /// from an apex at high altitude on a fixed bearing, straight down to the impact - and all
+    /// of it happens on the main thread; the simulation thread never touches this object.
+    /// It is drawn as a warhead model (Models/IncomingWarhead.obj), falling back to a sphere if
+    /// that cannot be loaded, with the nose - the model's +Z - pointed along the flight path.
     /// </summary>
     public class Missile
     {
@@ -24,16 +25,16 @@ namespace MissileDisaster.Game
         public Vector3 Target => _target;
         public WarheadSpec Spec => _spec;
 
-        /// <summary>メインスレッド。飛翔体の現在ワールド座標（迎撃判定用）。GameObject 破棄後は着弾点を返す。</summary>
+        /// <summary>Main thread. The missile's current world position, used to resolve interceptions. Once the GameObject is destroyed this returns the impact point.</summary>
         public Vector3 CurrentPosition => _go != null ? _go.transform.position : _target;
 
-        /// <summary>発射地点（高高度の apex）。発射音の3D音源位置に使う。</summary>
+        /// <summary>Where it was launched from, the high-altitude apex. Used to place the launch sound in 3D.</summary>
         public Vector3 LaunchPosition => _apex;
 
-        /// <summary>迎撃(命中確定)済みか。true の弾は再交戦せず、着弾してもダメージを発生させない。</summary>
+        /// <summary>Whether an interceptor is confirmed to hit it. Such a missile is not engaged again and does no damage when it lands.</summary>
         public bool Doomed => _doomed;
 
-        /// <summary>迎撃ミサイルの命中が確定した弾に印を付ける（メインスレッド）。</summary>
+        /// <summary>Marks a missile an interceptor is confirmed to hit. Main thread.</summary>
         public void MarkDoomed() { _doomed = true; }
 
         public Missile(Vector3 target, WarheadSpec spec)
@@ -41,7 +42,8 @@ namespace MissileDisaster.Game
             _target = target;
             _spec = spec;
 
-            // 固定方位・高高度の apex から降下する。上昇枝は存在しない(= 終端のみ描画)。
+            // It descends from an apex at high altitude on a fixed bearing. There is no ascent
+            // to draw; only the terminal phase exists.
             Offset2 off = LaunchGeometry.BearingOffset(ModConfig.IncomingBearingDegrees, ModConfig.ApexHorizontalOffset);
             _apex = new Vector3(target.x + off.X, target.y + ModConfig.ApexAltitude, target.z + off.Z);
             float dx = target.x - _apex.x;
@@ -51,17 +53,19 @@ namespace MissileDisaster.Game
 
             _go = CreateVisual();
             _go.transform.position = _apex;
-            // 直線降下なので進行方向は一定。機首(+Z)を進行方向へ一度だけ向ける。
+            // The descent is a straight line, so the heading never changes: the nose (+Z) is
+            // pointed along it exactly once.
             Vector3 velocity = _target - _apex;
             if (velocity.sqrMagnitude > 1e-6f)
             {
                 _go.transform.rotation = Quaternion.LookRotation(velocity);
             }
-            // 隕石風の燃焼トレイル（火の粉＋煙）を付与。ワールド空間なので後方に航跡を残す。
+            // Add the meteor-like burning trail of sparks and smoke. It is in world space, so
+            // it is left behind as the missile passes.
             MissileTrail.Attach(_go);
         }
 
-        /// <summary>弾頭モデルを生成。読込不可なら球へフォールバック。Collider は不要なので破棄。</summary>
+        /// <summary>Creates the warhead model, falling back to a sphere if it cannot be loaded. The collider is not needed and is destroyed.</summary>
         private static GameObject CreateVisual()
         {
             GameObject go = MissileModelProvider.CreateInstance(ModConfig.IncomingMissileModelName);
@@ -72,17 +76,18 @@ namespace MissileDisaster.Game
                 return go;
             }
 
-            // フォールバック（Phase 1 と同じ球）。
+            // Fallback: a plain sphere.
             GameObject sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            sphere.transform.localScale = new Vector3(6f, 6f, 6f); // 従来12の半分（モデル未読込時のフォールバック）
+            sphere.transform.localScale = new Vector3(6f, 6f, 6f); // the fallback size when the model could not be loaded
             Collider col = sphere.GetComponent<Collider>();
             if (col != null) Object.Destroy(col);
             return sphere;
         }
 
         /// <summary>
-        /// メインスレッド。apex→着弾を直線降下で補間する。戻り値 true = このフレームで着弾(t&gt;=1)。
-        /// 着弾後の処理(ダメージ enqueue と破棄)は MissileManager 側が行う。
+        /// Main thread. Interpolates the straight descent from the apex to the impact.
+        /// Returning true means it landed on this frame. Queuing the damage and destroying the
+        /// missile afterwards is MissileManager's job.
         /// </summary>
         public bool UpdateVisual(float simTimeDelta)
         {
@@ -94,7 +99,7 @@ namespace MissileDisaster.Game
             return _t >= 1f;
         }
 
-        /// <summary>メインスレッド。飛翔体 GameObject を破棄する。トレイルは切り離して残り寿命まで燃やし切る。</summary>
+        /// <summary>Main thread. Destroys the missile's GameObject, detaching the trail so it burns out over its remaining lifetime.</summary>
         public void DestroyVisual()
         {
             if (_go == null) return;
@@ -103,8 +108,10 @@ namespace MissileDisaster.Game
         }
 
         /// <summary>
-        /// 着弾時、トレイルの ParticleSystem を弾体から切り離し（ワールド位置維持）、新規放出だけ止めて
-        /// 既存の火の粉/煙は残り寿命まで漂わせてから破棄する。弾体ごと即破棄すると航跡が一瞬で消えるため。
+        /// On impact, the trail's ParticleSystem is detached from the missile - keeping its
+        /// world position - and only new emission is stopped, so the existing sparks and smoke
+        /// drift out over their remaining lifetime before being destroyed. Destroying it with
+        /// the missile would make the whole wake vanish instantly.
         /// </summary>
         private static void DetachAndFadeTrail(GameObject missile)
         {
@@ -114,8 +121,8 @@ namespace MissileDisaster.Game
             {
                 ParticleSystem ps = systems[i];
                 if (ps == null) continue;
-                ps.transform.SetParent(null, true); // 親破棄に巻き込まれないよう独立させる(ワールド位置維持)
-                ps.Stop(true, ParticleSystemStopBehavior.StopEmitting); // 放出停止・既存粒子は継続シミュレート
+                ps.transform.SetParent(null, true); // detach it so destroying the parent cannot take it too, keeping its world position
+                ps.Stop(true, ParticleSystemStopBehavior.StopEmitting); // stop emitting, but keep simulating the particles already out
                 Object.Destroy(ps.gameObject, life + 0.1f);
             }
         }

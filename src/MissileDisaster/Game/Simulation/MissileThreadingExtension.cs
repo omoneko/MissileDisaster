@@ -6,35 +6,42 @@ using UnityEngine;
 namespace MissileDisaster.Game.Simulation
 {
     /// <summary>
-    /// 発動・進行・着弾を駆動する。
-    /// OnUpdate（メイン）: 起動キーでツール起動、飛翔を進める、ランダム攻撃の発火要求を消化して発射。
-    /// OnAfterSimulationTick（sim）: 着弾ダメージ解決＋汚染ゾーン維持＋ランダム攻撃スケジューラ駆動。
+    /// Drives triggering, flight and impact.
+    /// OnUpdate, on the main thread, opens the tool on the hotkey, advances the missiles in
+    /// flight, and launches whenever the random strike mode has asked for one.
+    /// OnAfterSimulationTick, on the simulation thread, resolves impact damage, maintains the
+    /// contamination zones and drives the random strike scheduler.
     ///
-    /// ランダム攻撃はバニラ災害頻度に連動させる（StrikeScheduler）。頻度算出と「他災害でリセット」は
-    /// DisasterManager（sim スレッド）を読んで行い、実際の発射は GameObject 生成のためメインスレッドで行う。
-    /// 受け渡しは _pendingStrike フラグ（sim が立て、メインが消化）。
+    /// Random strikes follow the vanilla disaster frequency through StrikeScheduler. Working out
+    /// that frequency, and restarting the countdown when another disaster occurs, both need
+    /// DisasterManager and so happen on the simulation thread; the launch itself creates
+    /// GameObjects and so happens on the main thread.
+    /// The two are joined by the _pendingStrike flag, which the simulation thread raises and the
+    /// main thread consumes.
     /// </summary>
     public class MissileThreadingExtension : ThreadingExtensionBase
     {
         private readonly StrikeScheduler _scheduler = new StrikeScheduler();
-        private long _lastGameTicks;            // 前回tickのゲーム内時刻（sim スレッドのみ）
-        private volatile bool _pendingStrike;   // sim→メインへの発火要求
+        private long _lastGameTicks;            // in-game time at the previous tick; simulation thread only
+        private volatile bool _pendingStrike;   // the simulation thread's request for the main thread to launch
 
         public override void OnUpdate(float realTimeDelta, float simulationTimeDelta)
         {
             try
             {
-                // パネルは非表示で用意し、災害タブのミサイルボタンを取り付ける（出現を毎フレームで待つ）。
+                // Build the panel hidden and attach the launch button to the disasters tab,
+                // retrying every frame until that tab exists.
                 MissileDisaster.Game.UI.MissilePanel.EnsureCreated();
                 MissileDisaster.Game.UI.MissileDisasterButton.EnsureAttached();
 
-                // 起動キー（Modオプションで再割り当て可能。既定 F9）。
+                // The hotkey, which can be reassigned in the mod options.
                 if (Input.GetKeyDown(ModSettings.LaunchKeyCode))
                 {
                     ToolsModifierControl.SetTool<MissileDisaster.Game.UI.MissileTool>();
                 }
 
-                // ランダム攻撃の発火要求を消化（実際の発射はメインスレッド）。
+                // Consume the random strike request; the launch itself happens here, on the
+                // main thread.
                 if (_pendingStrike)
                 {
                     _pendingStrike = false;
@@ -59,10 +66,12 @@ namespace MissileDisaster.Game.Simulation
                 MissileManager.UpdateSimulation();
 
                 long nowTicks = SimulationManager.instance.m_currentGameTime.Ticks;
-                // 汚染ゾーンの維持（期限切れ消去・自然減衰対策の reassert。内部で間引き）。除染はしない。
+                // Maintain the contamination zones: clear the expired ones and reassert the rest
+                // against the game's natural decay, spaced out internally. Nothing is
+                // decontaminated here.
                 MissileDisaster.Game.Contamination.ContaminationManager.Maintain(nowTicks);
 
-                // ランダム攻撃スケジューラ（バニラ災害頻度連動）。
+                // The random strike scheduler, following the vanilla disaster frequency.
                 AdvanceRandomStrikes(nowTicks);
             }
             catch (System.Exception e)
@@ -71,7 +80,7 @@ namespace MissileDisaster.Game.Simulation
             }
         }
 
-        /// <summary>sim スレッド。DisasterManager を読み、ゲーム内時間でスケジューラを進める。発火時はフラグを立てる。</summary>
+        /// <summary>Simulation thread. Reads DisasterManager and advances the scheduler by in-game time, raising the flag when a strike is due.</summary>
         private void AdvanceRandomStrikes(long nowTicks)
         {
             if (!ModSettings.IsRandomEnabled)
@@ -83,13 +92,13 @@ namespace MissileDisaster.Game.Simulation
 
             if (_lastGameTicks == 0L) _lastGameTicks = nowTicks;
             double gameDaysDelta = (nowTicks - _lastGameTicks) / (double)TimeSpan.TicksPerDay;
-            if (gameDaysDelta < 0.0) gameDaysDelta = 0.0; // セーブロード等で時刻が巻き戻っても安全側
+            if (gameDaysDelta < 0.0) gameDaysDelta = 0.0; // stays safe if the clock goes backwards, as loading a save can do
             _lastGameTicks = nowTicks;
 
             DisasterManager dm = DisasterManager.instance;
             int disasterCount = dm != null ? dm.m_disasterCount : 0;
             float probability = dm != null ? dm.m_randomDisastersProbability : 0f;
-            double rng = SimulationManager.instance.m_randomizer.UInt32(1000u) / 1000.0; // [0,1) sim決定論
+            double rng = SimulationManager.instance.m_randomizer.UInt32(1000u) / 1000.0; // [0,1) from the deterministic simulation RNG
 
             if (_scheduler.Advance(gameDaysDelta, disasterCount, probability, ModSettings.StrikeFrequency, rng))
             {

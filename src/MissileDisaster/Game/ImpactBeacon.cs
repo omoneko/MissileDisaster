@@ -1,21 +1,25 @@
 namespace MissileDisaster.Game
 {
     /// <summary>
-    /// 全弾種の着弾を「外部Mod」がリフレクションで読めるように公開する疎結合ビーコン
-    /// （NuclearImpactBeaconの汎用版。CS:WARFRONTが軍事ユニットへの被害判定に使う——
-    /// ユーザーのWorkshopコメント対応「ミサイル災害でユニットが死なない」の修正）。
-    /// 両Modは相互にDLL参照しないため、外部Modは型名 "MissileDisaster.Game.ImpactBeacon" を
-    /// AppDomainから探し、下記2メンバをリフレクションで呼ぶ。片方のMODしか無くても安全に無視される。
+    /// Loosely coupled beacon publishing every impact, of any warhead, so that other mods can
+    /// read it by reflection. This is the general form of NuclearImpactBeacon; CS:WARFRONT uses
+    /// it to damage military units, which is what fixed the reported problem of units surviving
+    /// a missile strike.
+    /// Neither mod references the other's DLL: the reader looks up the type name
+    /// "MissileDisaster.Game.ImpactBeacon" in the AppDomain and calls the two members below by
+    /// reflection. With only one of the mods installed, it is safely ignored.
     ///
-    /// リフレクション契約（外部Modが依存する。シグネチャの互換を壊さないこと）:
-    ///   public static long CurrentId();   // 直近に発行した着弾ID（0=まだ無し）。安価な「新着有無」判定用。
-    ///   public static float[] Snapshot(); // 直近の着弾を新しい順に
+    /// The reflection contract, which other mods depend on - do not break these signatures:
+    ///   public static long CurrentId();   // the last impact ID issued, 0 if none. A cheap check for anything new.
+    ///   public static float[] Snapshot(); // recent impacts, newest first, as
     ///                                     // {id, x, z, destructionRadius, burnRadius, isNuclear(0/1)}
-    ///                                     // の6つ組で返す（最大Capacity件）。
-    /// IDはプロセス中単調増加（Resetでも巻き戻さない＝読み手の既読ID方式が破綻しない）。
+    ///                                     // six-element records, up to Capacity of them.
+    /// The ID rises monotonically for the life of the process and is not rewound even by Reset,
+    /// so a reader tracking the last ID it saw never breaks.
     ///
-    /// スレッド: Publishは着弾確定時（メインスレッド, MissileManager.UpdateVisual）から。
-    /// 読み手（CS:WARFRONT）はsimスレッドから呼ぶため、全公開メンバをロックで保護する。
+    /// Threading: Publish is called on the main thread, from MissileManager.UpdateVisual, when
+    /// an impact is confirmed. The reader (CS:WARFRONT) calls in from the simulation thread, so
+    /// every public member is lock-protected.
     /// </summary>
     public static class ImpactBeacon
     {
@@ -35,13 +39,13 @@ namespace MissileDisaster.Game
         private static long _lastId;
         private static readonly object _lock = new object();
 
-        /// <summary>直近に発行した着弾ID（0=まだ無し）。</summary>
+        /// <summary>The last impact ID issued, or 0 if none.</summary>
         public static long CurrentId()
         {
             lock (_lock) { return _lastId; }
         }
 
-        /// <summary>着弾を1件公開する（メインスレッド、着弾確定時）。</summary>
+        /// <summary>Publishes one impact. Main thread, as the impact is confirmed.</summary>
         public static void Publish(float x, float z, float destructionRadius, float burnRadius, bool isNuclear)
         {
             lock (_lock)
@@ -57,7 +61,7 @@ namespace MissileDisaster.Game
             }
         }
 
-        /// <summary>直近の着弾を新しい順に{id, x, z, destructionRadius, burnRadius, isNuclear}で返す。</summary>
+        /// <summary>Recent impacts, newest first, as {id, x, z, destructionRadius, burnRadius, isNuclear}.</summary>
         public static float[] Snapshot()
         {
             lock (_lock)
@@ -81,7 +85,7 @@ namespace MissileDisaster.Game
             }
         }
 
-        /// <summary>レベル切替時のリセット。件数のみ消し、IDは巻き戻さない（読み手の既読ID方式のため）。</summary>
+        /// <summary>Reset on a level change. It clears the entries but never rewinds the ID, which readers rely on.</summary>
         public static void Reset()
         {
             lock (_lock)
