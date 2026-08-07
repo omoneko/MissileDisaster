@@ -35,7 +35,7 @@
   を呼ぶ（sim スレッド）。既存の「ログのみ」を実適用に置換。
 - テスト: PollutionGrid の座標/半径列挙/減衰/範囲外除外。WarheadSpec の ContaminationRadius（核>0・他=0）。
 
-## スレッド規律（不変）
+## Thread discipline (unchanged)
 
 火災・汚染とも着弾処理の一部＝**sim スレッド**（ImpactResolver, DisasterHelpers/NaturalResourceManager と同じ側）。
 飛翔・迎撃・GameObject 生成はメインのまま。境界は既存の `_impactQueue` のみで変更なし。
@@ -45,7 +45,7 @@
 - ガイガーカウンター音（`freesound_...geiger...mp3`）は本計画対象外。汚染の可視/聴覚演出強化は後続。
 - 汚染の時間減衰・独自セーブ台帳は v1 では持たない（NuclearMeltdown の除染ロジックは将来移植候補）。
 
-## 完了の定義
+## Definition of done
 
-- Core テスト全緑（追加分含む）。ビルド＆デプロイ成功。
+- Every Core test is green, including the new ones, and the build and deployment succeed.
 - 実機: 白リン/サーモバリックで広範囲に火災、核で巨大火災＋汚染オーバーレイが残る。通常弾の見た目は不変。

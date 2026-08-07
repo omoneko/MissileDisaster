@@ -1,38 +1,44 @@
-# 弾頭選択UI＋核威力プリセット 実装計画
+# Warhead selection UI plus nuclear yield presets - implementation plan
 
-> ユーザー決定: テンキー選択は「テスト用」。実装は**UIで操作**できるようにする。
-> 核の出力調整は**方式3（発射時の威力プリセット選択）**。戦術/標準/戦略のプリセットで核の効果半径を一括スケール。
+> Decided: selecting with the number keys was only for testing; the real thing is **operated
+> through the UI**.
+> The nuclear yield uses **option 3, choosing a preset at launch**. The tactical, standard and
+> strategic presets scale all of the nuclear effect radii together.
 
-## アーキテクチャ
+## Architecture
 
-- `Core/NuclearYield.cs`（新規・TDD）: 威力プリセット（Tactical=20kt / Standard=150kt / Strategic=1000kt）。
-  効果スケール係数は爆風半径 ∝ 威力^(1/3) に倣い `Multiplier(kt)=cbrt(kt/150)`（Standard=1.0, Tactical≈0.51, Strategic≈1.87）。
-  UnityEngine 非依存・純粋。
-- `Core/WarheadSpec.cs`: `Scaled(float m)` を追加（Crater/Destruction/Burn/Contamination 半径を m 倍した**新しい struct** を返す＝不変）。
-- `Game/Missile.cs` / `Game/MissileManager.cs`: `Launch` を `(target, type, nuclearYieldMultiplier)` に。
-  核のみ `spec = WarheadSpec.For(type).Scaled(mult)`。Missile はスケール済み spec を受け取る。
-- `Game/UI/MissilePanel.cs`（新規）: UIView 直下の常設パネル。弾頭5種ボタン＋核威力3プリセットボタン＋
-  「照準（発射）」ボタン。選択をハイライト。AlienInvasion.InvasionUI のパターン（`ButtonMenu` スプライト、
-  eventClick、レベルロードで生成/破棄）を踏襲。選択は `MissileTool.CurrentWarhead` / `CurrentNuclearYield` に反映。
-- `Game/UI/MissileTool.cs`: テンキー選択とOnToolGUIラベルを**撤去**。発射時に選択中の弾頭＋核威力を使用。
-- `Game/Loading/MissileLoadingExtension.cs`: OnLevelLoaded で `MissilePanel.Create()`、OnLevelUnloading で `Destroy()`
-  （静的状態をレベルまたぎで残さない）。
-- `Game/ImpactResolver.cs`: クレーター半径/深さに上限（`CraterRadiusMax`/`CraterDepthMax`）を設け、
-  戦略核でも地形を過剰破壊しない（NuclearMeltdown と同方針）。
-- `Game/ModConfig.cs`: パネル寸法・位置・クレーター上限定数を追加。
+- `Core/NuclearYield.cs`, new and written test-first: the yield presets, Tactical at 20 kt, Standard at 150 kt and Strategic at 1000 kt.
+  Following the blast radius going as the cube root of the yield, the scale factor is `Multiplier(kt)=cbrt(kt/150)`: 1.0 for Standard, about 0.51 for Tactical and about 1.87 for Strategic.
+  Pure, with no UnityEngine dependency.
+- `Core/WarheadSpec.cs`: add `Scaled(float m)`, returning a **new struct** with the crater, destruction, burn and contamination radii multiplied - it is immutable.
+- `Game/Missile.cs` and `Game/MissileManager.cs`: change `Launch` to take `(target, type, nuclearYieldMultiplier)`.
+  Only a nuclear warhead uses `spec = WarheadSpec.For(type).Scaled(mult)`; Missile receives the already-scaled spec.
+- `Game/UI/MissilePanel.cs`, new: a permanent panel directly under UIView, with five warhead
+  buttons, three nuclear yield preset buttons and an aim-and-launch button, highlighting the
+  selection. It follows AlienInvasion.InvasionUI's pattern - the `ButtonMenu` sprite, eventClick,
+  and being created and destroyed on level load. The selection is written to
+  `MissileTool.CurrentWarhead` and `CurrentNuclearYield`.
+- `Game/UI/MissileTool.cs`: **remove** the number-key selection and the OnToolGUI label; launching uses the warhead and yield currently selected.
+- `Game/Loading/MissileLoadingExtension.cs`: `MissilePanel.Create()` in OnLevelLoaded and
+  `Destroy()` in OnLevelUnloading, so no static state survives a level change.
+- `Game/ImpactResolver.cs`: cap the crater radius and depth (`CraterRadiusMax` and
+  `CraterDepthMax`) so that even a strategic warhead does not wreck the terrain, following
+  NuclearMeltdown.
+- `Game/ModConfig.cs`: add the panel's size and position and the crater caps.
 
-## テスト戦略（TDD）
+## Testing (test-first)
 
-- `NuclearYieldTests`: Standard の係数=1.0、Tactical<1<Strategic、単調増加、正値、Multiplier(kt) の cbrt 関係。
-- `WarheadSpecTests`: `Scaled(1)` は不変、`Scaled(2)` で各半径2倍・SubmunitionCount/フラグ/Type 不変、元 struct 不変。
-- UI（UIPanel/UIButton）は実機確認（パネル表示、弾頭/威力選択→発射で反映、レベル再ロードで残留しない）。
+- `NuclearYieldTests`: Standard gives 1.0, Tactical is below 1 and Strategic above, it increases monotonically, stays positive, and `Multiplier(kt)` holds the cube-root relationship.
+- `WarheadSpecTests`: `Scaled(1)` changes nothing, `Scaled(2)` doubles every radius while leaving SubmunitionCount, the flags and the Type alone, and the original struct is untouched.
+- The UI (UIPanel and UIButton) is verified in game: the panel appears, choosing a warhead and a yield is reflected when launching, and nothing survives a level reload.
 
-## スレッド規律（不変）
+## Thread discipline (unchanged)
 
-UI はメインスレッド。着弾（威力反映済み spec の解決）は従来どおり sim スレッド。境界は `_impactQueue` のみ。
+The UI is on the main thread. The impact - resolving the already-scaled spec - stays on the simulation thread, and `_impactQueue` remains the only boundary.
 
-## 完了の定義
+## Definition of done
 
-- Core テスト全緑（追加分含む）。ビルド＆デプロイ成功。テンキー選択は撤去済み。
-- 実機: パネルで弾頭と核威力を選び、照準→クリックで発射。核は威力プリセットで規模が変わる。
-  レベル再ロードでパネルが二重化・残留しない。
+- Every Core test is green, including the new ones, and the build and deployment succeed. The number-key selection is gone.
+- In game: choose the warhead and the nuclear yield on the panel, then aim and click to launch.
+  The nuclear scale changes with the preset, and reloading a level neither duplicates the panel
+  nor leaves it behind.

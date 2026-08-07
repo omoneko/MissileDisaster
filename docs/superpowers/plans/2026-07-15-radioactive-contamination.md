@@ -1,47 +1,57 @@
-# 放射能汚染の本実装（原発MOD準拠・汚水処理場除染なし）計画
+# Radioactive contamination, implemented properly - following the NuclearMeltdown mod, without water-treatment decontamination
 
-> ユーザー要望: 放射能汚染を NuclearMeltdown（原発MOD）の本格実装準拠で移植。
-> **基本設定は原発MOD準拠**（濃度255・50年で期限切れ・自然減衰対策の維持reassert・セーブ永続）。
-> **唯一の変更**: 汚水処理場（Water Treatment）による除染を無効化する（＝除染されない）。
-> 汚染半径は本Mod既存の弾頭ベース（WarheadSpec.ContaminationRadius、地上核のみ>0）を使う。
+> Requested: port the radioactive contamination across from NuclearMeltdown's full
+> implementation.
+> **The basic settings follow that mod**: an intensity of 255, expiry after 50 years, reasserting
+> against the natural decay, and persistence in the save.
+> **The one change**: decontamination by a water treatment plant is disabled - nothing
+> decontaminates it.
+> The radius comes from this mod's existing per-warhead figure,
+> `WarheadSpec.ContaminationRadius`, which is above zero only for a nuclear groundburst.
 
-## 移植する仕組み（除染を除く）
+## What is ported (everything but the decontamination)
 
-- ゾーン台帳（ContaminationManager）: AddZone/ReassertZone/ClearZone/RemoveZoneAt/Zones/ReplaceAll。
-  着弾でゾーン追加→土壌汚染グリッド(NaturalResourceManager.m_pollution)へ書き込み。
-- 維持（毎tick間引き, sim スレッド）: 期限(50年)切れは Clear＋除去、それ以外は ReassertZone で自然減衰を打ち消す。
-  **除染判定(IsDecontaminationActive)・DecontaminateZone・ReducePollution は移植しない**（汚水処理場で除染されない）。
-- セーブ永続（ISerializableData）: ゾーン台帳を byte[] 直列化して保存/復元。土壌汚染自体もゲームのセーブに含まれる。
+- The zone ledger (ContaminationManager): AddZone, ReassertZone, ClearZone, RemoveZoneAt, Zones
+  and ReplaceAll. An impact adds a zone, which is written into the ground pollution grid,
+  `NaturalResourceManager.m_pollution`.
+- Upkeep, spaced out across ticks on the simulation thread: zones past the 50-year expiry are
+  cleared and removed, and the rest are held against the natural decay with ReassertZone.
+  **IsDecontaminationActive, DecontaminateZone and ReducePollution are not ported**, since a
+  water treatment plant does not decontaminate here.
+- Persistence through ISerializableData: the ledger is serialised to byte[] and restored. The ground pollution itself is part of the game's own save.
 
-## ファイル
+## Files
 
-Core（純粋・TDD）:
-- `Core/ContaminationZone.cs`（新規・移植）: {CenterX,CenterZ,Radius,StartTicks}
-- `Core/ContaminationClock.cs`（新規・移植）: HasExpired(start, now, years)
-- `Core/ZoneSerializer.cs`（新規・移植）: Serialize/Deserialize（バージョン付き・破損時空）
-- 既存: PollutionGrid, CellDose
+Core (pure, written test-first):
+- `Core/ContaminationZone.cs`, new and ported: {CenterX, CenterZ, Radius, StartTicks}
+- `Core/ContaminationClock.cs`, new and ported: HasExpired(start, now, years)
+- `Core/ZoneSerializer.cs`, new and ported: Serialize and Deserialize, versioned, yielding nothing on corrupt data
+- Existing: PollutionGrid and CellDose
 
 Game:
-- `Game/Contamination/ContaminationManager.cs`（書き換え）: 簡易Apply→台帳版。Maintain(nowTicks) で期限＋reassert（除染なし）。
-  半径は MaxContaminationRadius でクランプ。radius<=0 は無視（空中爆発）。
-- `Game/Contamination/PollutionField.cs`: ClearCell を追加（期限クリア用）。ApplyDose/Refresh は既存。
-- `Game/Serialization/ContaminationDataExtension.cs`（新規）: OnSaveData/OnLoadData。
-- `Game/Simulation/MissileThreadingExtension.cs`: OnAfterSimulationTick に汚染維持を追加（間引き）。
-- `Game/Loading/MissileLoadingExtension.cs`: OnLevelUnloading で ContaminationManager.Reset()（ロード時は消さない=OnLoadDataを尊重）。
-- `Game/ImpactResolver.cs`: Apply → AddZone(new ContaminationZone(x,z,radius,nowTicks))。
-- `Game/ModConfig.cs`: ContaminationExpiryYears=50、ContaminationMaintainInterval（tick間引き）を追加。
+- `Game/Contamination/ContaminationManager.cs`, rewritten from the simple Apply into the ledger
+  version. Maintain(nowTicks) handles the expiry and the reassert, with no decontamination. The
+  radius is clamped by MaxContaminationRadius, and a radius of zero or less is ignored, as for an
+  airburst.
+- `Game/Contamination/PollutionField.cs`: add ClearCell for the expiry; ApplyDose and Refresh already exist.
+- `Game/Serialization/ContaminationDataExtension.cs`, new: OnSaveData and OnLoadData.
+- `Game/Simulation/MissileThreadingExtension.cs`: add the contamination upkeep to OnAfterSimulationTick, spaced out.
+- `Game/Loading/MissileLoadingExtension.cs`: call ContaminationManager.Reset() in OnLevelUnloading, but not on load, so OnLoadData is respected.
+- `Game/ImpactResolver.cs`: Apply calls AddZone(new ContaminationZone(x, z, radius, nowTicks)).
+- `Game/ModConfig.cs`: add ContaminationExpiryYears=50 and ContaminationMaintainInterval, which spaces the upkeep across ticks.
 
-## 性能上の注意
+## A note on performance
 
-弾頭ベースの汚染半径は原発MOD(700m)より大きい（標準核で数km）。reassert を毎tickすると重いので
-ContaminationMaintainInterval で十分間引く（自然減衰対策には数秒毎で足りる）。
+The per-warhead radius is larger than NuclearMeltdown's 700 m - kilometres for a standard
+nuclear warhead - so reasserting every tick would be expensive. ContaminationMaintainInterval
+spaces it out generously; every few seconds is enough to counter the natural decay.
 
-## テスト
+## Tests
 
-- `ContaminationClockTests`: 期限前=false / 期限後=true。
-- `ZoneSerializerTests`: 往復一致 / バージョン不一致=空 / 破損=空。
-- 実機: 地上核で汚染が残る、汚水処理場を建てても除染されない、セーブ/ロードで汚染ゾーンが復元、50年で消滅。
+- `ContaminationClockTests`: false before the expiry, true after.
+- `ZoneSerializerTests`: a round trip matches; a version mismatch and corrupt data both yield nothing.
+- In game: a nuclear groundburst leaves contamination, building a water treatment plant does not clear it, the zones survive a save and reload, and it lifts after 50 years.
 
-## 完了の定義
+## Definition of done
 
-- Core テスト全緑。ビルド＆デプロイ成功。汚水処理場で除染されないことを実機確認。
+- Every Core test is green and the build and deployment succeed. Confirm in game that a water treatment plant does not decontaminate.

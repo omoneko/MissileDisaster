@@ -23,7 +23,7 @@
 
 ## ファイル構成（Phase 1 で作成するファイル）
 
-| ファイル | 責務 |
+| File | Responsibility |
 |---|---|
 | `MissileDisaster.sln` | ソリューション（mod + テスト） |
 | `src/MissileDisaster/MissileDisaster.csproj` | mod 本体プロジェクト（v3.5・CS DLL 参照） |
@@ -143,7 +143,7 @@ namespace MissileDisaster.Game
         // 手動発射ツールを起動するキー（Alien の F7 と衝突しないよう F9）。
         public const KeyCode ManualTriggerKey = KeyCode.F9;
 
-        // 飛翔（メインスレッドで simulationTimeDelta 駆動）。
+        // Flight, driven on the main thread by simulationTimeDelta.
         public const float MissileSpeed = 900f;   // 地表投影距離に対する m/秒 相当
         public const float MissileArcHeight = 700f; // 放物線の頂点高さ（m）
         public const float MissileStartAltitude = 1200f; // 発射点の高さ
@@ -217,16 +217,16 @@ Expected: sln 作成、テストプロジェクト追加成功（mod 本体 v3.5
 $ErrorActionPreference = "Stop"
 $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
 $msbuild = & $vswhere -latest -requires Microsoft.Component.MSBuild -find MSBuild\**\Bin\MSBuild.exe | Select-Object -First 1
-if (-not $msbuild) { throw "MSBuild が見つかりません" }
+if (-not $msbuild) { throw "MSBuild not found" }
 
 & $msbuild "src\MissileDisaster\MissileDisaster.csproj" /t:Restore,Build /p:Configuration=Release /v:minimal
-if ($LASTEXITCODE -ne 0) { throw "ビルド失敗" }
+if ($LASTEXITCODE -ne 0) { throw "Build failed" }
 
 $dll = "src\MissileDisaster\bin\Release\MissileDisaster.dll"
 $modDir = Join-Path $env:LOCALAPPDATA "Colossal Order\Cities_Skylines\Addons\Mods\MissileDisaster"
 New-Item -ItemType Directory -Force -Path $modDir | Out-Null
 Copy-Item $dll $modDir -Force
-Write-Host "配置完了: $modDir"
+Write-Host "Deploy complete: $modDir"
 ```
 
 - [ ] **Step 8: mod 本体がコンパイルできることを確認**
@@ -261,7 +261,7 @@ git commit -m "chore: MissileDisaster プロジェクト基盤 (空Mod+テスト
   - `float BallisticMath.ArcHeightAt(float t, float arcHeight)` — 放物線の高さ成分。t=0,1 で 0、t=0.5 で arcHeight
   - `float BallisticMath.AdvanceT(float t, float groundDistance, float speed, float dt)` — 進行度 t を速度・経過時間で進める（距離 0 でも例外を出さない）
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [ ] **Step 1: write the failing tests.**
 
 `tests/MissileDisaster.Core.Tests/BallisticMathTests.cs`:
 ```csharp
@@ -323,12 +323,12 @@ public class BallisticMathTests
 }
 ```
 
-- [ ] **Step 2: テストが失敗することを確認**
+- [ ] **Step 2: confirm the tests fail.**
 
 Run: `dotnet test tests/MissileDisaster.Core.Tests/MissileDisaster.Core.Tests.csproj --nologo`
 Expected: コンパイルエラー（`BallisticMath` 未定義）で FAIL。
 
-- [ ] **Step 3: 最小実装を書く**
+- [ ] **Step 3: write the minimum implementation.**
 
 `src/MissileDisaster/Core/BallisticMath.cs`:
 ```csharp
@@ -370,7 +370,7 @@ namespace MissileDisaster.Core
 }
 ```
 
-- [ ] **Step 4: テストが通ることを確認**
+- [ ] **Step 4: confirm the tests pass.**
 
 Run: `dotnet test tests/MissileDisaster.Core.Tests/MissileDisaster.Core.Tests.csproj --nologo`
 Expected: PASS（全 15 ケース合格）。
@@ -397,7 +397,7 @@ git commit -m "feat(core): 放物線飛翔の純粋数学 BallisticMath (TDD)"
   - `struct WarheadSpec { float CraterRadius; float CraterDepth; float DestructionRadius; bool Contaminates; }`
   - `WarheadSpec WarheadSpec.For(WarheadType type)` — Phase 1 は Conventional のみ実値、他は Conventional と同値の暫定（後続 Phase で差別化）
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [ ] **Step 1: write the failing tests.**
 
 `tests/MissileDisaster.Core.Tests/WarheadSpecTests.cs`:
 ```csharp
@@ -433,12 +433,12 @@ public class WarheadSpecTests
 }
 ```
 
-- [ ] **Step 2: テストが失敗することを確認**
+- [ ] **Step 2: confirm the tests fail.**
 
 Run: `dotnet test tests/MissileDisaster.Core.Tests/MissileDisaster.Core.Tests.csproj --nologo`
 Expected: コンパイルエラー（`WarheadType`/`WarheadSpec` 未定義）で FAIL。
 
-- [ ] **Step 3: 最小実装を書く**
+- [ ] **Step 3: write the minimum implementation.**
 
 `src/MissileDisaster/Core/WarheadType.cs`:
 ```csharp
@@ -487,10 +487,10 @@ namespace MissileDisaster.Core
 }
 ```
 
-- [ ] **Step 4: テストが通ることを確認**
+- [ ] **Step 4: confirm the tests pass.**
 
 Run: `dotnet test tests/MissileDisaster.Core.Tests/MissileDisaster.Core.Tests.csproj --nologo`
-Expected: PASS。
+Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
@@ -641,7 +641,7 @@ namespace MissileDisaster.Game
             return _t >= 1f;
         }
 
-        /// <summary>メインスレッド。飛翔体 GameObject を破棄する。</summary>
+        /// <summary>Main thread. Destroys the missile's GameObject.</summary>
         public void DestroyVisual()
         {
             if (_go != null) Object.Destroy(_go);
@@ -744,7 +744,7 @@ namespace MissileDisaster.Game
 - [ ] **Step 3: コンパイル確認**
 
 Run: `powershell -ExecutionPolicy Bypass -File build.ps1`
-Expected: ビルド成功。
+Expected: the build succeeds.
 
 - [ ] **Step 4: Commit**
 

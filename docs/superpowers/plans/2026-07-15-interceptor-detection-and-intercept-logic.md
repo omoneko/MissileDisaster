@@ -1,33 +1,37 @@
-# 迎撃施設「検出＋迎撃ロジック」実装計画（アセット方式・後継）
+# Interceptor sites: detection and interception logic - implementation plan (the asset-based successor)
 
-> 前提の転換: 迎撃施設は Asset Editor で作成した**正規アセット**（PAC3/THAAD/Aegis/Radar、命名統一済み）として
-> ゲームに存在するようになった。実行時クローン方式（`CustomBuildingFactory`/`InterceptorAI`）は完全に不要になり撤去する。
-> ユーザー決定: **コスト/電力/水/維持費はアセット側の設定をそのまま使う**（Mod は上書きしない）。
-> Mod の役割は「設置された建物を**名前で検出**し、**迎撃ロジックを実行する**」ことに限定する。
+> A change of premise: the interceptor sites now exist in the game as **ordinary assets** made
+> in the Asset Editor - PAC3, THAAD, Aegis and Radar, named consistently. The runtime cloning
+> approach (`CustomBuildingFactory` and `InterceptorAI`) is no longer needed at all and is
+> removed.
+> Decided: **the cost, power, water and upkeep come from the asset's own settings**, and the mod
+> does not override them.
+> The mod's job is limited to **detecting the placed buildings by name** and **running the
+> interception logic**.
 
-## アーキテクチャ
+## Architecture
 
-- `Core/InterceptorNameMatcher.cs`（新規・TDD）: 建物名キーワード判定（UnityEngine非依存）。`NuclearMeltdown.Core.NuclearNameMatcher` と同一パターン。
-  - PAC3→`InterceptorKind.Pac`、THAAD→`Sam`、Aegis/イージス→`Arrow`、Radar/レーダー→支援(IsRadar)。
-- `Game/Defense/InterceptorRegistry.cs`（新規）: メインスレッド専用。`BuildingManager` を間引き走査（~1秒毎）し、名前一致した**稼働中**建物を追跡。クールダウンは毎フレーム減算。`TryIntercept(missilePos, targetGroundPos, out interceptPoint)` で高い帯から順に交戦圏＋確率判定（既存Core `InterceptDecision`/`InterceptorTiers`を使用）。レーダー稼働中は確率×1.5。
-- `Game/Effects/InterceptFx.cs`（新規）: 迎撃成功時の簡易閃光（バニラ爆発エフェクトを流用、Alien `Effects.PlayImpactBurst` と同パターン）。
-- `Game/Missile.cs`: `CurrentPosition` を公開（迎撃判定用）。
-- `Game/MissileManager.cs`: `UpdateVisual` 内で `InterceptorRegistry.Tick`→各弾の迎撃判定→成功時は着弾enqueueせず消滅＋閃光。
-- `Game/Simulation/MissileThreadingExtension.cs`: Ctrl+1..4 ホットキー・`PumpPanelRefresh` 呼び出しを削除（Asset Editor化で不要になった暫定コード）。
-- `Game/Loading/MissileLoadingExtension.cs`: `CustomBuildingFactory.EnsureRegistered()` 呼び出しを削除。`InterceptorRegistry.Reset()` を load/unload で呼ぶ（`MissileManager.Reset()` と同じ静的状態衛生パターン）。
-- **削除**: `Game/Defense/CustomBuildingFactory.cs`、`Game/Defense/InterceptorAI.cs`。
-- `ModConfig.cs`: `FallbackBuildingTemplateName` 等クローン専用定数を削除。`RadarSupportMultiplier`/`InterceptorScanIntervalFrames`/`InterceptFlashMagnitude` を追加。
+- `Core/InterceptorNameMatcher.cs`, new and written test-first: keyword matching on building names, with no UnityEngine dependency, following the same pattern as `NuclearMeltdown.Core.NuclearNameMatcher`.
+  - PAC3 maps to `InterceptorKind.Pac`, THAAD to `Sam`, Aegis to `Arrow`, and Radar to the supporting role (IsRadar). Each also matches its Japanese name, since Workshop assets are often named in the author's own language.
+- `Game/Defense/InterceptorRegistry.cs`, new and main thread only: scans `BuildingManager` at intervals of about a second and tracks the **operating** buildings whose names match, ticking the cooldowns down every frame. `TryIntercept(missilePos, targetGroundPos, out interceptPoint)` works down from the highest layer, testing the engagement envelope and the probability through the existing Core `InterceptDecision` and `InterceptorTiers`. An operating radar multiplies the probability by 1.5.
+- `Game/Effects/InterceptFx.cs`, new: a simple flash on a successful interception, borrowing the game's own explosion effect, following Alien's `Effects.PlayImpactBurst`.
+- `Game/Missile.cs`: expose `CurrentPosition` for the interception test.
+- `Game/MissileManager.cs`: inside `UpdateVisual`, call `InterceptorRegistry.Tick`, test each missile, and on success let it disappear with a flash instead of queuing an impact.
+- `Game/Simulation/MissileThreadingExtension.cs`: remove the Ctrl+1..4 hotkeys and the `PumpPanelRefresh` call, stopgap code the move to the Asset Editor made unnecessary.
+- `Game/Loading/MissileLoadingExtension.cs`: remove the `CustomBuildingFactory.EnsureRegistered()` call and add `InterceptorRegistry.Reset()` on load and unload, the same static-state hygiene as `MissileManager.Reset()`.
+- **Deleted**: `Game/Defense/CustomBuildingFactory.cs` and `Game/Defense/InterceptorAI.cs`.
+- `ModConfig.cs`: remove the cloning-only constants such as `FallbackBuildingTemplateName`, and add `RadarSupportMultiplier`, `InterceptorScanIntervalFrames` and `InterceptFlashMagnitude`.
 
-## スレッド規律（不変）
+## Thread discipline (unchanged)
 
-迎撃判定・建物走査・クールダウン管理は**すべてメインスレッド**（`MissileManager.UpdateVisual` と同じ側、飛来ミサイルGameObjectと同じ）。着弾ダメージ解決は従来どおり sim スレッド。両者の接点は既存の `_impactQueue`（ロック保護）のみで変更なし。
+The interception test, the building scan and the cooldowns are **all on the main thread**, alongside `MissileManager.UpdateVisual` and the missiles' GameObjects. Impact damage still resolves on the simulation thread, and the only point of contact between them remains the existing lock-protected `_impactQueue`, unchanged.
 
-## テスト戦略
+## Testing
 
-`InterceptorNameMatcher` を Core xUnit でテスト（大文字小文字無視・Workshop風の`ID.名前_Data`接頭辞/接尾辞混在・非該当建物）。`InterceptorRegistry`/`InterceptFx` はゲーム型依存のため実機確認（ビルド成功＋実際に施設を配置してミサイルを迎撃できるか）。
+`InterceptorNameMatcher` is covered by xUnit in Core: case insensitivity, Workshop-style names with an ID prefix and a `_Data` suffix, and buildings that should not match. `InterceptorRegistry` and `InterceptFx` depend on game types and are verified in game - the build succeeding, and actually placing the sites and intercepting a missile.
 
-## 完了の定義
+## Definition of done
 
-- Core テスト全緑（追加分含む）。ビルド＆デプロイ成功。
-- 実機で PAC3/THAAD/Aegis を設置→飛来ミサイルが高度帯に応じて確率で迎撃され消滅＋閃光、すり抜けは通常着弾。
-- レーダーサイト設置＋稼働で迎撃確率が体感的に上がる（数値検証は次段階の実機フィードバックで調整）。
+- Every Core test is green, including the new ones, and the build and deployment succeed.
+- In game, place PAC3, THAAD and Aegis: an incoming missile is intercepted with the probability of whichever band it is in, disappearing with a flash, and anything that gets through lands as usual.
+- Building and operating a radar site noticeably raises the interception rate. The exact numbers are tuned from in-game feedback in the next round.

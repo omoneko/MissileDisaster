@@ -23,7 +23,7 @@
 
 ## ファイル構成（本プランで作成・変更）
 
-| ファイル | 種別 | 責務 |
+| File | Kind | Responsibility |
 |---|---|---|
 | `src/MissileDisaster/Core/LaunchGeometry.cs` | 新規 | 固定方位→(X,Z)オフセット（apex 水平位置） |
 | `tests/.../LaunchGeometryTests.cs` | 新規 | 上のテスト |
@@ -47,7 +47,7 @@
   - `struct MissileDisaster.Core.Offset2 { float X; float Z; }`
   - `Offset2 LaunchGeometry.BearingOffset(float bearingDeg, float horizontalDistance)` — 0°=+Z, 90°=+X, 時計回り。
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [ ] **Step 1: write the failing tests.**
 
 `tests/MissileDisaster.Core.Tests/LaunchGeometryTests.cs`:
 ```csharp
@@ -80,12 +80,12 @@ public class LaunchGeometryTests
 }
 ```
 
-- [ ] **Step 2: テスト失敗を確認**
+- [ ] **Step 2: confirm the tests fail.**
 
 Run: `dotnet test tests/MissileDisaster.Core.Tests/MissileDisaster.Core.Tests.csproj --nologo`
 Expected: コンパイルエラー（`Offset2`/`LaunchGeometry` 未定義）で FAIL。
 
-- [ ] **Step 3: 実装**
+- [ ] **Step 3: implement.**
 
 `src/MissileDisaster/Core/LaunchGeometry.cs`:
 ```csharp
@@ -117,7 +117,7 @@ namespace MissileDisaster.Core
 }
 ```
 
-- [ ] **Step 4: テスト成功を確認**
+- [ ] **Step 4: confirm the tests pass.**
 
 Run: `dotnet test tests/MissileDisaster.Core.Tests/MissileDisaster.Core.Tests.csproj --nologo`
 Expected: PASS（新規6ケース＋既存18ケース）。
@@ -143,7 +143,7 @@ git commit -m "feat(core): 固定方位→apex水平オフセット LaunchGeomet
   - `struct InterceptorTier { InterceptorKind Kind; float AltitudeMin; float AltitudeMax; float HorizontalRange; float InterceptChance; float CooldownSeconds; }`
   - `static class InterceptorTiers` with fields `Arrow`, `Sam`, `Pac` and `InterceptorTier[] Ordered`（高い帯から順）。
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [ ] **Step 1: write the failing tests.**
 
 `tests/MissileDisaster.Core.Tests/InterceptorTierTests.cs`:
 ```csharp
@@ -186,12 +186,12 @@ public class InterceptorTierTests
 }
 ```
 
-- [ ] **Step 2: テスト失敗を確認**
+- [ ] **Step 2: confirm the tests fail.**
 
 Run: `dotnet test tests/MissileDisaster.Core.Tests/MissileDisaster.Core.Tests.csproj --nologo`
-Expected: コンパイルエラーで FAIL。
+Expected: FAIL, with a compile error.
 
-- [ ] **Step 3: 実装**
+- [ ] **Step 3: implement.**
 
 `src/MissileDisaster/Core/InterceptorTier.cs`:
 ```csharp
@@ -235,10 +235,10 @@ namespace MissileDisaster.Core
 }
 ```
 
-- [ ] **Step 4: テスト成功を確認**
+- [ ] **Step 4: confirm the tests pass.**
 
 Run: `dotnet test tests/MissileDisaster.Core.Tests/MissileDisaster.Core.Tests.csproj --nologo`
-Expected: PASS。
+Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
@@ -261,7 +261,7 @@ git commit -m "feat(core): 迎撃3層データ InterceptorTiers (ARROW/SAM/PAC, 
   - `bool InterceptDecision.InEngagementZone(float missileAltitude, float horizontalDistance, InterceptorTier tier)`
   - `bool InterceptDecision.ShouldIntercept(float missileAltitude, float horizontalDistance, InterceptorTier tier, float roll)` — roll(0..1) を注入。
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [ ] **Step 1: write the failing tests.**
 
 `tests/MissileDisaster.Core.Tests/InterceptDecisionTests.cs`:
 ```csharp
@@ -303,12 +303,12 @@ public class InterceptDecisionTests
 }
 ```
 
-- [ ] **Step 2: テスト失敗を確認**
+- [ ] **Step 2: confirm the tests fail.**
 
 Run: `dotnet test tests/MissileDisaster.Core.Tests/MissileDisaster.Core.Tests.csproj --nologo`
-Expected: コンパイルエラーで FAIL。
+Expected: FAIL, with a compile error.
 
-- [ ] **Step 3: 実装**
+- [ ] **Step 3: implement.**
 
 `src/MissileDisaster/Core/InterceptDecision.cs`:
 ```csharp
@@ -336,10 +336,10 @@ namespace MissileDisaster.Core
 }
 ```
 
-- [ ] **Step 4: テスト成功を確認**
+- [ ] **Step 4: confirm the tests pass.**
 
 Run: `dotnet test tests/MissileDisaster.Core.Tests/MissileDisaster.Core.Tests.csproj --nologo`
-Expected: PASS。
+Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
@@ -366,7 +366,7 @@ git commit -m "feat(core): 交戦圏+確率の迎撃判定 InterceptDecision (TD
 
 `src/MissileDisaster/Game/ModConfig.cs` の飛翔ブロック（`MissileSpeed` / `MissileArcHeight` / `MissileStartAltitude` / `MissileLaunchOffset` の4定数）を、以下へ置き換える（`MissileSpeed` は残す）:
 ```csharp
-        // 飛翔（メインスレッドで simulationTimeDelta 駆動）。
+        // Flight, driven on the main thread by simulationTimeDelta.
         // 弾道は固定方位・高高度の apex(頂点)から着弾までの「降下枝のみ」。
         public const float MissileSpeed = 900f;              // 降下ペース(水平投影距離に対する m/秒 相当)
         public const float IncomingBearingDegrees = 315f;    // 飛来方位(0=北,時計回り)。全弾同一方位。315=北西
@@ -433,7 +433,7 @@ namespace MissileDisaster.Game
             return _t >= 1f;
         }
 
-        /// <summary>メインスレッド。飛翔体 GameObject を破棄する。</summary>
+        /// <summary>Main thread. Destroys the missile's GameObject.</summary>
         public void DestroyVisual()
         {
             if (_go != null) Object.Destroy(_go);
@@ -462,7 +462,7 @@ git commit -m "feat: 飛来ミサイルを固定方位・高高度apexの降下�
 
 ---
 
-## 完了の定義
+## Definition of done
 
 - 全 Core テスト合格（既存18＋新規: LaunchGeometry6/InterceptorTier3/InterceptDecision12 目安）。
 - ビルド＆デプロイ成功。

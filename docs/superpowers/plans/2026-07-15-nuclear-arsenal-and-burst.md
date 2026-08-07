@@ -25,7 +25,7 @@
 - **空中爆発(Airburst)**: クレーター無し・汚染ほぼ無し。ただし爆風/熱線で**破壊・延焼が広がる**（×AirBurstBlastFactor≈1.35）。
   広島/長崎は空中爆発で被害面積を最大化した。核以外の弾頭にも適用可（空中=クレーター無し＋広域、地上=クレーター有り）。
 
-## アーキテクチャ
+## Architecture
 
 - `Core/NuclearWeapons.cs`（新規・TDD）: `NuclearWeapon{Name,Kilotons}` と `Catalog`(10種, kt昇順)。純粋。
 - `Core/NuclearYield.cs`（整理）: 3プリセット enum を撤去し、`NuclearYields.Multiplier(int kt)`＋`StandardKilotons` のみ残す
@@ -41,14 +41,14 @@
   - 空中/地上を2ボタンでトグル（ハイライト）。全弾頭に効く。
   - 現在の kt/種別/爆発高度を表示。
 
-## テスト戦略（TDD）
+## Testing (test-first)
 
 - `NuclearWeaponsTests`: 10件・全 kt>0・名称非空・kt昇順・既知値(リトルボーイ15/ツァーリ50000)。
 - `NuclearYieldTests`: `Multiplier(150)=1`, cbrt 関係, 単調増加, 正値（enumテストは撤去）。
 - `WarheadSpecTests`: `WithBurst(Ground)` 不変、`WithBurst(Air)` はクレーター0・汚染0・破壊/延焼増、元 struct 不変。
 - UI(UIDropDown/UITextField/UIButton) は実機確認。
 
-## 完了の定義
+## Definition of done
 
 - Core テスト全緑。ビルド＆デプロイ成功。
 - 実機: カタログ選択 or kt手入力で威力可変、空中/地上で挙動差（クレーター有無・汚染有無・破壊広がり）が出る。
