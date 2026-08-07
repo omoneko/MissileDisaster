@@ -1,51 +1,68 @@
-# 火災・放射能汚染の本実装 計画
+# Implementing the fires and the radioactive contamination properly - plan
 
-> ユーザー選択: 「火災・放射能汚染の本実装」。焼夷系(白リン/サーモバリック)の実火災と、核の放射能汚染を実装する。
-> 独立した2サブシステムのため **2段階**で進める（各段階でビルド→実機確認）。
+> Chosen: implement the fires and the radioactive contamination properly - real fires for the
+> incendiary warheads (white phosphorus and thermobaric) and radioactive contamination for the
+> nuclear one.
+> They are two independent subsystems, so this proceeds in **two stages**, each built and
+> verified in game.
 
-## 重要な前提（調査結果）
+## What the investigation established
 
-- **火災は既存APIで実現できる**: `DisasterHelpers.DestroyStuff(seed, null, pos, preR, totalR, removeR, destMin, destMax, burnMin, burnMax)`
-  の末尾2引数 `burnMin/burnMax` が「延焼帯」で、この範囲の建物は破壊ではなく**着火**する（現行ミサイルも
-  `burnMin=r*0.3, burnMax=r*0.6` で既に少量着火している）。よって新しい火災システムは不要で、弾頭ごとに
-  延焼半径を調整すればよい。`preR/totalR` は処理外周（= max(destMax, burnMax) にしないと外側が処理されない）。
-- **放射能汚染は土壌汚染フィールド方式**: NuclearMeltdown が使う `NaturalResourceManager.m_naturalResources[i].m_pollution`
-  （0-255）へ円形に書き込む。ゲームのセーブに自然に含まれ、汚染オーバーレイに可視化される。
-  Core の座標計算(`PollutionGrid`)は純粋・テスト可能。適用は sim スレッド（NaturalResourceManager 書込み）。
+- **The existing API can do fires.** In
+  `DisasterHelpers.DestroyStuff(seed, null, pos, preR, totalR, removeR, destMin, destMax, burnMin, burnMax)`,
+  the last two arguments are the burn band: buildings inside it are **set on fire** rather than
+  destroyed. The missiles already do a little of this, with `burnMin=r*0.3, burnMax=r*0.6`. No
+  new fire system is needed - it is enough to tune the burn radius per warhead. `preR` and
+  `totalR` are the outer bound of the operation and have to be `max(destMax, burnMax)`, or the
+  outer area is never processed.
+- **Radioactive contamination goes through the ground pollution field**, the approach
+  NuclearMeltdown uses: write a circle into
+  `NaturalResourceManager.m_naturalResources[i].m_pollution`, which runs 0 to 255. It becomes
+  part of the game's own save and shows on its pollution overlay.
+  The coordinate maths in Core (`PollutionGrid`) is pure and testable; applying it happens on the
+  simulation thread, since it writes to NaturalResourceManager.
 
-## 段階1: 火災（焼夷差の作り込み）
+## Stage 1: fires, and what makes the incendiary warheads different
 
-- `Core/WarheadSpec.cs`: `BurnRadius`（延焼の外縁・m）を追加。値:
-  通常72 / クラスター30 / 白リン90 / サーモバリック260 / 核420。白リンは破壊<<延焼（焼夷弾らしさ）。
-- `Game/ImpactResolver.cs`: `ApplyBlast` の DestroyStuff 呼び出しを延焼帯対応に:
-  `outer=max(destR, BurnRadius)`, `burnMin=min(destR*0.3, BurnRadius*0.5)`, `burnMax=BurnRadius`。
-  通常弾の見た目は現行維持（BurnRadius=72 で従来と同値）。
-- テスト: 白リンは BurnRadius>DestructionRadius（延焼が破壊を上回る）、サーモバリック>通常、核が最大、全値>=0。
+- `Core/WarheadSpec.cs`: add `BurnRadius`, the outer edge of the fires in metres:
+  72 conventional, 30 cluster, 90 white phosphorus, 260 thermobaric and 420 nuclear. White
+  phosphorus burns far more than it destroys, which is what makes it read as an incendiary.
+- `Game/ImpactResolver.cs`: make `ApplyBlast`'s DestroyStuff call honour the burn band:
+  `outer=max(destR, BurnRadius)`, `burnMin=min(destR*0.3, BurnRadius*0.5)` and
+  `burnMax=BurnRadius`. The conventional warhead looks exactly as it does today, since a
+  BurnRadius of 72 reproduces the current values.
+- Tests: white phosphorus has BurnRadius above DestructionRadius, thermobaric burns further than conventional, nuclear is the largest, and every value is non-negative.
 
-## 段階2: 放射能汚染（核のみ）
+## Stage 2: radioactive contamination (nuclear only)
 
-- `Core/CellDose.cs`（新規・移植）: `{ int Index; byte Intensity; }`。
-- `Core/PollutionGrid.cs`（新規・移植・TDD）: CellSize=33.75, Resolution=512, WorldToCell/CellIndex/CellsInRadius
-  （中心 max→端 0 の線形減衰）。UnityEngine 非依存。
-- `Game/Contamination/PollutionField.cs`（新規）: NaturalResourceManager への読み書き＋AreaModifiedB でテクスチャ更新。
-- `Game/Contamination/ContaminationManager.cs`（新規・簡易版）: `Apply(centerX, centerZ, radius)` で汚染を書き込む。
-  v1 は減衰/独自セーブを持たない（土壌汚染はゲームのセーブに含まれるため永続。減衰は後続で検討）。
-- `Core/WarheadSpec.cs`: `ContaminationRadius`（核のみ>0, 例 460m）を追加。
-- `Game/ImpactResolver.cs`: `spec.Contaminates` 時に `ContaminationManager.Apply(target.x, target.z, spec.ContaminationRadius)`
-  を呼ぶ（sim スレッド）。既存の「ログのみ」を実適用に置換。
-- テスト: PollutionGrid の座標/半径列挙/減衰/範囲外除外。WarheadSpec の ContaminationRadius（核>0・他=0）。
+- `Core/CellDose.cs`, new and ported: `{ int Index; byte Intensity; }`.
+- `Core/PollutionGrid.cs`, new, ported and written test-first: CellSize 33.75, Resolution 512,
+  and WorldToCell, CellIndex and CellsInRadius, the last falling off linearly from the maximum at
+  the centre to zero at the edge. No UnityEngine dependency.
+- `Game/Contamination/PollutionField.cs`, new: reads and writes NaturalResourceManager and refreshes the texture through AreaModifiedB.
+- `Game/Contamination/ContaminationManager.cs`, new and deliberately simple:
+  `Apply(centerX, centerZ, radius)` writes the contamination. Version 1 has no decay and no save
+  of its own - the ground pollution is already persisted by the game, and decay is left for
+  later.
+- `Core/WarheadSpec.cs`: add `ContaminationRadius`, above zero for the nuclear warhead only, around 460 m.
+- `Game/ImpactResolver.cs`: where `spec.Contaminates`, call
+  `ContaminationManager.Apply(target.x, target.z, spec.ContaminationRadius)` on the simulation
+  thread, replacing the current log-only behaviour with the real thing.
+- Tests: PollutionGrid's coordinates, its radius enumeration, the falloff and excluding what lies outside; and WarheadSpec's ContaminationRadius, above zero for nuclear and zero for the rest.
 
 ## Thread discipline (unchanged)
 
-火災・汚染とも着弾処理の一部＝**sim スレッド**（ImpactResolver, DisasterHelpers/NaturalResourceManager と同じ側）。
-飛翔・迎撃・GameObject 生成はメインのまま。境界は既存の `_impactQueue` のみで変更なし。
+Both the fires and the contamination are part of resolving an impact and therefore run on the
+**simulation thread**, alongside ImpactResolver, DisasterHelpers and NaturalResourceManager.
+The flight, the interception and creating GameObjects stay on the main thread, and the only
+boundary remains the existing `_impactQueue`, unchanged.
 
-## 対象外（明記）
+## Explicitly out of scope
 
-- ガイガーカウンター音（`freesound_...geiger...mp3`）は本計画対象外。汚染の可視/聴覚演出強化は後続。
-- 汚染の時間減衰・独自セーブ台帳は v1 では持たない（NuclearMeltdown の除染ロジックは将来移植候補）。
+- The Geiger counter sound is not part of this plan; strengthening how the contamination looks and sounds comes later.
+- Version 1 has neither decay over time nor a ledger of its own in the save. NuclearMeltdown's decontamination logic is a candidate for porting later.
 
 ## Definition of done
 
 - Every Core test is green, including the new ones, and the build and deployment succeed.
-- 実機: 白リン/サーモバリックで広範囲に火災、核で巨大火災＋汚染オーバーレイが残る。通常弾の見た目は不変。
+- In game: white phosphorus and thermobaric start fires over a wide area, the nuclear warhead produces an enormous fire and leaves the contamination overlay behind, and the conventional warhead looks unchanged.

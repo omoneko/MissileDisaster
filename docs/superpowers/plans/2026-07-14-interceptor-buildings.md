@@ -1,86 +1,95 @@
-# 迎撃施設フェーズ 実装計画（正規建物・実行時クローン）
+# The interceptor sites phase - implementation plan (proper buildings, cloned at runtime)
 
-> 設計書 `2026-07-13-flight-and-defense-design.md` の 2B(建物メッシュ)＋2D(建物+AI+レジストリ+判定)＋2E(迎撃弾+爆発) を実装する。
-> ユーザー決定: 施設は **正規建物方式（実行時クローン）**。順序=飛来弾(済)→施設。PAC施設メッシュ=PAC3。
+> This implements 2B (the building meshes), 2D (the buildings, AI, registry and decision) and 2E
+> (the interceptors and the explosion) from the design document
+> `2026-07-13-flight-and-defense-design.md`.
+> Decided: the sites are **proper buildings, cloned at runtime**. The order is the incoming
+> missile first, which is done, then the sites. The terminal site uses the PAC3 mesh.
 
-## 方針と既知のリスク（重要）
+## The approach, and the risks already known
 
-CS初代で**コードのみの正規 BuildingInfo 生成は「半信頼」**（コミュニティ調査結論）。壊れやすいのは `m_generatedInfo` / LOD / サムネイルatlas。確実に近づける唯一の道は:
-- **同フットプリントのバニラ建物をテンプレとしてクローン**（例: `Wind Turbine`＝`PowerPlantAI`。小型・電力・維持費あり）。
-- **メッシュ/マテリアル/名前/コスト/AI だけ差し替え**、`m_generatedInfo`/atlas/thumbnail/**シェーダー**はテンプレ由来を継承。
-- 名前は**セーフ&セーブ間で不変**、登録は `InitializePrefabs`+`BindPrefabs`、`OnLevelLoaded` で**冪等**に。
-- マテリアルはテンプレの `m_material` を複製（`Custom/Buildings/Building` シェーダー）→ マゼンタ回避。
+In CS 2015, **building a proper BuildingInfo in code alone is only semi-reliable** - that is the
+community's conclusion. What breaks is `m_generatedInfo`, the LODs and the thumbnail atlas. The
+only way to get close to reliable is:
+- **Clone a vanilla building of the same footprint as the template** - the `Wind Turbine`, for instance, which is a `PowerPlantAI`: small, powered and with an upkeep.
+- **Replace only the mesh, the material, the name, the cost and the AI**, inheriting `m_generatedInfo`, the atlas, the thumbnail and **the shader** from the template.
+- The name must be **stable across saves**, registration goes through `InitializePrefabs` plus `BindPrefabs`, and `OnLevelLoaded` must be **idempotent**.
+- The material is a copy of the template's `m_material`, which uses the `Custom/Buildings/Building` shader; that is what avoids the magenta error colour.
 
-**だから最初のサブ増分 S1 を「歩く骨格」にして、実機で建物が出る/置ける/クラッシュしないを先に確認する。** S1 が通らなければ方式を再検討（ツール設置サイト方式へ退避、or アセットバンドル）。
+**So the first sub-increment, S1, is a walking skeleton: confirm in game that the building appears, can be placed, and does not crash, before anything else.** If S1 does not hold up, the approach is reconsidered - falling back to placing sites with a tool, or to an AssetBundle.
 
-## スレッド規律
+## Thread discipline
 
-- 建物 AI の `SimulationStep` は **sim スレッド**。迎撃判定は **メインスレッド**（`MissileManager.UpdateVisual`、飛来弾 GameObject と同じ側）。
-- 従って **InterceptorRegistry はメインスレッドが `BuildingManager` を間引き走査して更新**する（sim スレッドから登録しない＝ロック不要）。稼働中(建設完了・電力OK)の迎撃建物だけを列挙。
+- A building AI's `SimulationStep` runs on the **simulation thread**, while the interception decision runs on the **main thread**, alongside `MissileManager.UpdateVisual` and the missiles' GameObjects.
+- So **the main thread scans `BuildingManager` at intervals and updates InterceptorRegistry itself**; nothing registers from the simulation thread, and no lock is needed. It lists only the operating sites - built and powered.
 
 ---
 
-## S1: 歩く骨格 — 建物を1つ設置できる（PAC3, デリスク最優先）
+## S1: the walking skeleton - one building can be placed (PAC3), de-risking above all
 
 **Files:**
-- Blender 書き出し: `src/MissileDisaster/Models/Building_PAC3.obj`(+.mtl)（直立=up_axis Y、原点・接地）
-- Create: `src/MissileDisaster/Game/Defense/InterceptorAI.cs`（`PlayerBuildingAI` 派生の最小AI。`InterceptorKind` を保持）
-- Create: `src/MissileDisaster/Game/Defense/CustomBuildingFactory.cs`（テンプレ列挙→クローン→差し替え→登録）
-- Modify: `src/MissileDisaster/Game/ModConfig.cs`（建物定数: テンプレ候補名・建物名・コスト・維持費・モデル名・スケール）
-- Modify: `src/MissileDisaster/Game/Loading/MissileLoadingExtension.cs`（`OnLevelLoaded` で `CustomBuildingFactory.EnsureRegistered()` を冪等呼び出し、gated LoadMode）
+- Export from Blender: `src/MissileDisaster/Models/Building_PAC3.obj` and its `.mtl`, upright with up_axis Y and its origin at ground level.
+- Create `src/MissileDisaster/Game/Defense/InterceptorAI.cs`, a minimal `PlayerBuildingAI` subclass holding an `InterceptorKind`.
+- Create `src/MissileDisaster/Game/Defense/CustomBuildingFactory.cs`: find the template, clone it, replace the parts, register it.
+- Modify `src/MissileDisaster/Game/ModConfig.cs` with the building constants: the candidate template names, the building name, the cost, the upkeep, the model name and the scale.
+- Modify `src/MissileDisaster/Game/Loading/MissileLoadingExtension.cs` to call `CustomBuildingFactory.EnsureRegistered()` idempotently from `OnLevelLoaded`, gated on the LoadMode.
 
 **CustomBuildingFactory.EnsureRegistered():**
-1. 冪等ガード（登録済みなら return）。
-2. テンプレ取得: `PrefabCollection<BuildingInfo>.FindLoaded("Wind Turbine")`。null なら loaded を列挙して `PowerPlantAI` かつ最小 cell の建物を選ぶ（フォールバック）。
-3. `Object.Instantiate(template.gameObject)`→`DontDestroyOnLoad`→`SetActive(false)`。
-4. `info.name` を一意・不変("MissileDisaster_PAC3")。`m_prefabInitialized=false`。
-5. メッシュ/マテリアル: `MissileModelProvider.CreateInstance("Building_PAC3")` で得た Mesh/Material を使う…**が建物は Custom/Buildings/Building シェーダーが要る**ため、マテリアルは `new Material(template.m_material)` を複製し `mainTexture` に我々のメッシュ色を持たせる（テクスチャ無しなら色のみ）。`m_mesh`/`m_lodMesh`=我々, `m_material`/`m_lodMaterial`=複製。
-   - `m_generatedInfo`/`m_cellWidth`/`m_cellLength`/`m_Atlas`/`m_Thumbnail`/`m_class`/`m_collisionHeight` は**テンプレ継承**。`m_placementStyle=Manual`。
-6. AI 差し替え: 既存 `BuildingAI` を `DestroyImmediate`→`AddComponent<InterceptorAI>()`。`ai.m_info=info; info.m_buildingAI=ai;` コスト/維持費を AI に設定。`InterceptorKind=Pac`。
-7. 登録: `info.m_prefabDataIndex=-1; PrefabCollection<BuildingInfo>.InitializePrefabs("MissileDisaster", info, null); BindPrefabs(); info.RefreshLevelOfDetail(); go.SetActive(true);`
-8. メニューに出ない場合（遅延登録）は該当 `GeneratedScrollPanel.RefreshPanel()`（電力タブ）。ログで確認。
+1. The idempotence guard: return if it is already registered.
+2. Find the template with `PrefabCollection<BuildingInfo>.FindLoaded("Wind Turbine")`. If that is null, walk the loaded prefabs and take the smallest `PowerPlantAI` building as a fallback.
+3. `Object.Instantiate(template.gameObject)`, then `DontDestroyOnLoad`, then `SetActive(false)`.
+4. Give `info.name` a unique, stable value ("MissileDisaster_PAC3") and set `m_prefabInitialized=false`.
+5. Mesh and material: take them from
+   `MissileModelProvider.CreateInstance("Building_PAC3")` - **but a building needs the
+   Custom/Buildings/Building shader**, so the material is a copy of `template.m_material`, with
+   our mesh's colour in its `mainTexture`, or just the colour where there is no texture.
+   `m_mesh` and `m_lodMesh` are ours; `m_material` and `m_lodMaterial` are the copy.
+   - `m_generatedInfo`, `m_cellWidth`, `m_cellLength`, `m_Atlas`, `m_Thumbnail`, `m_class` and `m_collisionHeight` are **inherited from the template**. `m_placementStyle=Manual`.
+6. Swap the AI: `DestroyImmediate` the existing `BuildingAI`, then `AddComponent<InterceptorAI>()`. Set `ai.m_info=info; info.m_buildingAI=ai;`, put the cost and upkeep on the AI, and set `InterceptorKind=Pac`.
+7. Register: `info.m_prefabDataIndex=-1; PrefabCollection<BuildingInfo>.InitializePrefabs("MissileDisaster", info, null); BindPrefabs(); info.RefreshLevelOfDetail(); go.SetActive(true);`
+8. If it does not appear in the menu because it registered late, call `RefreshPanel()` on the relevant `GeneratedScrollPanel` - the power tab - and check the log.
 
-**InterceptorAI:** `PlayerBuildingAI` 派生。`public InterceptorKind Kind;`。S1 では挙動は基底委譲のみ（存在・電力・維持）。将来 S2 でレジストリ用の状態参照に使う。
+**InterceptorAI:** a `PlayerBuildingAI` subclass with `public InterceptorKind Kind;`. In S1 it delegates everything to the base class - existing, power and upkeep - and S2 uses it to read state for the registry.
 
-**検証（ユーザー・実機）:** 電力タブに建物が出る→設置できる→**PAC3モデルが表示**（マゼンタでない）→電力/コスト動作→クラッシュ無し。ログに登録メッセージ。**ここが通ってから S2 以降へ。**
-
----
-
-## S2: 迎撃判定の配線（検出→ミサイル消滅＋簡易フラッシュ）
-
-**Files:** Create `Game/Defense/InterceptorRegistry.cs`; Modify `MissileManager.cs`, `Missile.cs`(現在位置プロパティ), `Simulation/MissileThreadingExtension.cs`（レジストリ更新駆動）, `Effects/`（簡易フラッシュ）。
-
-- `InterceptorRegistry`（メインスレッド専用）: `Refresh()` が `BuildingManager.instance.m_buildings` を間引き走査し、`InterceptorAI` かつ稼働中(完了・電力OK)の建物の {位置, Kind→InterceptorTier, クールダウン残} を収集。`TryConsume(...)` でクールダウン管理。
-- `MissileManager.UpdateVisual`（メイン）: 各飛来弾について高い帯から順に、圏内(高度帯∩水平射程)＆クールダウン明けの建物で `InterceptDecision.ShouldIntercept(alt, dist, tier, roll)`（roll=`SimulationManager.instance.m_randomizer`…はsim。メインは `UnityEngine.Random`）。成功→弾を消滅（着弾 enqueue せず DestroyVisual）、建物クールダウン開始、`Effects.PlayInterceptFlash(交会点)`。
-- 弾の高度=`pos.y - Target.y`、水平距離=建物との XZ 距離。
-- **検証:** 建物設置→発射→時々迎撃(消滅+閃光)・時々すり抜け。帯/確率は定数調整。
+**Verification, by the user in game:** the building appears in the power tab, can be placed, **shows the PAC3 model** rather than magenta, draws power and costs money, and does not crash, with the registration logged. **Only once this holds does anything after S2 begin.**
 
 ---
 
-## S3: 3施設化（ARROW/SM/PAC 各1建物）
+## S2: wiring up the interception (detect, remove the missile, simple flash)
 
-- Blender: `Building_VLS_ARROW.obj` / `Building_VLS_SM.obj` 追加書き出し。
-- `CustomBuildingFactory` を3種登録に一般化（Kind→モデル名/建物名/コスト/テンプレ）。各 `InterceptorAI.Kind` を設定。
-- `InterceptorRegistry` は Kind→`InterceptorTiers` で帯・射程・確率・CD を引く（既存 Core を使用）。
-- **検証:** 3種を設置、高度帯で担当が分かれて迎撃（ARROW=超高高度→SAM→PAC=終端）。
+**Files:** create `Game/Defense/InterceptorRegistry.cs`; modify `MissileManager.cs`, `Missile.cs` (the current position property), `Simulation/MissileThreadingExtension.cs` (driving the registry refresh) and `Effects/` (the simple flash).
+
+- `InterceptorRegistry`, main thread only: `Refresh()` scans `BuildingManager.instance.m_buildings` at intervals and collects, for each operating building with an `InterceptorAI` - built and powered - its position, the InterceptorTier its Kind maps to, and its remaining cooldown. `TryConsume(...)` manages the cooldown.
+- `MissileManager.UpdateVisual`, on the main thread: for each incoming missile, working down from the highest layer, take a building that is in range - both the altitude band and the horizontal range - and off cooldown, and call `InterceptDecision.ShouldIntercept(alt, dist, tier, roll)`. The roll uses `UnityEngine.Random`, since `SimulationManager.instance.m_randomizer` belongs to the simulation thread. On success the missile disappears through DestroyVisual without queuing an impact, the building's cooldown starts, and `Effects.PlayInterceptFlash(meeting point)` plays.
+- The missile's altitude is `pos.y - Target.y` and the horizontal distance is the XZ distance to the building.
+- **Verification:** place a building, launch, and see it sometimes intercepted - disappearing with a flash - and sometimes getting through. The bands and probabilities are tuned through the constants.
 
 ---
 
-## S4: 迎撃弾の飛翔＋爆発演出
+## S3: all three sites (one building each for ARROW, SM and PAC)
 
-- Create `Game/Defense/InterceptorShot.cs`（迎撃弾モデル `Interceptor_ARROW/SM/PAC` を建物→交会点へ上昇飛翔、機首+Z を進行方向へ＝既存 LookRotation 手法）。
-- Create `Game/Effects/InterceptFx.cs`（交会点で爆発フラッシュ＋両者消滅）。`MissileTrail` の資産解決を流用可。
-- 迎撃成功時 S2 の簡易フラッシュを InterceptorShot＋InterceptFx に置換。
-- **検証:** 迎撃時、施設から迎撃弾が上がり交会点で爆発、飛来弾が消える。
+- Blender: also export `Building_VLS_ARROW.obj` and `Building_VLS_SM.obj`.
+- Generalise `CustomBuildingFactory` to register all three, mapping the Kind to its model name, building name, cost and template, and set each `InterceptorAI.Kind`.
+- `InterceptorRegistry` looks the band, range, probability and cooldown up from the Kind through `InterceptorTiers`, using the existing Core.
+- **Verification:** place all three and watch them divide the work by altitude band, from the exo-atmospheric layer down through the high-altitude one to the terminal one.
+
+---
+
+## S4: the interceptor's flight and the explosion
+
+- Create `Game/Defense/InterceptorShot.cs`: the interceptor models climb from the building to the meeting point with their noses (+Z) along the flight path, using the existing LookRotation approach.
+- Create `Game/Effects/InterceptFx.cs`: a flash at the meeting point and both disappear. `MissileTrail`'s asset resolution can be reused.
+- Replace S2's simple flash on a successful interception with InterceptorShot plus InterceptFx.
+- **Verification:** on an interception, an interceptor climbs from the site, explodes at the meeting point, and the incoming missile disappears.
 
 ---
 
 ## Definition of done
 
-- S1: 建物が設置でき、モデル表示・電力・非クラッシュ（実機・ユーザー）。
-- S2–S4: 3施設で高度帯別に確率迎撃、迎撃弾飛翔＋爆発、すり抜けは通常着弾。Core テスト維持。
-- 各サブ増分ごとに ビルド＆デプロイ→レビュー→通常コミット（Codexフック尊重、`--no-verify` 禁止）。
+- S1: the building can be placed, shows its model, draws power and does not crash, verified in game by the user.
+- S2 to S4: the three sites intercept probabilistically by altitude band, the interceptors fly and explode, and anything that gets through lands as usual. The Core tests stay green.
+- Each sub-increment is built and deployed, reviewed, then committed normally.
 
-## Risksと退避
+## Risks and fallbacks
 
-- S1 で建物が出ない/クラッシュ/マゼンタ/サムネ壊れ → 早期フェーズ登録(PrefabHook/Harmony)へ、それでも駄目ならツール設置サイト方式 or アセットバンドルへ退避（ユーザーへ相談）。
+- If S1 produces no building, crashes, renders magenta or breaks the thumbnail, move registration to an earlier phase through a prefab hook or Harmony; failing that, fall back to placing sites with a tool or to an AssetBundle, after discussing it with the user.

@@ -1,54 +1,60 @@
-# 核兵器カタログ＋kt入力＋空中/地上爆発 実装計画
+# A nuclear weapon catalogue, a typed-in yield, and air or ground burst - implementation plan
 
-> 参照: ja.wikipedia.org/wiki/核兵器一覧, nukesimulator.com/ja。
-> ユーザー要望: (1) 代表的核兵器10種から選択、(2) kt単位の数値入力で出力指定、(3) 空中爆発/地上爆発の選択。
-> 従来の3プリセット(戦術/標準/戦略)はカタログ＋数値入力に置換する。
+> Sources: the Wikipedia list of nuclear weapons, and nukesimulator.com.
+> Requested: (1) choose from ten well-known weapons, (2) type the yield in kilotons directly, and
+> (3) choose between an airburst and a groundburst.
+> The three existing presets - tactical, standard and strategic - are replaced by the catalogue
+> plus the typed-in yield.
 
-## 代表核兵器カタログ（10種・kt昇順・出典の代表値）
+## The catalogue (ten weapons, in ascending order of kilotons, using published figures)
 
-| # | 名称 | 威力 | 備考 |
+| # | Name | Yield | Notes |
 |---|---|---|---|
-| 1 | リトルボーイ | 15 kt | 広島 |
-| 2 | ファットマン | 22 kt | 長崎 |
-| 3 | トリニティ | 25 kt | 世界初の核実験 |
-| 4 | W87 | 300 kt | ミニットマンIII |
-| 5 | B61 | 340 kt | 可変・最大 |
-| 6 | W88 | 475 kt | トライデントII |
-| 7 | B83 | 1,200 kt | 米現役最大級 |
-| 8 | アイビー・マイク | 10,400 kt | 初の水爆 |
-| 9 | キャッスル・ブラボー | 15,000 kt | 米最大の核実験 |
-| 10 | ツァーリ・ボンバ | 50,000 kt | 史上最大 |
+| 1 | Little Boy | 15 kt | Hiroshima |
+| 2 | Fat Man | 22 kt | Nagasaki |
+| 3 | Trinity | 25 kt | the first nuclear test |
+| 4 | W87 | 300 kt | Minuteman III |
+| 5 | B61 | 340 kt | variable yield; the maximum |
+| 6 | W88 | 475 kt | Trident II |
+| 7 | B83 | 1,200 kt | among the largest in current US service |
+| 8 | Ivy Mike | 10,400 kt | the first hydrogen bomb |
+| 9 | Castle Bravo | 15,000 kt | the largest US test |
+| 10 | Tsar Bomba | 50,000 kt | the largest ever |
 
-## 空中爆発 / 地上爆発（物理準拠）
+## Airburst and groundburst (following the physics)
 
-- **地上爆発(Groundburst)**: クレーターあり＋放射性降下物(汚染)あり。従来の核挙動。
-- **空中爆発(Airburst)**: クレーター無し・汚染ほぼ無し。ただし爆風/熱線で**破壊・延焼が広がる**（×AirBurstBlastFactor≈1.35）。
-  広島/長崎は空中爆発で被害面積を最大化した。核以外の弾頭にも適用可（空中=クレーター無し＋広域、地上=クレーター有り）。
+- **Groundburst**: a crater and fallout. This is how the nuclear warhead behaved before.
+- **Airburst**: no crater and almost no fallout, but the blast and thermal radiation **widen the
+  destruction and the fires**, by AirBurstBlastFactor, about 1.35.
+  Hiroshima and Nagasaki were airbursts precisely to maximise the area affected. It applies to
+  the non-nuclear warheads too: an airburst has no crater but reaches further, a groundburst
+  leaves a crater.
 
 ## Architecture
 
-- `Core/NuclearWeapons.cs`（新規・TDD）: `NuclearWeapon{Name,Kilotons}` と `Catalog`(10種, kt昇順)。純粋。
-- `Core/NuclearYield.cs`（整理）: 3プリセット enum を撤去し、`NuclearYields.Multiplier(int kt)`＋`StandardKilotons` のみ残す
-  （kt→スケール係数 = cbrt(kt/150)）。数値入力・カタログ選択の双方がこの1関数を使う。
-- `Core/BurstType.cs`（新規）: enum `{ Airburst, Groundburst }`。
-- `Core/WarheadSpec.cs`: `WithBurst(BurstType)` を追加（Airburst はクレーター/汚染を0にし破壊・延焼を×1.35した**新struct**）。不変。
-- `Game/UI/MissileTool.cs`: `CurrentYieldKilotons(int=150)`, `CurrentBurst(BurstType=Groundburst)`。発射時に
-  `Multiplier(kt)` と `burst` を使用。
-- `Game/MissileManager.cs`: `Launch(target, type, yieldMultiplier, burst)`。spec=For(type)→核なら Scaled(mult)→WithBurst(burst)。
-- `Game/UI/MissilePanel.cs`: 核威力セクションを刷新。
-  - 核兵器カタログ(10種)を UIDropDown で選択（選ぶと kt を反映）。
-  - kt 数値入力（UITextField, 整数, 1以上）。手入力が最優先。
-  - 空中/地上を2ボタンでトグル（ハイライト）。全弾頭に効く。
-  - 現在の kt/種別/爆発高度を表示。
+- `Core/NuclearWeapons.cs`, new and written test-first: `NuclearWeapon{Name,Kilotons}` and `Catalog`, ten of them in ascending order of kilotons. Pure.
+- `Core/NuclearYield.cs`, tidied: drop the three-preset enum and keep only
+  `NuclearYields.Multiplier(int kt)` and `StandardKilotons`, where the scale factor is
+  cbrt(kt/150). Both the typed-in yield and the catalogue go through that one function.
+- `Core/BurstType.cs`, new: the enum `{ Airburst, Groundburst }`.
+- `Core/WarheadSpec.cs`: add `WithBurst(BurstType)`, returning a **new struct** where an airburst zeroes the crater and the contamination and multiplies the destruction and fires by 1.35. Immutable.
+- `Game/UI/MissileTool.cs`: `CurrentYieldKilotons` defaulting to 150 and `CurrentBurst`
+  defaulting to Groundburst, both used at launch through `Multiplier(kt)` and `burst`.
+- `Game/MissileManager.cs`: `Launch(target, type, yieldMultiplier, burst)`. The spec is `For(type)`, then `Scaled(mult)` for a nuclear warhead, then `WithBurst(burst)`.
+- `Game/UI/MissilePanel.cs`: rework the nuclear yield section.
+  - A UIDropDown of the ten catalogue weapons; choosing one fills in its kilotons.
+  - A UITextField for the kilotons, an integer of 1 or more. What is typed in wins.
+  - Two buttons toggling air against ground, highlighted, and applying to every warhead.
+  - Show the current yield, warhead and burst height.
 
 ## Testing (test-first)
 
-- `NuclearWeaponsTests`: 10件・全 kt>0・名称非空・kt昇順・既知値(リトルボーイ15/ツァーリ50000)。
-- `NuclearYieldTests`: `Multiplier(150)=1`, cbrt 関係, 単調増加, 正値（enumテストは撤去）。
-- `WarheadSpecTests`: `WithBurst(Ground)` 不変、`WithBurst(Air)` はクレーター0・汚染0・破壊/延焼増、元 struct 不変。
-- UI(UIDropDown/UITextField/UIButton) は実機確認。
+- `NuclearWeaponsTests`: ten entries, every yield positive, no empty names, ascending order, and the known values - Little Boy at 15 and Tsar Bomba at 50000.
+- `NuclearYieldTests`: `Multiplier(150)=1`, the cube-root relationship, monotonic increase and positive values. The enum tests are removed.
+- `WarheadSpecTests`: `WithBurst(Ground)` changes nothing; `WithBurst(Air)` zeroes the crater and the contamination and increases the destruction and fires; the original struct is untouched.
+- The UI (UIDropDown, UITextField, UIButton) is verified in game.
 
 ## Definition of done
 
-- Core テスト全緑。ビルド＆デプロイ成功。
-- 実機: カタログ選択 or kt手入力で威力可変、空中/地上で挙動差（クレーター有無・汚染有無・破壊広がり）が出る。
+- Every Core test is green and the build and deployment succeed.
+- In game: the yield varies with the catalogue choice or the typed-in kilotons, and air and ground bursts differ visibly - the crater, the fallout and how far the destruction reaches.
