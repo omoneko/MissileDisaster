@@ -1,7 +1,7 @@
 # Blender 5.1.2 MTL File: 'model.blend'
 # www.blender.org
 
-newmtl マテリアル
+newmtl Material
 Ns 159.999985
 Ka 0.850000 0.850000 0.850000
 Kd 0.035014 0.035014 0.035014
@@ -11,7 +11,7 @@ Ni 1.500000
 d 1.000000
 illum 3
 
-newmtl マテリアル.022
+newmtl Material.022
 Ns 250.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.168405 0.168405 0.168405
@@ -21,7 +21,7 @@ Ni 1.500000
 d 1.000000
 illum 2
 
-newmtl マテリアル.023
+newmtl Material.023
 Ns 159.999985
 Ka 0.250000 0.250000 0.250000
 Kd 0.800000 0.800000 0.800000

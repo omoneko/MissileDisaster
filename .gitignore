@@ -13,7 +13,8 @@ Thumbs.db
 *.mp3
 *.blend
 *.blend1
-# Dated screenshots / recordings
+# Dated screenshots / recordings. These are the default file names a Japanese
+# Windows produces, so the patterns have to stay in Japanese to match.
 スクリーンショット*.png
 レコーディング*
 画像*.png
