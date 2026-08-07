@@ -1,6 +1,6 @@
 namespace MissileDisaster.Core
 {
-    /// <summary>代表的な核兵器1種（名称と威力kt）。UnityEngine 非依存。</summary>
+    /// <summary>One well-known nuclear weapon: its name and its yield in kilotons. No UnityEngine dependency.</summary>
     public struct NuclearWeapon
     {
         public string Name;
@@ -14,8 +14,9 @@ namespace MissileDisaster.Core
     }
 
     /// <summary>
-    /// 代表的な核兵器10種のカタログ（ja.wikipedia「核兵器一覧」等の公表代表値）。kt昇順。
-    /// UI の選択肢に使う。任意 kt は数値入力で指定でき、双方 NuclearYields.Multiplier(kt) で係数化する。
+    /// A catalogue of ten well-known nuclear weapons, using widely published yields, in
+    /// ascending order of kilotons. These are the options offered in the UI; any other yield can
+    /// be typed in directly, and both paths go through NuclearYields.Multiplier(kt).
     /// </summary>
     public static class NuclearWeapons
     {

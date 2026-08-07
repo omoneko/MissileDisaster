@@ -1,9 +1,12 @@
 namespace MissileDisaster.Core
 {
     /// <summary>
-    /// 放射能汚染ゾーン。ワールド座標中心・半径(m)・発生ゲーム内時刻(Ticks)・現在濃度(0-255)。
-    /// Intensity は float（除染で連続的に低下し、微小な減衰も端数として蓄積される）。土壌汚染フィールドへ
-    /// 書き込む際に整数へ丸める。除染で下がった濃度は元へ戻らない。UnityEngine 非依存。
+    /// A radioactive contamination zone: world-space centre, radius in metres, the in-game time
+    /// it started (ticks) and its current intensity (0-255).
+    /// Intensity is a float because decontamination lowers it continuously and very small
+    /// decrements need to accumulate as fractions; it is rounded to an integer when written to
+    /// the ground pollution field. An intensity lowered by decontamination never rises again.
+    /// No UnityEngine dependency.
     /// </summary>
     public struct ContaminationZone
     {

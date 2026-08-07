@@ -1,8 +1,9 @@
 namespace MissileDisaster.Core
 {
     /// <summary>
-    /// ミサイル飛翔（放物線）の純粋数学。UnityEngine 非依存（float のみ）で単体テスト可能。
-    /// ゲーム側は x/z を Lerp、y を Lerp + ArcHeightAt で合成して Vector3 を作る。
+    /// Pure maths for a missile's parabolic flight. No UnityEngine dependency - floats only -
+    /// so it is unit testable. The Game layer builds the Vector3 by lerping x and z, and
+    /// composing y from a lerp plus ArcHeightAt.
     /// </summary>
     public static class BallisticMath
     {
@@ -19,17 +20,17 @@ namespace MissileDisaster.Core
             return a + (b - a) * t;
         }
 
-        /// <summary>放物線の高さ成分。t=0,1 で 0、t=0.5 で arcHeight。</summary>
+        /// <summary>The height component of the arc: 0 at t=0 and t=1, and arcHeight at t=0.5.</summary>
         public static float ArcHeightAt(float t, float arcHeight)
         {
             t = Clamp01(t);
             return arcHeight * 4f * t * (1f - t);
         }
 
-        /// <summary>進行度 t を「地表投影距離 groundDistance を speed で進む」ぶんだけ加算。</summary>
+        /// <summary>Advances t by however far speed carries it along groundDistance, the distance projected on the ground.</summary>
         public static float AdvanceT(float t, float groundDistance, float speed, float dt)
         {
-            if (groundDistance <= 0.0001f) return 1f; // 距離0は即着弾扱い
+            if (groundDistance <= 0.0001f) return 1f; // zero distance counts as an immediate impact
             return t + (speed * dt) / groundDistance;
         }
     }

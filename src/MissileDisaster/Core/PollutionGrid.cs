@@ -3,9 +3,11 @@ using System.Collections.Generic;
 namespace MissileDisaster.Core
 {
     /// <summary>
-    /// NaturalResourceManager の土壌汚染グリッド(512×512, セル33.75m)に対する座標計算・半径列挙。
-    /// UnityEngine 非依存・乱数不使用（再現可能）。NuclearMeltdown.Core.PollutionGrid から移植。
-    /// 放射能汚染は本グリッドへの書き込みで表現し、ゲームのセーブ・汚染オーバーレイに載る。
+    /// Coordinate maths and radius enumeration for NaturalResourceManager's ground pollution
+    /// grid (512x512, 33.75 m cells). No UnityEngine dependency and no randomness, so it is
+    /// reproducible. Ported from NuclearMeltdown.Core.PollutionGrid.
+    /// Radioactive contamination is expressed by writing into this grid, which puts it in the
+    /// save game and on the game's own pollution overlay.
     /// </summary>
     public static class PollutionGrid
     {
@@ -26,8 +28,9 @@ namespace MissileDisaster.Core
         }
 
         /// <summary>
-        /// 中心(centerX,centerZ)・半径radiusMetersの円内セルを列挙する。
-        /// 濃度は中心 maxIntensity、半径端で0への線形減衰（半径外は含めない）。
+        /// Lists the cells inside the circle at (centerX, centerZ) with the given radius.
+        /// Intensity falls off linearly from maxIntensity at the centre to zero at the edge;
+        /// cells outside the radius are not included.
         /// </summary>
         public static List<CellDose> CellsInRadius(float centerX, float centerZ, float radiusMeters, byte maxIntensity)
         {
@@ -52,7 +55,7 @@ namespace MissileDisaster.Core
                     float dist = (float)System.Math.Sqrt(worldDx * worldDx + worldDz * worldDz);
                     if (dist > radiusMeters) continue;
 
-                    float t = 1f - (dist / radiusMeters); // 中心1..端0
+                    float t = 1f - (dist / radiusMeters); // 1 at the centre .. 0 at the edge
                     if (t < 0f) t = 0f;
                     byte intensity = (byte)(maxIntensity * t);
                     result.Add(new CellDose(CellIndex(cx, cz), intensity));

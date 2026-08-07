@@ -1,8 +1,10 @@
 namespace MissileDisaster.Core
 {
     /// <summary>
-    /// 迎撃可否の純粋判定。乱数は引数(roll)注入でテスト可能に。UnityEngine 非依存。
-    /// altitude はミサイルの対地高度、horizontalDistance は迎撃建物までの水平距離。
+    /// Pure decision on whether an interception succeeds. The random number is injected as the
+    /// roll argument so it can be tested. No UnityEngine dependency.
+    /// altitude is the missile's height above the ground and horizontalDistance is how far away
+    /// the interceptor building is.
     /// </summary>
     public static class InterceptDecision
     {

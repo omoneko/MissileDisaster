@@ -1,37 +1,44 @@
 namespace MissileDisaster.Core
 {
     /// <summary>
-    /// 弾頭ごとの着弾パラメータ（UnityEngine 非依存の数値表）。半径は実世界の被害半径に基づく（ゲームバランス非考慮）。
-    /// 核は「爆風半径 ∝ 威力^(1/3)」で較正: 150kt 基準で 5psi(建物倒壊)≈3.7km、熱線/延焼≈5.9km、降下物≈5.3km。
-    /// これに Scaled(cbrt(kt/150)) を掛けると任意威力で実半径 R = C×kt^(1/3) になる
-    /// （例 1Mt: 破壊≈7.0km・延焼≈11km は Nukemap 等の実値と一致）。
-    /// 利用可能な着弾APIは MakeCrater/DestroyStuff のみのため、火災は延焼帯、汚染は土壌汚染で表現する。
+    /// Impact parameters per warhead, as a plain table of numbers with no UnityEngine
+    /// dependency. The radii come from real-world damage figures rather than game balance.
+    /// The nuclear entry is calibrated on the blast radius going as the cube root of the yield:
+    /// at the 150 kt baseline, 5 psi (buildings collapse) is about 3.7 km, thermal radiation and
+    /// fires about 5.9 km, and fallout about 5.3 km. Multiplying those by
+    /// Scaled(cbrt(kt/150)) gives the real radius R = C * kt^(1/3) at any yield - at 1 Mt, for
+    /// instance, roughly 7.0 km of destruction and 11 km of fires, which matches published
+    /// figures such as Nukemap's.
+    /// The only impact APIs available are MakeCrater and DestroyStuff, so fires are represented
+    /// as a burn band and fallout as ground pollution.
     /// </summary>
     public struct WarheadSpec
     {
         public WarheadType Type;
         public float CraterRadius;
         public float CraterDepth;
-        public float DestructionRadius;   // 建物倒壊（核=5psi 相当）
+        public float DestructionRadius;   // buildings collapse; for nuclear this is the 5 psi contour
         public int SubmunitionCount;
         public float SpreadRadius;
         public bool RaiseCraterEdges;
-        public float BurnRadius;          // 延焼/熱線（核=3度熱傷相当。破壊より広い）
+        public float BurnRadius;          // fires and thermal radiation; for nuclear this is third-degree burns, wider than the destruction
         public bool Contaminates;
-        public float ContaminationRadius; // 放射性降下物（核のみ>0）
+        public float ContaminationRadius; // fallout; greater than zero for nuclear warheads only
 
-        // 空中爆発時に破壊・延焼半径へ掛ける係数（爆風/熱線が広い面積に及ぶため）。
+        // Factor applied to the destruction and burn radii for an airburst, whose blast and
+        // thermal radiation reach a wider area.
         public const float AirBurstBlastFactor = 1.35f;
 
         /// <summary>
-        /// 爆発高度を反映した新しい spec を返す（不変・元は変えない）。
-        /// 地上爆発は変化なし。空中爆発はクレーター/汚染を無くし、破壊・延焼を AirBurstBlastFactor 倍に広げる。
+        /// A new spec reflecting the burst height. This is immutable and leaves the original
+        /// alone. A groundburst changes nothing; an airburst removes the crater and the
+        /// contamination and widens the destruction and burn radii by AirBurstBlastFactor.
         /// </summary>
         public WarheadSpec WithBurst(BurstType burst)
         {
             if (burst == BurstType.Groundburst) return this;
 
-            WarheadSpec s = this; // struct のコピー（元は不変）
+            WarheadSpec s = this; // a copy of the struct; the original is untouched
             s.CraterRadius = 0f;
             s.CraterDepth = 0f;
             s.RaiseCraterEdges = false;
@@ -42,10 +49,10 @@ namespace MissileDisaster.Core
             return s;
         }
 
-        /// <summary>効果半径(クレーター/破壊/延焼/汚染)を multiplier 倍した新しい spec を返す（不変・元は変えない）。</summary>
+        /// <summary>A new spec with every effect radius - crater, destruction, burn and contamination - multiplied. Immutable; the original is untouched.</summary>
         public WarheadSpec Scaled(float multiplier)
         {
-            WarheadSpec s = this; // struct のコピー（呼び出し元の元 spec は不変）
+            WarheadSpec s = this; // a copy of the struct; the caller's spec is untouched
             s.CraterRadius *= multiplier;
             s.CraterDepth *= multiplier;
             s.DestructionRadius *= multiplier;
@@ -59,7 +66,8 @@ namespace MissileDisaster.Core
             switch (type)
             {
                 case WarheadType.Cluster:
-                    // クラスター爆弾: 子弾を広く散布。1発は小威力だが被害面積が広い。
+                    // Cluster munition: the submunitions scatter widely. Each one is small, but
+                    // together they cover a large area.
                     return new WarheadSpec
                     {
                         Type = type,
@@ -68,7 +76,8 @@ namespace MissileDisaster.Core
                         RaiseCraterEdges = false, BurnRadius = 12f, Contaminates = false,
                     };
                 case WarheadType.WhitePhosphorus:
-                    // 白リン(焼夷): 爆発破壊は小さいが延焼が広い。子弾散布で広域炎上。
+                    // White phosphorus, an incendiary: little destruction from the blast itself
+                    // but wide-spreading fires, scattered by submunitions.
                     return new WarheadSpec
                     {
                         Type = type,
@@ -77,7 +86,8 @@ namespace MissileDisaster.Core
                         RaiseCraterEdges = false, BurnRadius = 70f, Contaminates = false,
                     };
                 case WarheadType.Thermobaric:
-                    // サーモバリック(気化爆弾, 大型 FAE 相当): 過圧で広範囲を薙ぎ倒す。クレーターは浅い。
+                    // Thermobaric, equivalent to a large fuel-air explosive: the overpressure
+                    // flattens a wide area, but the crater is shallow.
                     return new WarheadSpec
                     {
                         Type = type,
@@ -86,8 +96,9 @@ namespace MissileDisaster.Core
                         RaiseCraterEdges = true, BurnRadius = 220f, Contaminates = false,
                     };
                 case WarheadType.Nuclear:
-                    // 核(基準 150kt・地上爆発の実被害半径): 5psi=3.7km, 熱線=5.9km, 降下物=5.3km, クレーター=210m。
-                    // 任意威力は Scaled(cbrt(kt/150)) で実半径にスケールする。
+                    // Nuclear, at the 150 kt baseline, using real groundburst radii: 3.7 km at
+                    // 5 psi, 5.9 km of thermal radiation, 5.3 km of fallout and a 210 m crater.
+                    // Any other yield is scaled to its real radii by Scaled(cbrt(kt/150)).
                     return new WarheadSpec
                     {
                         Type = type,
@@ -96,7 +107,7 @@ namespace MissileDisaster.Core
                         RaiseCraterEdges = true, BurnRadius = 5850f,
                         Contaminates = true, ContaminationRadius = 5300f,
                     };
-                default: // Conventional（大型 HE 弾頭 ~1t 相当の実被害半径）
+                default: // Conventional: the real radii of a large HE warhead of about 1 t
                     return new WarheadSpec
                     {
                         Type = WarheadType.Conventional,

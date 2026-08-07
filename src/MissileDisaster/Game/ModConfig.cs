@@ -2,147 +2,172 @@ using UnityEngine;
 
 namespace MissileDisaster.Game
 {
-    /// <summary>Mod 全体の定数と共通ログ。</summary>
+    /// <summary>Mod-wide constants and shared logging.</summary>
     public static class ModConfig
     {
         public const string LogPrefix = "[MissileDisaster] ";
 
-        // 手動発射ツールを起動するキー（Alien の F7 と衝突しないよう F9）。
+        // Hotkey that opens the manual launch tool; F9, to avoid Alien Invasion's F7.
         public const KeyCode ManualTriggerKey = KeyCode.F9;
 
-        // 飛翔（メインスレッドで simulationTimeDelta 駆動）。
-        // 弾道は固定方位・高高度の apex(頂点)から着弾までの「降下枝のみ」を直線補間する。
-        public const float MissileSpeed = 900f;            // 降下ペース(水平投影距離に対する m/秒 相当)
-        public const float IncomingBearingDegrees = 315f;  // 飛来方位(0=北,時計回り)。全弾同一方位。315=北西
-        public const float ApexHorizontalOffset = 2200f;   // apex の水平オフセット(m)。大きいほど浅い角度
-        public const float ApexAltitude = 4000f;           // apex の対地高度(m)。高いほど急角度で高高度から飛来
+        // Flight, driven on the main thread by simulationTimeDelta.
+        // Only the descending half of the trajectory is interpolated: from an apex at high
+        // altitude on a fixed bearing, down to the impact.
+        public const float MissileSpeed = 900f;            // descent pace, in metres per second against the horizontal distance
+        public const float IncomingBearingDegrees = 315f;  // bearing they arrive from, clockwise from north; 315 is north-west, and every missile shares it
+        public const float ApexHorizontalOffset = 2200f;   // horizontal offset of the apex in metres; larger means a shallower angle
+        public const float ApexAltitude = 4000f;           // height of the apex above the ground in metres; higher means a steeper dive from further up
 
-        // 飛来ミサイルの表示モデル（Models/&lt;name&gt;.obj）。モデル軸は +Z=機首。
+        // Model for the incoming missile, Models/&lt;name&gt;.obj, with +Z as the nose.
         public const string ModelsFolderName = "Models";
         public const string IncomingMissileModelName = "IncomingWarhead";
-        public const float IncomingMissileScale = 9f;      // モデル ~2m → 実機 ~19m（従来18の半分）
-        public const float ObjMetallic = 0.6f;             // Standard シェーダの金属質
-        public const float ObjGlossiness = 0.5f;           // Standard シェーダの滑らかさ
-        public static readonly Color ObjFallbackColor = new Color(0.25f, 0.25f, 0.25f, 1f); // MTL 欠落時の既定色
+        public const float IncomingMissileScale = 9f;      // takes the ~2 m model to about 19 m in game
+        public const float ObjMetallic = 0.6f;             // the Standard shader's metallic parameter
+        public const float ObjGlossiness = 0.5f;           // the Standard shader's smoothness parameter
+        public static readonly Color ObjFallbackColor = new Color(0.25f, 0.25f, 0.25f, 1f); // fallback when the MTL is missing
 
-        // 燃焼トレイル（隕石風。飛来ミサイルに付与。メインスレッドで生成）。
-        // 尾は引かせない方針: 寿命を短くして弾体近くで消し、航跡を残さない。煙は薄め・少なめ。
-        public const float TrailFireRate = 70f;       // 火の粉の毎秒放出数
-        public const float TrailFireLifetime = 0.3f;  // 火の粉の寿命(秒)。短く=尾を引かない
-        public const float TrailFireSize = 10f;       // 火の粉の基準サイズ(m)
-        public const float TrailFireSpeed = 1.5f;     // 火の粉の初速(拡散・m/秒)。小さく=弾体近くに留める
-        public const float TrailSmokeRate = 14f;      // 煙の毎秒放出数。少なめ
-        public const float TrailSmokeLifetime = 0.45f;// 煙の寿命(秒)。短く=尾を残さない
-        public const float TrailSmokeSize = 18f;      // 煙の基準サイズ(m)
-        public static readonly Color TrailFireCoreColor = new Color(1f, 0.85f, 0.35f, 1f);  // 明るい黄橙(コア)
-        public static readonly Color TrailFireEdgeColor = new Color(0.9f, 0.28f, 0.06f, 1f); // 赤橙(縁)
-        public static readonly Color TrailSmokeColor = new Color(0.16f, 0.15f, 0.14f, 0.2f); // 暗い煙・薄く
+        // The burning trail on an incoming missile, in the style of a meteor, created on the
+        // main thread.
+        // It deliberately does not streak: short lifetimes keep the particles near the body and
+        // leave no wake behind, and the smoke is thin and sparse.
+        public const float TrailFireRate = 70f;       // sparks emitted per second
+        public const float TrailFireLifetime = 0.3f;  // lifetime of a spark in seconds; short, so it does not streak
+        public const float TrailFireSize = 10f;       // base size of a spark in metres
+        public const float TrailFireSpeed = 1.5f;     // initial spread speed of a spark, m/s; low, so they stay near the body
+        public const float TrailSmokeRate = 14f;      // smoke puffs emitted per second; kept sparse
+        public const float TrailSmokeLifetime = 0.45f;// lifetime of a puff in seconds; short, so no wake is left
+        public const float TrailSmokeSize = 18f;      // base size of a puff in metres
+        public static readonly Color TrailFireCoreColor = new Color(1f, 0.85f, 0.35f, 1f);  // bright yellow-orange core
+        public static readonly Color TrailFireEdgeColor = new Color(0.9f, 0.28f, 0.06f, 1f); // red-orange edge
+        public static readonly Color TrailSmokeColor = new Color(0.16f, 0.15f, 0.14f, 0.2f); // dark, thin smoke
 
-        // 迎撃施設は Asset Editor で作成した正規アセット（PAC3/THAAD/Aegis/Radar）。
-        // Mod はコスト/電力/水を上書きせず、設置された建物を「名前で検出」して迎撃判定のみ行う。
-        // 迎撃判定・建物走査・クールダウンはすべてメインスレッド（MissileManager.UpdateVisual 側）。
-        public const int InterceptorScanIntervalFrames = 30;  // 建物再走査の間引き（~0.5s @60fps）
-        public const float RadarSupportMultiplier = 1.5f;     // レーダー稼働時の迎撃確率倍率
+        // The interceptor sites are ordinary assets made in the Asset Editor - PAC3, THAAD,
+        // Aegis and Radar. This mod does not override their cost, power or water: it detects
+        // the placed buildings by name and does nothing but resolve interceptions.
+        // The interception logic, the building scan and the cooldowns all run on the main
+        // thread, from MissileManager.UpdateVisual.
+        public const int InterceptorScanIntervalFrames = 30;  // how often the buildings are rescanned, about 0.5 s at 60 fps
+        public const float RadarSupportMultiplier = 1.5f;     // multiplier on the hit probability while a radar is operating
 
-        // 迎撃成功時の閃光（バニラ非依存の簡易パーティクルバースト。メインスレッド）。
-        public const int InterceptFlashBurst = 40;            // 一度に放出する火花数
-        public const float InterceptFlashLifetime = 0.5f;     // 火花の寿命(秒)
-        public const float InterceptFlashSpeed = 60f;         // 火花の初速(拡散・m/秒)
-        public const float InterceptFlashSize = 40f;          // 火花の基準サイズ(m)
-        public static readonly Color InterceptFlashCoreColor = new Color(1f, 0.95f, 0.7f, 1f);  // 中心の白橙
-        public static readonly Color InterceptFlashEdgeColor = new Color(1f, 0.55f, 0.15f, 1f); // 縁の橙
+        // Flash on a successful interception: a simple particle burst owing nothing to the base
+        // game. Main thread.
+        public const int InterceptFlashBurst = 40;            // sparks emitted in the burst
+        public const float InterceptFlashLifetime = 0.5f;     // lifetime of a spark in seconds
+        public const float InterceptFlashSpeed = 60f;         // initial spread speed of a spark, m/s
+        public const float InterceptFlashSize = 40f;          // base size of a spark in metres
+        public static readonly Color InterceptFlashCoreColor = new Color(1f, 0.95f, 0.7f, 1f);  // white-orange core
+        public static readonly Color InterceptFlashEdgeColor = new Color(1f, 0.55f, 0.15f, 1f); // orange edge
 
-        // 迎撃ミサイル本体（可視・メインスレッド）。命中/失敗を問わず発射器から実際に飛ばす。
-        // モデルは Models/<name>.obj（+Z=機首）。層ごとに実機に近い速度を割り当てる。
+        // The interceptor missile itself, visible and on the main thread. It really is fired
+        // from the launcher, whether or not it goes on to hit.
+        // The model is Models/<name>.obj with +Z as the nose, and each layer gets a speed close
+        // to its real counterpart.
         public const string InterceptorModelPac = "Interceptor_PAC";     // PAC-3
         public const string InterceptorModelThaad = "Interceptor_THAAD"; // THAAD
         public const string InterceptorModelArrow = "Interceptor_SM";    // SM-3(Aegis)
-        public const float InterceptorModelScale = 6f; // 従来12の半分
+        public const float InterceptorModelScale = 6f;
         public const float InterceptorSpeedPac = 1700f;    // PAC-3 ~Mach5
         public const float InterceptorSpeedThaad = 2500f;  // THAAD ~Mach8
         public const float InterceptorSpeedArrow = 3000f;  // SM-3 ~Mach10
-        public const float InterceptorCatchRadius = 60f;   // 迎撃点への到達判定距離(m)
-        public const float InterceptorMaxFlightSeconds = 8f; // 到達不能時の保険（消滅まで）
-        public const int InterceptFizzleBurst = 14;        // 失敗時の小さな煙玉の粒数
+        public const float InterceptorCatchRadius = 60f;   // how close it must get to count as reaching the intercept point (m)
+        public const float InterceptorMaxFlightSeconds = 8f; // safety net: it disappears after this if it never arrives
+        public const int InterceptFizzleBurst = 14;        // particles in the small puff a miss leaves behind
 
-        // 迎撃ミサイルの噴煙トレイル（ロケット排気。煙は少しの間残す）。ワールド空間で航跡を残す。
-        public const float ExhaustFireRate = 90f;          // ノズル火炎の毎秒放出数
-        public const float ExhaustFireLifetime = 0.25f;    // 火炎の寿命(秒)
-        public const float ExhaustFireSize = 8f;           // 火炎の基準サイズ(m)
-        public const float ExhaustSmokeRate = 60f;         // 噴煙の毎秒放出数
-        public const float ExhaustSmokeLifetime = 2.5f;    // 噴煙の寿命(秒)。長め=少しの間残る
-        public const float ExhaustSmokeSize = 7f;          // 噴煙の基準サイズ(m)。細く
-        public static readonly Color ExhaustFireColor = new Color(1f, 0.9f, 0.6f, 1f);         // 白橙の火炎
-        public static readonly Color ExhaustSmokeColor = new Color(0.85f, 0.85f, 0.85f, 0.32f); // 白っぽい薄煙
+        // Exhaust trail of an interceptor. Unlike the incoming missile's, this one does leave a
+        // wake: the smoke lingers a while, in world space.
+        public const float ExhaustFireRate = 90f;          // flame particles emitted per second at the nozzle
+        public const float ExhaustFireLifetime = 0.25f;    // lifetime of a flame particle in seconds
+        public const float ExhaustFireSize = 8f;           // base size of a flame particle in metres
+        public const float ExhaustSmokeRate = 60f;         // smoke particles emitted per second
+        public const float ExhaustSmokeLifetime = 2.5f;    // lifetime of a smoke particle in seconds; long, so the wake lingers
+        public const float ExhaustSmokeSize = 7f;          // base size of a smoke particle in metres; kept narrow
+        public static readonly Color ExhaustFireColor = new Color(1f, 0.9f, 0.6f, 1f);         // white-orange flame
+        public static readonly Color ExhaustSmokeColor = new Color(0.85f, 0.85f, 0.85f, 0.32f); // thin whitish smoke
 
-        // 着弾（通常弾頭・sim スレッドで DisasterHelpers を呼ぶ）。
+        // Impact of a conventional warhead; DisasterHelpers is called on the simulation thread.
         public const float SinkholeRadius = 60f;
         public const float SinkholeDepth = 16f;
         public const float DestructionRadius = 120f;
 
-        // 放射能汚染（核のみ・sim スレッドで NaturalResourceManager へ書込み）。基本設定は NuclearMeltdown 準拠。
-        public const byte ContaminationMaxIntensity = 255;   // 中心の最大濃度(0-255)
-        public const int ContaminationExpiryYears = 50;      // ゾーンの寿命（ゲーム内50年で自然消滅）
-        // 汚染ゾーンの維持（自然減衰を打ち消す reassert）の間引き間隔（tick）。大きな汚染半径でも重くならないよう間引く。
+        // Radioactive contamination, for nuclear warheads only, written to
+        // NaturalResourceManager on the simulation thread. The basic settings follow
+        // NuclearMeltdown.
+        public const byte ContaminationMaxIntensity = 255;   // peak intensity at the centre (0-255)
+        public const int ContaminationExpiryYears = 50;      // a zone lifts on its own after this many in-game years
+        // How often, in ticks, a zone is reasserted to counteract the game's natural decay.
+        // Spacing it out keeps a large contamination radius from becoming expensive.
         public const int ContaminationMaintainInterval = 128;
-        // 注: 汚水処理場による除染は NuclearMeltdown と異なり無効（ユーザー指定で「除染されない」仕様）。
-        // 専用の「Decontamination facility」建物だけが除染する。名称に下記キーワードを含む稼働中の建物が
-        // ゾーン付近にあると、そのゾーンの濃度をゲーム内1か月あたり DecontaminationMonthlyFraction 相対除去する。
+        // Note that, unlike NuclearMeltdown, a water treatment plant does not decontaminate
+        // here. Only a dedicated "Decontamination facility" building does: an operating building
+        // whose name contains the keyword below, near a zone, removes
+        // DecontaminationMonthlyFraction of what remains per in-game month.
         public const string DecontaminationKeyword = "Decontamination";
-        public const float DecontaminationMonthlyFraction = 0.05f; // 1か月で5%除去（相対）
-        public const float DecontaminationFacilityRange = 1000f;    // ゾーン半径＋この範囲内に施設があれば除染
-        public const byte DecontaminationMinIntensity = 5;          // これ以下まで下がったゾーンは消滅
+        public const float DecontaminationMonthlyFraction = 0.05f; // 5% of what remains, per month
+        public const float DecontaminationFacilityRange = 1000f;    // a facility within the zone radius plus this decontaminates it
+        public const byte DecontaminationMinIntensity = 5;          // a zone that falls to this or below disappears
 
-        // 破壊の同心円モデル: 内側 DestructionCoreFraction までは全壊、そこから破壊半径へ向け破壊確率が低下する。
-        // Nukemap の「ほぼ全壊/民家破壊」半径比 ≈ 0.2 に倣う。
+        // Destruction is modelled as concentric rings: everything within
+        // DestructionCoreFraction of the radius is destroyed outright, and beyond that the
+        // probability falls off towards the full destruction radius. The ratio of about 0.2
+        // follows Nukemap's near-total-destruction to residential-destruction radii.
         public const float DestructionCoreFraction = 0.2f;
 
-        // クレーターの上限（地形ハイトマップを破綻させないための工学的安全上限。ゲームバランスではない）。
-        // 実被害半径は破壊/延焼/汚染で表現し、クレーター(地形変形)だけは端末保護のため丸める。
+        // Ceiling on the crater. This is an engineering safety limit that keeps the terrain
+        // heightmap intact, not a balance decision: the real damage radii are expressed through
+        // the destruction, fires and contamination, and only the crater - which deforms the
+        // terrain - is rounded down.
         public const float CraterRadiusMax = 500f;
         public const float CraterDepthMax = 80f;
 
-        // 破壊/延焼半径の工学的安全上限。大威力核の実半径はマップを超えるため、DestroyStuff の
-        // 極端な走査によるフリーズを避ける安全弁（マップ全域を覆う十分な大きさ。ゲームバランス目的ではない）。
+        // Engineering safety ceiling on the destruction and burn radii. A high-yield nuclear
+        // weapon's real radii exceed the map, so this is the valve that stops DestroyStuff from
+        // freezing the game on an extreme scan. It is still large enough to cover the whole map,
+        // and it is not a balance decision.
         public const float MaxEffectRadius = 12000f;
-        // 汚染半径の上限（土壌汚染グリッドの範囲=約±8.6km。これ以上はマップ全域を覆うため走査の無駄を省く）。
+        // Ceiling on the contamination radius. The ground pollution grid spans about plus or
+        // minus 8.6 km, so anything beyond this already covers the map and only wastes scan time.
         public const float MaxContaminationRadius = 8600f;
 
-        // 着弾爆発エフェクト（バニラ隕石着弾エフェクトを流用・メインスレッドで DispatchEffect）。
-        // 通常弾/サーモバリックは単一エフェクト、子弾散布弾は散布点ごと、核は単一の特大＋キノコ雲。
-        public const float ExplosionBloomScaleMax = 7f;   // 非核の1発あたり最大スケール（控えめ）
-        public const float NuclearExplosionScaleMax = 140f; // 核の単一エフェクトの最大スケール
+        // Impact explosion, borrowing the game's meteor impact effect and dispatched on the
+        // main thread. A conventional or thermobaric warhead gets a single effect, a scattering
+        // warhead gets one per submunition, and a nuclear warhead gets a single very large one
+        // plus a mushroom cloud.
+        public const float ExplosionBloomScaleMax = 7f;   // largest scale per non-nuclear detonation; deliberately modest
+        public const float NuclearExplosionScaleMax = 140f; // largest scale for the single nuclear effect
 
-        // サウンド（Sounds/*.mp3 を実行時に読み込み、3D 位置音として再生。メインスレッド）。
+        // Sound: loaded from Sounds at runtime and played as positional 3D audio. Main thread.
         public const string SoundsFolderName = "Sounds";
-        public const float SoundVolumeNormal = 0.5f;      // 通常の効果音音量（0-1）
-        public const float SoundVolumeNuclear = 1.0f;     // 核爆発は他の2倍（AudioSource 上限1.0のため他を0.5に）
-        // 3D 減衰の最小/最大距離(m)。最小内は最大音量、最大で無音。
+        public const float SoundVolumeNormal = 0.5f;      // volume of the ordinary effects (0-1)
+        public const float SoundVolumeNuclear = 1.0f;     // the nuclear blast is twice as loud; AudioSource caps at 1.0, so the others sit at 0.5
+        // Minimum and maximum distances for the 3D rolloff, in metres: full volume inside the
+        // minimum, silent at the maximum.
         public const float SoundLaunchMinDistance = 300f;
-        public const float SoundLaunchMaxDistance = 8000f;   // 発射音は遠方まで届かせ距離で増減
+        public const float SoundLaunchMaxDistance = 8000f;   // the launch is audible a long way off, fading with distance
         public const float SoundExplosionMinDistance = 200f;
         public const float SoundExplosionMaxDistance = 5000f;
         public const float SoundNuclearMinDistance = 600f;
-        public const float SoundNuclearMaxDistance = 16000f;  // 核はマップ全域級
+        public const float SoundNuclearMaxDistance = 16000f;  // the nuclear blast carries across the whole map
         public const float SoundInterceptMinDistance = 150f;
         public const float SoundInterceptMaxDistance = 4000f;
 
-        // 弾頭選択UIパネル（メインスレッド・UIView 直下に常設）。
-        public const float PanelPosX = 16f;    // 画面左からの位置
-        public const float PanelPosY = 200f;   // 画面上からの位置
+        // The warhead selection panel: main thread, and a permanent child of UIView.
+        public const float PanelPosX = 16f;    // position from the left of the screen
+        public const float PanelPosY = 200f;   // position from the top of the screen
         public const float PanelWidth = 264f;
         public const float PanelButtonHeight = 26f;
         public const float PanelButtonGap = 4f;
 
-        // 災害パネル（バニラ DisastersPanel）に貼るミサイル起動ボタン（UFO! ボタンと同方式）。
+        // The launch button attached to the vanilla DisastersPanel, done the same way Alien
+        // Invasion's button is.
         public const float TabButtonWidth = 46f;
         public const float TabButtonHeight = 36f;
-        public const float TabButtonOffsetX = 8f;   // パネル右端からの内側マージン
-        public const float TabButtonOffsetY = -40f; // パネル上端からの相対Y（負=災害アイコン列の上へはみ出す）
-        public const int TabButtonFallbackFrames = 600; // 災害パネル未出現時にフォールバックへ切替えるまで
+        public const float TabButtonOffsetX = 8f;   // inner margin from the panel's right edge
+        public const float TabButtonOffsetY = -40f; // Y relative to the panel's top edge; negative lifts it above the disaster icon row
+        public const int TabButtonFallbackFrames = 600; // frames to wait for the disasters panel before falling back
 
-        // 詳細ログの出力可否。公開版は false（静かに）。不具合調査時のみ true にして再ビルドする。
-        // エラー(LogError)は常時出力する。static readonly にして到達不能コード警告(CS0162)を避ける。
+        // Whether verbose logging is on. It is false in a release, to keep the log quiet; set
+        // it to true and rebuild only when investigating a problem. Errors are always logged.
+        // It is static readonly rather than const to avoid the unreachable-code warning CS0162.
         public static readonly bool DebugLogging = false;
 
         public static void Log(string msg) { if (DebugLogging) Debug.Log(LogPrefix + msg); }

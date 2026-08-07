@@ -3,10 +3,10 @@ using System.IO;
 
 namespace MissileDisaster.Core
 {
-    /// <summary>汚染ゾーン台帳を byte[] に直列化/復元（セーブデータ保存用）。NuclearMeltdown から移植。</summary>
+    /// <summary>Serialises the contamination zone ledger to and from byte[] for the save game. Ported from NuclearMeltdown.</summary>
     public static class ZoneSerializer
     {
-        public const byte Version = 3; // v3: Intensity を float 化（端数保持）
+        public const byte Version = 3; // v3 made Intensity a float, so fractions are kept
 
         public static byte[] Serialize(List<ContaminationZone> zones)
         {
@@ -54,7 +54,7 @@ namespace MissileDisaster.Core
             }
             catch
             {
-                return new List<ContaminationZone>(); // 破損時は空
+                return new List<ContaminationZone>(); // corrupt data yields nothing
             }
             return result;
         }

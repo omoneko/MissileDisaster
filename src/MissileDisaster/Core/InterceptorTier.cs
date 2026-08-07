@@ -2,7 +2,7 @@ namespace MissileDisaster.Core
 {
     public enum InterceptorKind { Arrow, Sam, Pac }
 
-    /// <summary>迎撃層の担当高度帯・水平射程・迎撃確率・クールダウン。UnityEngine 非依存。</summary>
+    /// <summary>An interception layer: the altitude band it covers, its horizontal range, its hit probability and its cooldown. No UnityEngine dependency.</summary>
     public struct InterceptorTier
     {
         public InterceptorKind Kind;
@@ -14,12 +14,17 @@ namespace MissileDisaster.Core
     }
 
     /// <summary>
-    /// ARROW(超高高度)→SAM(高高度)→PAC(終端)の3層。帯は地面から連続。
-    /// InterceptChance は「1発あたりの撃墜確率(single-shot Pk)」で、実世界の公表値に近づけた暫定値:
-    ///   PAC-3(終端点防御) ~0.65、THAAD(高高度) ~0.75、SM-3/Aegis(中間段・最難) ~0.60。
-    /// 1回の交戦で発射器は1発だけ撃つ(発射でクールダウン消費)ため、この確率が実際の撃墜率になる。
-    /// 3層すべてが撃てば累積撃墜率は約 1-(1-.65)(1-.75)(1-.60)≒0.965 と、多層防御らしい高い値になる。
-    /// CooldownSeconds は再装填時間(=同一発射器が次に撃てるまで)。レーダー稼働中は Pk×1.5(上限1.0)。
+    /// Three layers, from the top down: exo-atmospheric, high altitude, then terminal. The
+    /// bands are continuous from the ground up.
+    /// InterceptChance is the single-shot probability of a kill, set near published real-world
+    /// figures: about 0.65 for terminal point defence (PAC-3), about 0.75 at high altitude
+    /// (THAAD) and about 0.60 for the hardest midcourse intercept (SM-3/Aegis).
+    /// A launcher fires exactly one round per engagement, spending its cooldown, so this
+    /// probability is the actual kill rate.
+    /// With all three layers firing, the cumulative rate is about
+    /// 1-(1-.65)(1-.75)(1-.60) = 0.965, the high figure a layered defence should give.
+    /// CooldownSeconds is the reload time before the same launcher can fire again. An active
+    /// radar multiplies the kill probability by 1.5, capped at 1.0.
     /// </summary>
     public static class InterceptorTiers
     {
@@ -39,7 +44,7 @@ namespace MissileDisaster.Core
             HorizontalRange = 6000f, InterceptChance = 0.60f, CooldownSeconds = 8f
         };
 
-        /// <summary>迎撃試行順(高い帯から)。</summary>
+        /// <summary>The order interception is attempted in, from the highest band down.</summary>
         public static readonly InterceptorTier[] Ordered = { Arrow, Sam, Pac };
     }
 }

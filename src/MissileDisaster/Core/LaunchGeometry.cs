@@ -1,6 +1,6 @@
 namespace MissileDisaster.Core
 {
-    /// <summary>水平方位オフセット(X,Z)。UnityEngine 非依存。</summary>
+    /// <summary>A horizontal bearing offset as (X, Z). No UnityEngine dependency.</summary>
     public struct Offset2
     {
         public float X;
@@ -8,8 +8,9 @@ namespace MissileDisaster.Core
     }
 
     /// <summary>
-    /// 固定方位から飛来する弾道の apex(頂点)水平位置を算出する純粋ロジック。
-    /// 方位規約: 0°=+Z(北), 90°=+X(東), 時計回りに増加。UnityEngine 非依存。
+    /// Works out the horizontal position of a trajectory's apex for a missile arriving from a
+    /// fixed bearing. Bearings run clockwise, with 0 degrees as +Z (north) and 90 as +X (east).
+    /// No UnityEngine dependency.
     /// </summary>
     public static class LaunchGeometry
     {

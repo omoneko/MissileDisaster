@@ -4,12 +4,14 @@ using System.Collections.Generic;
 namespace MissileDisaster.Core
 {
     /// <summary>
-    /// ランダム攻撃の優先照準：建物名から優先度層を判定する純粋ロジック（UnityEngine 非依存）。
-    /// A(0)＞B(1)＞C(2)＞None(-1)。各層のキーワード群はプレイヤー設定（カンマ区切り）から与えられ、
-    /// 建物の内部名(info.name、非ローカライズ)に部分一致（大文字小文字無視）で判定する。
-    /// 例: A に "Oil" を足すと石油系の建物が最優先で狙われる。
-    /// ランドマーク/モニュメントは名前だけでは判別しづらいため、Game 層で AI 型(MonumentAI)により
-    /// TierC を補完する（本分類は名前ベースのみを担当）。
+    /// Target priority for a random strike: works out a building's priority tier from its name.
+    /// Pure, with no UnityEngine dependency.
+    /// The tiers run A (0), then B (1), then C (2), with None (-1) for anything unmatched. The
+    /// keywords for each tier come from the player's settings as a comma-separated list, and are
+    /// matched as case-insensitive substrings against the building's internal, unlocalised
+    /// info.name. Adding "Oil" to tier A, for instance, makes oil facilities the first choice.
+    /// Landmarks and monuments are hard to identify by name alone, so the Game layer fills tier
+    /// C in from the AI type (MonumentAI); this class only ever classifies by name.
     /// </summary>
     public static class TargetTierClassifier
     {
@@ -18,7 +20,7 @@ namespace MissileDisaster.Core
         public const int TierC = 2;
         public const int TierNone = -1;
 
-        /// <summary>カンマ区切り文字列をキーワード配列へ（前後空白除去・空要素破棄）。</summary>
+        /// <summary>Splits a comma-separated string into keywords, trimming whitespace and dropping empty entries.</summary>
         public static string[] ParseKeywords(string csv)
         {
             if (string.IsNullOrEmpty(csv)) return new string[0];
@@ -32,7 +34,7 @@ namespace MissileDisaster.Core
             return list.ToArray();
         }
 
-        /// <summary>建物名から優先度層を返す（該当なしは TierNone）。判定順 A→B→C。</summary>
+        /// <summary>The priority tier for a building name, or TierNone if nothing matches. Tested A, then B, then C.</summary>
         public static int Classify(string name, string[] aKeywords, string[] bKeywords, string[] cKeywords)
         {
             if (string.IsNullOrEmpty(name)) return TierNone;

@@ -3,15 +3,17 @@ using System;
 namespace MissileDisaster.Core
 {
     /// <summary>
-    /// 核出力(kt)から効果半径のスケール係数を求める。UnityEngine 非依存・純粋。
-    /// 爆風半径 ∝ 威力^(1/3) に倣い、Standard(150kt) を基準に Multiplier = cbrt(kt/150)。
-    /// カタログ選択・数値入力の双方がこの1関数を使う。
+    /// Turns a nuclear yield in kilotons into a scale factor for the effect radii. Pure, with
+    /// no UnityEngine dependency.
+    /// Following the blast radius going as the cube root of the yield, and taking the standard
+    /// 150 kt as the baseline, the multiplier is cbrt(kt/150).
+    /// Both the catalogue selection and a typed-in yield go through this one function.
     /// </summary>
     public static class NuclearYields
     {
         public const int StandardKilotons = 150;
 
-        /// <summary>kt からスケール係数（爆風半径の相対比）を返す。0以下は0。</summary>
+        /// <summary>The scale factor - the blast radius relative to the baseline - for a yield in kilotons. Zero or less gives 0.</summary>
         public static float Multiplier(int kilotons)
         {
             if (kilotons <= 0) return 0f;

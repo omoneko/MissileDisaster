@@ -1,22 +1,26 @@
 namespace MissileDisaster.Core
 {
     /// <summary>
-    /// ランダム攻撃の発火スケジューラ（純粋・UnityEngine 非依存）。
-    /// バニラ自然災害の頻度(probability)に比例した間隔でミサイル攻撃を発火し、
-    /// 他の自然災害が発生(disasterCount の増加)するたびにカウントダウンをリセットする
-    /// ＝ミサイルは災害の“合間”に発生する。ゲーム内時間(日)で駆動する。
+    /// Scheduler deciding when a random strike fires. Pure, with no UnityEngine dependency.
+    /// Strikes come at an interval proportional to the vanilla natural disaster frequency, and
+    /// the countdown restarts every time another natural disaster occurs - that is, whenever
+    /// disasterCount rises - so missiles land in the gaps between disasters. It is driven by
+    /// in-game time, in days.
     ///
-    /// probability(=DisasterManager.m_randomDisastersProbability)の絶対スケールは非公開のため、
-    /// 基準値 RefProbability で正規化し係数を [ProbFactorMin, ProbFactorMax] にクランプして用いる。
-    /// これにより実機値が想定と多少ずれても間隔が暴れない。BaseIntervalDays が主要な調整ノブ。
+    /// The absolute scale of probability (DisasterManager.m_randomDisastersProbability) is not
+    /// documented, so it is normalised against the RefProbability baseline and the resulting
+    /// factor is clamped to [ProbFactorMin, ProbFactorMax]. That keeps the interval sane even
+    /// if the real values turn out somewhat different from what is assumed here.
+    /// BaseIntervalDays is the main knob to turn.
     /// </summary>
     public sealed class StrikeScheduler
     {
-        // 調整用定数（実機で校正。純粋ロジックのため数値変更はテスト対象外）。
-        public const double BaseIntervalDays = 20.0;  // 既定の災害頻度・freq×1 でのミサイル基準間隔(ゲーム内日)
-        public const double RefProbability = 0.05;    // 想定される標準的な m_randomDisastersProbability
-        public const double ProbFactorMin = 0.25;     // probability 係数の下限（災害無効マップ等のフォールバック）
-        public const double ProbFactorMax = 4.0;      // 上限
+        // Tuning constants, calibrated in-game. This is pure logic, so changing the numbers is
+        // not what the tests check.
+        public const double BaseIntervalDays = 20.0;  // baseline interval in in-game days, at the default disaster frequency and a multiplier of 1
+        public const double RefProbability = 0.05;    // the m_randomDisastersProbability assumed to be typical
+        public const double ProbFactorMin = 0.25;     // floor on the probability factor, the fallback on maps with disasters off
+        public const double ProbFactorMax = 4.0;      // ceiling
         public const double MinIntervalDays = 2.0;
         public const double MaxIntervalDays = 365.0;
         public const double Epsilon = 1e-6;
@@ -25,10 +29,10 @@ namespace MissileDisaster.Core
         private int _lastDisasterCount;
         private bool _initialized;
 
-        /// <summary>次の攻撃までの残りゲーム内日数（監視用）。</summary>
+        /// <summary>In-game days remaining until the next strike, exposed for monitoring.</summary>
         public double CountdownDays => _countdownDays;
 
-        /// <summary>状態を初期化前へ戻す（ランダム攻撃OFF／レベル遷移時に呼ぶ）。</summary>
+        /// <summary>Returns the state to uninitialised. Called when random strikes are switched off and on a level change.</summary>
         public void Reset()
         {
             _initialized = false;
@@ -37,9 +41,10 @@ namespace MissileDisaster.Core
         }
 
         /// <summary>
-        /// 1シミュレーションティックごとに呼ぶ。true=今tickで攻撃発火。
-        /// gameDaysDelta: 前回からのゲーム内経過日数。disasterCount: 現在の m_disasterCount。
-        /// probability: 現在の m_randomDisastersProbability。freqMultiplier: 設定(0.25..3.0)。rng: [0,1)。
+        /// Call once per simulation tick; true means a strike fires this tick.
+        /// gameDaysDelta is the in-game days elapsed since the last call, disasterCount is the
+        /// current m_disasterCount, probability is the current m_randomDisastersProbability,
+        /// freqMultiplier is the player's setting from 0.25 to 3.0, and rng is a value in [0,1).
         /// </summary>
         public bool Advance(double gameDaysDelta, int disasterCount, float probability, double freqMultiplier, double rng)
         {
@@ -53,14 +58,15 @@ namespace MissileDisaster.Core
 
             if (disasterCount > _lastDisasterCount)
             {
-                // 他の自然災害が発生 → カウントダウンをリセット（合間発生）。
+                // Another natural disaster occurred, so restart the countdown - missiles land
+                // in the gaps between them.
                 _lastDisasterCount = disasterCount;
                 _countdownDays = NextInterval(probability, freqMultiplier, rng);
                 return false;
             }
             if (disasterCount < _lastDisasterCount)
             {
-                _lastDisasterCount = disasterCount; // 災害消滅：追従のみ、リセットしない
+                _lastDisasterCount = disasterCount; // a disaster ended: follow the count, but do not reset
             }
 
             if (gameDaysDelta > 0.0)
@@ -75,7 +81,7 @@ namespace MissileDisaster.Core
             return false;
         }
 
-        /// <summary>probability と頻度乗数から次の間隔(日)を算出。rng[0,1)で[0.5×,1.5×]にばらつかせクランプ。</summary>
+        /// <summary>The next interval in days, from the probability and the frequency multiplier. rng spreads it over 0.5x to 1.5x, clamped.</summary>
         public static double NextInterval(float probability, double freqMultiplier, double rng)
         {
             double m = freqMultiplier > Epsilon ? freqMultiplier : 1.0;
@@ -87,7 +93,7 @@ namespace MissileDisaster.Core
             return interval;
         }
 
-        /// <summary>probability を RefProbability で正規化し [ProbFactorMin, ProbFactorMax] にクランプ。</summary>
+        /// <summary>Normalises probability against RefProbability and clamps it to [ProbFactorMin, ProbFactorMax].</summary>
         public static double ProbabilityFactor(float probability)
         {
             double p = probability > 0f ? probability : 0.0;

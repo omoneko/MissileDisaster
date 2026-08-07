@@ -1,6 +1,6 @@
 namespace MissileDisaster.Core
 {
-    /// <summary>汚染グリッドの1セルへの適用量。Index=セル線形index、Intensity=汚染濃度(0-255)。UnityEngine 非依存。</summary>
+    /// <summary>What to apply to one cell of the pollution grid: Index is the cell's linear index and Intensity is the contamination level (0-255). No UnityEngine dependency.</summary>
     public struct CellDose
     {
         public int Index;

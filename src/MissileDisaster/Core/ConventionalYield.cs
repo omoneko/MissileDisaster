@@ -3,15 +3,18 @@ using System;
 namespace MissileDisaster.Core
 {
     /// <summary>
-    /// 非核弾頭の装薬量(kg TNT)から効果半径のスケール係数を求める。UnityEngine 非依存・純粋。
-    /// 爆風半径 ∝ 装薬量^(1/3)。基準1000kg(=各非核弾頭の既定スペック)に対し Multiplier = cbrt(kg/1000)。
-    /// 通常弾/クラスター/白リン/サーモバリックの各既定値を、選んだ出力で相対スケールする。
+    /// Turns the charge of a non-nuclear warhead, in kg of TNT, into a scale factor for its
+    /// effect radii. Pure, with no UnityEngine dependency.
+    /// The blast radius goes as the cube root of the charge, so against the 1000 kg baseline -
+    /// the default spec of every non-nuclear warhead - the multiplier is cbrt(kg/1000).
+    /// The defaults for the high-explosive, cluster, white phosphorus and thermobaric warheads
+    /// are all scaled relative to the chosen yield this way.
     /// </summary>
     public static class ConventionalYields
     {
-        public const int ReferenceKilograms = 1000; // 基準 1t TNT（既定スペック相当）
+        public const int ReferenceKilograms = 1000; // the 1 t TNT baseline, equal to the default spec
 
-        /// <summary>kg TNT からスケール係数（爆風半径の相対比）を返す。0以下は0。</summary>
+        /// <summary>The scale factor - the blast radius relative to the baseline - for a charge in kg of TNT. Zero or less gives 0.</summary>
         public static float Multiplier(int kilograms)
         {
             if (kilograms <= 0) return 0f;

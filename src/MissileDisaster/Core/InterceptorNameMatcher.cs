@@ -3,19 +3,23 @@ using System;
 namespace MissileDisaster.Core
 {
     /// <summary>
-    /// 設置された建物の名称から、迎撃施設(PAC3/THAAD/Aegis)か支援施設(レーダーサイト)かを
-    /// キーワードで判定する純粋ロジック。UnityEngine 非依存。
-    /// NuclearMeltdown.Core.NuclearNameMatcher と同一パターン（大文字小文字無視、Workshop風の
-    /// "12345.PAC3_Data" のような接頭辞/接尾辞付き名称にも部分一致で対応）。
+    /// Works out from a building's name whether it is an interceptor site (PAC3, THAAD or
+    /// Aegis) or a supporting radar site. Pure, with no UnityEngine dependency.
+    /// It follows the same pattern as NuclearMeltdown.Core.NuclearNameMatcher: case-insensitive
+    /// substring matching, so Workshop-style names carrying a prefix or suffix - like
+    /// "12345.PAC3_Data" - still match.
     /// </summary>
     public static class InterceptorNameMatcher
     {
-        public static readonly string[] AegisKeywords = { "Aegis", "イージス" };
+        // The second keyword is Japanese for "Aegis". Kept as matching data, not prose:
+        // Workshop authors name assets in their own language.
+        public static readonly string[] AegisKeywords = { "Aegis", "\u30a4\u30fc\u30b8\u30b9" };
         public static readonly string[] ThaadKeywords = { "THAAD" };
         public static readonly string[] Pac3Keywords = { "PAC3" };
-        public static readonly string[] RadarKeywords = { "Radar", "レーダー" };
+        // The second keyword is Japanese for "radar", kept for the same reason.
+        public static readonly string[] RadarKeywords = { "Radar", "\u30ec\u30fc\u30c0\u30fc" };
 
-        /// <summary>建物名が迎撃施設(PAC3/THAAD/Aegis)ならその迎撃層を返す。判定順序: Aegis→THAAD→PAC3。</summary>
+        /// <summary>The interception layer for an interceptor site's name, tested as Aegis, then THAAD, then PAC3.</summary>
         public static bool TryMatchTier(string buildingName, out InterceptorKind kind)
         {
             kind = InterceptorKind.Pac;
@@ -27,7 +31,7 @@ namespace MissileDisaster.Core
             return false;
         }
 
-        /// <summary>建物名がレーダーサイト(支援施設)を示すか。</summary>
+        /// <summary>Whether the name identifies a radar site, which is a supporting facility.</summary>
         public static bool IsRadar(string buildingName)
         {
             return Contains(buildingName, RadarKeywords);

@@ -2,7 +2,7 @@ using System;
 
 namespace MissileDisaster.Core
 {
-    /// <summary>汚染ゾーンの時間経過による消滅判定（ゲーム内時刻ベース）。UnityEngine 非依存。</summary>
+    /// <summary>Decides when a contamination zone has aged out, based on in-game time. No UnityEngine dependency.</summary>
     public static class ContaminationClock
     {
         public static bool HasExpired(long startTicks, long nowTicks, int years)

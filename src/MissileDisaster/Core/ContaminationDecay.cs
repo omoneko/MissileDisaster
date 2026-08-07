@@ -3,15 +3,17 @@ using System;
 namespace MissileDisaster.Core
 {
     /// <summary>
-    /// 除染施設による汚染濃度の減衰計算（純粋・UnityEngine 非依存）。
-    /// ゲーム内 1 か月あたり monthlyFraction（例 0.05=5%）を相対的に除去する。
-    /// 濃度は float で保持して減衰係数を掛け続けることで、微小な間隔でも端数が失われず着実に減衰する。
+    /// Works out how far a decontamination facility lowers the contamination. Pure, with no
+    /// UnityEngine dependency.
+    /// It removes monthlyFraction of what remains per in-game month - 0.05 being 5%.
+    /// Keeping the intensity as a float and repeatedly multiplying by the decay factor means
+    /// even very short intervals lose nothing to rounding, so the decay stays steady.
     /// </summary>
     public static class ContaminationDecay
     {
-        private static readonly long TicksPerMonth = TimeSpan.FromDays(30).Ticks; // ゲーム内1か月=30日相当
+        private static readonly long TicksPerMonth = TimeSpan.FromDays(30).Ticks; // an in-game month is 30 days
 
-        /// <summary>start→end のゲーム内経過を「月」で返す（end&lt;=start は0）。</summary>
+        /// <summary>The in-game time from start to end, in months. Returns 0 when end is at or before start.</summary>
         public static double MonthsBetween(long startTicks, long endTicks)
         {
             if (endTicks <= startTicks) return 0.0;
@@ -19,8 +21,9 @@ namespace MissileDisaster.Core
         }
 
         /// <summary>
-        /// deltaMonths 分の相対減衰係数 (1-monthlyFraction)^deltaMonths を返す（0..1）。
-        /// deltaMonths&lt;=0 や monthlyFraction&lt;=0 は 1（減衰なし）。現在濃度に掛けて使う。
+        /// The decay factor over deltaMonths, (1-monthlyFraction)^deltaMonths, in 0..1.
+        /// A deltaMonths or monthlyFraction of zero or less gives 1, meaning no decay.
+        /// Multiply the current intensity by this.
         /// </summary>
         public static double DecayFactor(double deltaMonths, double monthlyFraction)
         {
