@@ -5,7 +5,8 @@ types at any location — and defend against them. Nuclear strikes leave realist
 radioactive fallout that you can clean up with a dedicated decontamination facility.
 
 > Base game only (no DLC required). If the **Natural Disasters** DLC is present, the vanilla
-> meteor impact effect is used for explosions; otherwise a built‑in particle fireball is used.
+> meteor impact effect is used for the explosion flash; otherwise a built‑in particle fireball is
+> used. The nuclear mushroom cloud is always the mod's own, so its size can be tied to the blast.
 
 ## Features
 

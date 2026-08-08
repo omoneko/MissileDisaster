@@ -1,33 +1,55 @@
+using System;
+
 namespace MissileDisaster.Core
 {
     /// <summary>
-    /// Turns a warhead spec into the scale factor its explosion effect is played at, so that the
-    /// fireball on screen matches the yield instead of looking the same at every charge. Pure,
-    /// with no UnityEngine dependency.
-    /// The effect radii have already been scaled by the yield when this is called, so the scale
-    /// factor follows the same cube-root law they do: doubling the radius doubles the fireball.
-    /// The clamps are wide enough that the whole practical range of yields moves the size, and
-    /// the ceilings exist to stop an extreme yield asking for an effect the size of the map.
+    /// Works out how the game's own explosion effect should be dispatched so that what appears on
+    /// screen matches the yield. Pure, with no UnityEngine dependency.
+    ///
+    /// The important part is what the two dispatch arguments actually do, which was read out of
+    /// the base game's IL rather than guessed at:
+    ///
+    ///   ParticleEffect.RenderEffect  particlesPerSquare = timeDelta * magnitude * 0.01
+    ///   ParticleEffect.EmitParticles count = max(100, PI*r*r) * particlesPerSquare
+    ///                                and each particle is placed uniformly inside a disc of
+    ///                                radius r, taken from the SpawnArea
+    ///
+    /// So EffectManager.DispatchEffect's magnitude is a particle *density*, not a size: raising it
+    /// packs more particles into the same place, and with a SpawnArea radius of zero the area is
+    /// floored at 100 m^2, which is why an effect dispatched that way looks identical at every
+    /// yield no matter how large the magnitude is. The radius of the SpawnArea is the only
+    /// argument that makes the effect physically bigger. (Per-particle size lives in the effect
+    /// prefab itself and can only be changed by modifying a shared game asset.)
+    ///
+    /// For reference, MeteorAI dispatches its own impact with radius 0 and magnitude 1, so the
+    /// magnitudes here stay within a small factor of 1 - other parts of the same effect, such as
+    /// LightEffect's brightness, are multiplied by it too.
     /// </summary>
     public static class ExplosionScale
     {
-        // A single detonation - conventional or thermobaric. The reference radius is what a
-        // scale of 1 corresponds to; the 1 t conventional default lands near 1.8.
-        public const float SingleReferenceRadius = 40f;
-        public const float SingleMin = 0.5f;
-        public const float SingleMax = 14f;
+        // The two constants the emitted count is built from, straight out of the IL above.
+        public const float EmitAreaFloor = 100f;   // max(100, PI*r*r)
+        public const float DensityPerMagnitude = 0.01f;
 
-        // One submunition of a scattering warhead. There are ten or more of them, so each is
-        // played smaller than a single detonation of the same radius.
-        public const float SubmunitionReferenceRadius = 24f;
-        public const float SubmunitionMin = 0.4f;
-        public const float SubmunitionMax = 5f;
+        // The spawn disc against what the warhead does. Half the visual radius reads as a
+        // fireball filling the heart of the blast rather than the whole damaged area.
+        public const float SpawnRadiusFraction = 0.5f;
+        public const float SpawnRadiusMin = 8f;
+        // Ceiling on the disc. The count goes with its area, so this is what keeps a strategic
+        // warhead from asking for hundreds of thousands of particles a second.
+        public const float SpawnRadiusMax = 250f;
 
-        // The single very large nuclear effect. The floor keeps even a sub-kiloton device
-        // looking nuclear.
-        public const float NuclearReferenceRadius = 60f;
-        public const float NuclearMin = 12f;
-        public const float NuclearMax = 140f;
+        // Particle budgets, in particles per second, that the magnitude is solved for. The single
+        // figure is set so that a disc at SpawnRadiusMax still solves to a magnitude above
+        // MagnitudeMin - that is, so the clamp never quietly pushes the emission over budget.
+        public const float SingleParticlesPerSecond = 1000f;
+        public const float SubmunitionParticlesPerSecond = 250f; // there are ten or more of these at once
+        public const float NuclearParticlesPerSecond = 1200f;
+
+        // Bounds on the magnitude. The base game uses 1; straying far from it would leave the
+        // light flash either invisible or blinding.
+        public const float MagnitudeMin = 0.5f;
+        public const float MagnitudeMax = 8f;
 
         /// <summary>
         /// The radius the visible explosion should read as, in metres: the widest of what the
@@ -45,22 +67,37 @@ namespace MissileDisaster.Core
             return r < 0f ? 0f : r;
         }
 
-        /// <summary>The scale for a single detonation, conventional or thermobaric.</summary>
-        public static float ForSingle(WarheadSpec spec)
+        /// <summary>The radius of the disc the effect's particles are spawned over - the one argument that makes the explosion physically larger.</summary>
+        public static float SpawnRadius(float visualRadius)
         {
-            return Clamp(VisualRadius(spec) / SingleReferenceRadius, SingleMin, SingleMax);
+            return Clamp(visualRadius * SpawnRadiusFraction, SpawnRadiusMin, SpawnRadiusMax);
         }
 
-        /// <summary>The scale for one submunition of a scattering warhead - cluster or white phosphorus.</summary>
-        public static float ForSubmunition(WarheadSpec spec)
+        /// <summary>Convenience: the spawn radius for a whole warhead.</summary>
+        public static float SpawnRadius(WarheadSpec spec)
         {
-            return Clamp(VisualRadius(spec) / SubmunitionReferenceRadius, SubmunitionMin, SubmunitionMax);
+            return SpawnRadius(VisualRadius(spec));
         }
 
-        /// <summary>The scale for a nuclear detonation, whose effect is played very much larger than any other.</summary>
-        public static float ForNuclear(WarheadSpec spec)
+        /// <summary>
+        /// The magnitude to dispatch with, solved from the count formula so that a disc of this
+        /// radius emits roughly particlesPerSecond however large it is. A bigger explosion
+        /// therefore covers more ground at a steady density instead of piling particles onto one
+        /// spot.
+        /// </summary>
+        public static float Magnitude(float spawnRadius, float particlesPerSecond)
         {
-            return Clamp(VisualRadius(spec) / NuclearReferenceRadius, NuclearMin, NuclearMax);
+            float area = (float)(Math.PI * spawnRadius * spawnRadius);
+            if (area < EmitAreaFloor) area = EmitAreaFloor;
+            return Clamp(particlesPerSecond / (area * DensityPerMagnitude), MagnitudeMin, MagnitudeMax);
+        }
+
+        /// <summary>The particles a second a disc of this radius actually emits at this magnitude. Used to keep the budget honest in tests.</summary>
+        public static float ParticlesPerSecond(float spawnRadius, float magnitude)
+        {
+            float area = (float)(Math.PI * spawnRadius * spawnRadius);
+            if (area < EmitAreaFloor) area = EmitAreaFloor;
+            return area * magnitude * DensityPerMagnitude;
         }
 
         private static float Clamp(float value, float min, float max)

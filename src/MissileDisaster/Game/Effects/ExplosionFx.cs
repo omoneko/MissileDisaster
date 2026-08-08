@@ -6,15 +6,16 @@ using UnityEngine;
 namespace MissileDisaster.Game.Effects
 {
     /// <summary>
-    /// Plays the game's meteor impact effect on impact, scaled to the size of the explosion.
-    /// Main thread only, called from the impact side of MissileManager.UpdateVisual.
-    /// The larger the explosion, the more copies of the effect are scattered across the
-    /// destruction radius, so it reads as an area rather than a point. A scattering warhead
-    /// fires one per submunition.
-    /// Without the meteor effect - that is, without the Natural Disasters DLC - it falls back to
-    /// a simple particle fireball.
+    /// Plays the game's meteor impact effect on impact, sized to the yield. Main thread only,
+    /// called from the impact side of MissileManager.UpdateVisual. A scattering warhead fires one
+    /// per submunition. Without the meteor effect - that is, without the Natural Disasters DLC -
+    /// it falls back to this mod's own particle fireball.
     /// It dispatches through EffectManager the same way NuclearMeltdown.Game.MeltdownEffect
-    /// does.
+    /// does, but the size comes from the SpawnArea's radius rather than from the magnitude: see
+    /// MissileDisaster.Core.ExplosionScale for why the magnitude cannot do it.
+    /// The nuclear mushroom cloud is always this mod's own NuclearMushroomFx, with or without the
+    /// DLC, because it is the only one whose canopy can be built to the destruction radius; the
+    /// vanilla effect is used for the flash at the point the warhead went off.
     /// </summary>
     public static class ExplosionFx
     {
@@ -43,24 +44,22 @@ namespace MissileDisaster.Game.Effects
 
                 if (spec.Type == WarheadType.Nuclear)
                 {
+                    // The cloud is always this mod's own, raised from ground zero with a canopy as
+                    // wide as the destruction radius. The vanilla effect cannot be stretched to
+                    // kilometres, so it is not asked to be the cloud.
+                    NuclearMushroomFx.Play(groundZero, spec.DestructionRadius);
+                    // The flash goes where the warhead actually went off - up in the air for an
+                    // airburst - and is the size of the fireball, not of the destruction.
+                    float fireball = spec.DestructionRadius * NuclearFireballFraction;
                     if (effect != null)
                     {
-                        // With the DLC: the meteor impact effect, that large mushroom-shaped
-                        // cloud, scaled with the destruction radius. It is a cloud, so it belongs
-                        // at ground zero even when the warhead burst high above it.
-                        Dispatch(effect, groundZero, ExplosionScale.ForNuclear(spec));
+                        Dispatch(effect, center, fireball, ExplosionScale.NuclearParticlesPerSecond);
                     }
-                    else
+                    else if (spec.Airburst)
                     {
-                        // Without it: this mod's own mushroom cloud, raised from ground zero with
-                        // a canopy as wide as the destruction radius.
-                        NuclearMushroomFx.Play(groundZero, spec.DestructionRadius);
-                    }
-                    // An airburst still needs its fireball where it actually went off - the cloud
-                    // below it is the only part that belongs on the ground.
-                    if (spec.Airburst)
-                    {
-                        ExplosionFallback.Play(center, spec.DestructionRadius * NuclearFireballFraction);
+                        // Without the DLC a groundburst already has the cloud's own fireball at
+                        // this point, so only an airburst needs one adding in the air.
+                        ExplosionFallback.Play(center, fireball);
                     }
                     return;
                 }
@@ -75,17 +74,17 @@ namespace MissileDisaster.Game.Effects
                 {
                     // Scattering warhead: a smaller effect at each submunition point.
                     Offset2[] offs = SubmunitionScatter.Offsets(spec.SubmunitionCount, spec.SpreadRadius);
-                    float s = ExplosionScale.ForSubmunition(spec);
                     for (int i = 0; i < offs.Length; i++)
                     {
-                        Dispatch(effect, new Vector3(center.x + offs[i].X, center.y, center.z + offs[i].Z), s);
+                        Dispatch(effect, new Vector3(center.x + offs[i].X, center.y, center.z + offs[i].Z),
+                            radius, ExplosionScale.SubmunitionParticlesPerSecond);
                     }
                     return;
                 }
 
                 // A single detonation, conventional or thermobaric: one explosion at the
-                // detonation point, scaled with the yield.
-                Dispatch(effect, center, ExplosionScale.ForSingle(spec));
+                // detonation point, sized to the yield.
+                Dispatch(effect, center, radius, ExplosionScale.SingleParticlesPerSecond);
             }
             catch (Exception e)
             {
@@ -93,11 +92,18 @@ namespace MissileDisaster.Game.Effects
             }
         }
 
-        private static void Dispatch(EffectInfo effect, Vector3 pos, float scale)
+        /// <summary>
+        /// Dispatches the vanilla effect so that it covers visualRadius on the ground. The disc
+        /// the particles are spawned over is what makes the effect large; the magnitude is solved
+        /// from it to hold the emission near a fixed particle budget, since it is a density.
+        /// </summary>
+        private static void Dispatch(EffectInfo effect, Vector3 pos, float visualRadius, float particlesPerSecond)
         {
-            var area = new EffectInfo.SpawnArea(pos, Vector3.up, 0f);
+            float spawnRadius = ExplosionScale.SpawnRadius(visualRadius);
+            float magnitude = ExplosionScale.Magnitude(spawnRadius, particlesPerSecond);
+            var area = new EffectInfo.SpawnArea(pos, Vector3.up, spawnRadius);
             Singleton<EffectManager>.instance.DispatchEffect(
-                effect, default(InstanceID), area, Vector3.zero, 0f, scale,
+                effect, default(InstanceID), area, Vector3.zero, 0f, magnitude,
                 Singleton<VehicleManager>.instance.m_audioGroup);
         }
 

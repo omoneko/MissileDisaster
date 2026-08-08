@@ -14,11 +14,11 @@ public class ExplosionScaleTests
     }
 
     [Fact]
-    public void A_heavier_charge_makes_a_bigger_explosion()
+    public void A_heavier_charge_covers_more_ground()
     {
-        float small = ExplosionScale.ForSingle(Conventional(100));
-        float baseline = ExplosionScale.ForSingle(Conventional(1000));
-        float large = ExplosionScale.ForSingle(Conventional(10000));
+        float small = ExplosionScale.SpawnRadius(Conventional(100));
+        float baseline = ExplosionScale.SpawnRadius(Conventional(1000));
+        float large = ExplosionScale.SpawnRadius(Conventional(10000));
         Assert.True(small < baseline, "100 kg is smaller than the 1 t baseline");
         Assert.True(baseline < large, "10 t is larger than the 1 t baseline");
     }
@@ -28,9 +28,9 @@ public class ExplosionScaleTests
     {
         // The point of the mapping: no two ordinary charges look the same. 1.5 t against 20 t is
         // the comparison the calibration was written around.
-        Assert.True(ExplosionScale.ForSingle(Conventional(20000)) >
-                    ExplosionScale.ForSingle(Conventional(1500)) * 2f,
-            "a 20 t warhead explodes visibly larger than a 1.5 t one");
+        Assert.True(ExplosionScale.SpawnRadius(Conventional(20000)) >
+                    ExplosionScale.SpawnRadius(Conventional(1500)) * 2f,
+            "a 20 t warhead explodes over visibly more ground than a 1.5 t one");
     }
 
     [Fact]
@@ -38,41 +38,24 @@ public class ExplosionScaleTests
     {
         // White phosphorus has a fixed destruction radius, so the fireball has to follow the
         // burn radius instead - otherwise every charge would look identical.
-        float baseline = ExplosionScale.ForSubmunition(Phosphorus(1000));
-        float large = ExplosionScale.ForSubmunition(Phosphorus(8000));
-        Assert.True(large > baseline * 1.5f, "a heavier incendiary charge burns visibly larger");
+        float baseline = ExplosionScale.SpawnRadius(Phosphorus(1000));
+        float large = ExplosionScale.SpawnRadius(Phosphorus(8000));
+        Assert.True(large > baseline * 1.5f, "a heavier incendiary charge burns over visibly more ground");
     }
 
     [Fact]
-    public void Submunitions_are_played_smaller_than_a_single_detonation_of_the_same_size()
+    public void The_spawn_radius_is_clamped_at_both_ends()
     {
-        var cluster = WarheadSpec.For(WarheadType.Cluster);
-        Assert.True(ExplosionScale.ForSubmunition(cluster) < ExplosionScale.ForSingle(WarheadSpec.For(WarheadType.Conventional)),
-            "one bomblet is smaller than a whole conventional warhead");
+        Assert.Equal(ExplosionScale.SpawnRadiusMin, ExplosionScale.SpawnRadius(Conventional(1)), 3);
+        Assert.Equal(ExplosionScale.SpawnRadiusMax, ExplosionScale.SpawnRadius(Conventional(100000000)), 3);
     }
 
     [Fact]
-    public void Nuclear_dwarfs_every_conventional_explosion()
-    {
-        float nuke = ExplosionScale.ForNuclear(WarheadSpec.For(WarheadType.Nuclear));
-        Assert.True(nuke > ExplosionScale.SingleMax, "even the largest conventional fireball is far smaller");
-    }
-
-    [Fact]
-    public void The_scale_is_clamped_at_both_ends()
-    {
-        Assert.Equal(ExplosionScale.SingleMin, ExplosionScale.ForSingle(Conventional(1)), 3);
-        Assert.Equal(ExplosionScale.SingleMax, ExplosionScale.ForSingle(Conventional(100000000)), 3);
-        Assert.Equal(ExplosionScale.NuclearMax, ExplosionScale.ForNuclear(
-            WarheadSpec.For(WarheadType.Nuclear).Scaled(NuclearYields.Multiplier(50000))), 3);
-    }
-
-    [Fact]
-    public void A_zero_charge_never_returns_a_negative_scale()
+    public void A_zero_charge_never_returns_a_negative_radius()
     {
         var dud = WarheadSpec.For(WarheadType.Conventional).Scaled(0f);
         Assert.Equal(0f, ExplosionScale.VisualRadius(dud), 3);
-        Assert.Equal(ExplosionScale.SingleMin, ExplosionScale.ForSingle(dud), 3);
+        Assert.Equal(ExplosionScale.SpawnRadiusMin, ExplosionScale.SpawnRadius(dud), 3);
     }
 
     [Fact]
@@ -84,5 +67,54 @@ public class ExplosionScaleTests
         // White phosphorus barely destroys anything, so its fires lead instead.
         var wp = WarheadSpec.For(WarheadType.WhitePhosphorus);
         Assert.Equal(wp.BurnRadius * 0.5f, ExplosionScale.VisualRadius(wp), 3);
+    }
+
+    // ---- the magnitude, which the base game's IL says is a density and not a size ----
+
+    [Fact]
+    public void The_magnitude_holds_the_particle_budget_whatever_the_size()
+    {
+        // A bigger explosion must spread the same rate of particles over more ground rather than
+        // pile more of them onto one spot, or it stops being affordable.
+        foreach (int kg in new[] { 100, 1000, 5000, 50000, 1000000 })
+        {
+            float r = ExplosionScale.SpawnRadius(Conventional(kg));
+            float m = ExplosionScale.Magnitude(r, ExplosionScale.SingleParticlesPerSecond);
+            float actual = ExplosionScale.ParticlesPerSecond(r, m);
+            Assert.InRange(actual, 1f, ExplosionScale.SingleParticlesPerSecond * 1.01f);
+        }
+    }
+
+    [Fact]
+    public void A_larger_explosion_asks_for_a_lower_density()
+    {
+        float small = ExplosionScale.SpawnRadius(Conventional(100));
+        float large = ExplosionScale.SpawnRadius(Conventional(50000));
+        Assert.True(ExplosionScale.Magnitude(large, ExplosionScale.SingleParticlesPerSecond) <
+                    ExplosionScale.Magnitude(small, ExplosionScale.SingleParticlesPerSecond),
+            "spreading the same budget over more ground means fewer particles per square metre");
+    }
+
+    [Fact]
+    public void The_magnitude_stays_near_the_value_the_base_game_uses()
+    {
+        // MeteorAI dispatches its own impact with a magnitude of 1, and the same number scales
+        // the light flash, so anything wildly away from it would look wrong rather than big.
+        foreach (int kg in new[] { 1, 100, 1000, 20000, 1000000 })
+        {
+            float r = ExplosionScale.SpawnRadius(Conventional(kg));
+            Assert.InRange(ExplosionScale.Magnitude(r, ExplosionScale.SingleParticlesPerSecond),
+                ExplosionScale.MagnitudeMin, ExplosionScale.MagnitudeMax);
+        }
+    }
+
+    [Fact]
+    public void A_tiny_disc_is_charged_for_the_hundred_square_metre_floor()
+    {
+        // EmitParticles floors the area at 100 m^2, so a smaller disc emits no fewer particles.
+        Assert.Equal(ExplosionScale.ParticlesPerSecond(0f, 1f),
+                     ExplosionScale.ParticlesPerSecond(3f, 1f), 3);
+        Assert.Equal(ExplosionScale.EmitAreaFloor * ExplosionScale.DensityPerMagnitude,
+                     ExplosionScale.ParticlesPerSecond(0f, 1f), 3);
     }
 }
