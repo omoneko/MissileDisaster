@@ -226,6 +226,18 @@ public class WarheadSpecTests
     }
 
     [Fact]
+    public void An_airburst_goes_off_low_enough_to_stay_on_screen()
+    {
+        // The camera sits close over the city, so a detonation much above a kilometre is off the
+        // top of the screen and the player never sees it. ModConfig.MaxBurstAltitude enforces the
+        // same ceiling once the yield has scaled it.
+        foreach (WarheadType t in System.Enum.GetValues(typeof(WarheadType)))
+        {
+            Assert.InRange(WarheadSpec.For(t).BurstAltitude, 1f, 1000f);
+        }
+    }
+
+    [Fact]
     public void Nuclear_bursts_highest_and_thermobaric_lowest()
     {
         float nuke = WarheadSpec.For(WarheadType.Nuclear).BurstAltitude;

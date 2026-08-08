@@ -22,7 +22,11 @@ radioactive fallout that you can clean up with a dedicated decontamination facil
   - Ground burst: forms a crater and destroys roads/bridges/foundations; leaves radioactive fallout (nuclear)
   - Air burst: **detonates in mid‑air above the target** — the fireball hangs over the city, no
     crater is formed, the blast/fire reach wider, and roads / water pipes / metro / foundations
-    survive. Burst altitude follows the yield (≈60–300 m conventional, ~1.8 km for a 150 kt nuclear)
+    survive. Burst altitude follows the yield (≈30–150 m conventional, ~900 m for a 150 kt
+    nuclear) and is capped at 1 km so the explosion stays on screen
+  - The **mushroom cloud always rises from the ground**, even for an air burst, and its canopy is
+    built to the same width as the destruction radius — so the cloud shows you exactly how far
+    the blast reached
 - **Distance‑based destruction** — total destruction near ground zero, falling off with distance
 - **Fire** for incendiary/thermobaric/nuclear warheads
   - White Phosphorus is a pure incendiary: no crater and almost no blast **at any charge** —
@@ -49,8 +53,9 @@ subscribe/create building assets whose names contain these keywords:
 Build these anywhere; the mod picks them up automatically once completed.
 
 > Note: interceptors engage by altitude band (PAC‑3 0–800 m, THAAD 800–2500 m, Aegis above).
-> A **nuclear air burst** detonates around 1.8 km up, i.e. above PAC‑3's ceiling — terminal
-> point defense alone cannot stop one, so keep a higher layer if you expect them.
+> A **150 kt nuclear air burst** goes off at ~900 m, just above PAC‑3's ceiling, so terminal point
+> defense alone cannot stop one — keep a higher layer if you expect them. Smaller yields burst
+> lower and do come within PAC‑3's reach.
 
 ## How to use
 

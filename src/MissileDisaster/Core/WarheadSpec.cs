@@ -103,7 +103,7 @@ namespace MissileDisaster.Core
                         CraterRadius = 9.5f, CraterDepth = 3f, DestructionRadius = 18f,
                         SubmunitionCount = 10, SpreadRadius = 260f,
                         RaiseCraterEdges = false, BurnRadius = 12f, Contaminates = false,
-                        BurstAltitude = 300f,
+                        BurstAltitude = 150f,
                     };
                 case WarheadType.WhitePhosphorus:
                     // White phosphorus, an incendiary. The filler burns rather than detonating,
@@ -117,7 +117,7 @@ namespace MissileDisaster.Core
                         CraterRadius = 0f, CraterDepth = 0f, DestructionRadius = 6f,
                         SubmunitionCount = 14, SpreadRadius = 220f,
                         RaiseCraterEdges = false, BurnRadius = 70f, Contaminates = false,
-                        BurstAltitude = 250f, Incendiary = true,
+                        BurstAltitude = 125f, Incendiary = true,
                     };
                 case WarheadType.Thermobaric:
                     // Thermobaric, equivalent to a large fuel-air explosive: the overpressure
@@ -129,7 +129,7 @@ namespace MissileDisaster.Core
                         CraterRadius = 47f, CraterDepth = 9f, DestructionRadius = 180f,
                         SubmunitionCount = 1, SpreadRadius = 0f,
                         RaiseCraterEdges = true, BurnRadius = 220f, Contaminates = false,
-                        BurstAltitude = 60f,
+                        BurstAltitude = 30f,
                     };
                 case WarheadType.Nuclear:
                     // Nuclear, at the 150 kt baseline, using real groundburst radii: 3.7 km at
@@ -142,7 +142,7 @@ namespace MissileDisaster.Core
                         SubmunitionCount = 1, SpreadRadius = 0f,
                         RaiseCraterEdges = true, BurnRadius = 5850f,
                         Contaminates = true, ContaminationRadius = 5300f,
-                        BurstAltitude = 1800f, // roughly the optimum height of burst for 150 kt
+                        BurstAltitude = 900f, // half the optimum height of burst for 150 kt, so the fireball stays in shot
                     };
                 default: // Conventional: a large HE warhead of about 1 t
                     return new WarheadSpec
@@ -151,7 +151,7 @@ namespace MissileDisaster.Core
                         CraterRadius = 24f, CraterDepth = 6f, DestructionRadius = 72f,
                         SubmunitionCount = 1, SpreadRadius = 0f,
                         RaiseCraterEdges = false, BurnRadius = 40f, Contaminates = false,
-                        BurstAltitude = 80f,
+                        BurstAltitude = 40f,
                     };
             }
         }

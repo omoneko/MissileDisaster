@@ -18,11 +18,21 @@ namespace MissileDisaster.Game.Effects
     /// </summary>
     public static class ExplosionFx
     {
+        // The nuclear fireball against what the weapon destroys. At 150 kt the fireball is about
+        // 500 m across and the 5 psi contour 3.7 km, so the ball is roughly a seventh of it.
+        private const float NuclearFireballFraction = 0.15f;
+
         private static EffectInfo _meteorEffect;
         private static bool _searched;
 
-        /// <summary>Plays the explosion at the detonation point - on the ground for a groundburst, up at the burst altitude for an airburst. Main thread. A failure here does not stop the impact resolving.</summary>
-        public static void Play(Vector3 center, WarheadSpec spec)
+        /// <summary>
+        /// Plays the explosion. center is where the warhead actually went off - on the ground for
+        /// a groundburst, up at the burst altitude for an airburst - and groundZero is the spot
+        /// below it that takes the damage. The fireball goes where it detonated; a mushroom cloud
+        /// always rises from the ground, however high above it the warhead burst.
+        /// Main thread. A failure here does not stop the impact resolving.
+        /// </summary>
+        public static void Play(Vector3 center, Vector3 groundZero, WarheadSpec spec)
         {
             try
             {
@@ -36,15 +46,21 @@ namespace MissileDisaster.Game.Effects
                     if (effect != null)
                     {
                         // With the DLC: the meteor impact effect, that large mushroom-shaped
-                        // cloud, scaled with the destruction radius.
-                        Dispatch(effect, center, ExplosionScale.ForNuclear(spec));
+                        // cloud, scaled with the destruction radius. It is a cloud, so it belongs
+                        // at ground zero even when the warhead burst high above it.
+                        Dispatch(effect, groundZero, ExplosionScale.ForNuclear(spec));
                     }
                     else
                     {
-                        // Without it: this mod's own white mushroom cloud, scaled the same way,
-                        // which reproduces the lingering column and the canopy spreading out at
-                        // the top.
-                        NuclearMushroomFx.Play(center, radius);
+                        // Without it: this mod's own mushroom cloud, raised from ground zero with
+                        // a canopy as wide as the destruction radius.
+                        NuclearMushroomFx.Play(groundZero, spec.DestructionRadius);
+                    }
+                    // An airburst still needs its fireball where it actually went off - the cloud
+                    // below it is the only part that belongs on the ground.
+                    if (spec.Airburst)
+                    {
+                        ExplosionFallback.Play(center, spec.DestructionRadius * NuclearFireballFraction);
                     }
                     return;
                 }

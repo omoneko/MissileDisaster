@@ -134,10 +134,12 @@ namespace MissileDisaster.Game
         // plus a mushroom cloud. How large each one is played is worked out from the yield by
         // MissileDisaster.Core.ExplosionScale.
 
-        // Ceiling on how high above the target an airburst detonates. This is an engineering
-        // limit rather than a balance one: the descent is only interpolated from ApexAltitude, so
-        // a burst altitude approaching it would leave the missile no distance to fall.
-        public const float MaxBurstAltitude = 2000f;
+        // Ceiling on how high above the target an airburst detonates. Partly an engineering
+        // limit - the descent is only interpolated from ApexAltitude, so a burst altitude
+        // approaching it would leave the missile no distance to fall - and partly a playability
+        // one, since an explosion much higher than this is off the top of the screen at the zoom
+        // the game is normally played at.
+        public const float MaxBurstAltitude = 1000f;
 
         // Sound: loaded from Sounds at runtime and played as positional 3D audio. Main thread.
         public const string SoundsFolderName = "Sounds";
