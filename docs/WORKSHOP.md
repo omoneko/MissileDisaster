@@ -12,3 +12,7 @@ https://steamcommunity.com/sharedfiles/filedetails/?id=3765194357
 [h1]Source code[/h1]
 This mod is open source under the MIT licence. Bug reports and pull requests are welcome:
 [url=https://github.com/omoneko/MissileDisaster]github.com/omoneko/MissileDisaster[/url]
+
+[h1]Support[/h1]
+If you enjoy the mod, you can support development here:
+https://ko-fi.com/omoneko
