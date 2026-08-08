@@ -84,8 +84,11 @@ namespace MissileDisaster.Game
                     // explosion. Only one that got through gets both.
                     if (!m.Doomed)
                     {
-                        ExplosionFx.Play(m.Target, m.Spec); // the impact effect, scaled with the yield. Main thread.
-                        PlayImpactSound(m.Target, m.Spec);  // the blast; a nuclear one is twice as loud
+                        // The explosion and its sound go where the warhead actually detonates -
+                        // up in the air for an airburst - while the damage below is always
+                        // applied at the target on the ground.
+                        ExplosionFx.Play(m.DetonationPosition, m.Spec); // the impact effect, scaled with the yield. Main thread.
+                        PlayImpactSound(m.DetonationPosition, m.Spec);  // the blast; a nuclear one is twice as loud
                         // Publish the nuclear impact to the loosely coupled beacon, which is
                         // what lets Alien Invasion topple a tripod caught in a direct hit.
                         if (m.Spec.Type == WarheadType.Nuclear)

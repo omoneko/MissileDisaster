@@ -131,9 +131,13 @@ namespace MissileDisaster.Game
         // Impact explosion, borrowing the game's meteor impact effect and dispatched on the
         // main thread. A conventional or thermobaric warhead gets a single effect, a scattering
         // warhead gets one per submunition, and a nuclear warhead gets a single very large one
-        // plus a mushroom cloud.
-        public const float ExplosionBloomScaleMax = 7f;   // largest scale per non-nuclear detonation; deliberately modest
-        public const float NuclearExplosionScaleMax = 140f; // largest scale for the single nuclear effect
+        // plus a mushroom cloud. How large each one is played is worked out from the yield by
+        // MissileDisaster.Core.ExplosionScale.
+
+        // Ceiling on how high above the target an airburst detonates. This is an engineering
+        // limit rather than a balance one: the descent is only interpolated from ApexAltitude, so
+        // a burst altitude approaching it would leave the missile no distance to fall.
+        public const float MaxBurstAltitude = 2000f;
 
         // Sound: loaded from Sounds at runtime and played as positional 3D audio. Main thread.
         public const string SoundsFolderName = "Sounds";

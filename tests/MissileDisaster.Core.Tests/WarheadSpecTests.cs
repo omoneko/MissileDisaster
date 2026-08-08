@@ -157,7 +157,105 @@ public class WarheadSpecTests
     public void WhitePhosphorus_is_incendiary_burn_exceeds_destruction()
     {
         var wp = WarheadSpec.For(WarheadType.WhitePhosphorus);
-        Assert.True(wp.BurnRadius > wp.DestructionRadius, "an incendiary burns further than it destroys");
+        Assert.True(wp.Incendiary, "white phosphorus is the incendiary warhead");
+        Assert.True(wp.BurnRadius > wp.DestructionRadius * 5f, "an incendiary burns far further than it destroys");
+    }
+
+    [Fact]
+    public void WhitePhosphorus_leaves_no_crater_and_is_the_only_incendiary()
+    {
+        var wp = WarheadSpec.For(WarheadType.WhitePhosphorus);
+        Assert.Equal(0f, wp.CraterRadius, 3);
+        Assert.Equal(0f, wp.CraterDepth, 3);
+        foreach (WarheadType t in new[] { WarheadType.Conventional, WarheadType.Cluster,
+            WarheadType.Thermobaric, WarheadType.Nuclear })
+        {
+            Assert.False(WarheadSpec.For(t).Incendiary, $"{t} is not an incendiary");
+        }
+    }
+
+    [Fact]
+    public void An_incendiary_charge_grows_the_fires_but_not_the_blast()
+    {
+        var wp = WarheadSpec.For(WarheadType.WhitePhosphorus);
+        var heavy = wp.Scaled(4f); // a charge 64 times the reference, by the cube-root law
+        Assert.Equal(wp.DestructionRadius, heavy.DestructionRadius, 3);
+        Assert.Equal(wp.CraterRadius, heavy.CraterRadius, 3);
+        Assert.Equal(wp.CraterDepth, heavy.CraterDepth, 3);
+        Assert.Equal(wp.BurnRadius * 4f, heavy.BurnRadius, 3);
+    }
+
+    [Fact]
+    public void A_conventional_charge_grows_the_blast_as_well()
+    {
+        var conv = WarheadSpec.For(WarheadType.Conventional);
+        var heavy = conv.Scaled(4f);
+        Assert.Equal(conv.DestructionRadius * 4f, heavy.DestructionRadius, 3);
+        Assert.Equal(conv.CraterRadius * 4f, heavy.CraterRadius, 3);
+    }
+
+    [Fact]
+    public void A_1500kg_crater_is_as_wide_as_20000kg_used_to_dig()
+    {
+        // The calibration asked for: the crater of a 1.5 t warhead now matches what a 20 t one
+        // dug against the old 10 m baseline, so a single warhead scars the ground plainly.
+        float now = WarheadSpec.For(WarheadType.Conventional)
+            .Scaled(ConventionalYields.Multiplier(1500)).CraterRadius;
+        float before = 10f * ConventionalYields.Multiplier(20000);
+        Assert.InRange(now, before * 0.95f, before * 1.05f);
+    }
+
+    [Fact]
+    public void A_1500kg_warhead_does_not_level_a_whole_block()
+    {
+        // Its destruction radius stays under 100 m - about one city block across - while the
+        // crater it leaves is a good deal wider than it used to be.
+        var s = WarheadSpec.For(WarheadType.Conventional).Scaled(ConventionalYields.Multiplier(1500));
+        Assert.InRange(s.DestructionRadius, 60f, 100f);
+        Assert.True(s.CraterRadius > 20f, "the crater is plainly visible");
+    }
+
+    [Fact]
+    public void Every_warhead_has_a_burst_altitude_to_detonate_at()
+    {
+        foreach (WarheadType t in System.Enum.GetValues(typeof(WarheadType)))
+        {
+            Assert.True(WarheadSpec.For(t).BurstAltitude > 0f, $"{t} has an airburst altitude");
+            Assert.False(WarheadSpec.For(t).Airburst, "the base spec is not yet fused either way");
+        }
+    }
+
+    [Fact]
+    public void Nuclear_bursts_highest_and_thermobaric_lowest()
+    {
+        float nuke = WarheadSpec.For(WarheadType.Nuclear).BurstAltitude;
+        float thermo = WarheadSpec.For(WarheadType.Thermobaric).BurstAltitude;
+        float conv = WarheadSpec.For(WarheadType.Conventional).BurstAltitude;
+        Assert.True(nuke > conv * 10f, "a nuclear airburst goes off a kilometre or more up");
+        Assert.True(thermo < conv, "a thermobaric fuel cloud is ignited just above the rooftops");
+    }
+
+    [Fact]
+    public void Airburst_detonates_above_the_target_and_groundburst_on_it()
+    {
+        var s = WarheadSpec.For(WarheadType.Nuclear);
+        var air = s.WithBurst(BurstType.Airburst);
+        Assert.True(air.Airburst);
+        Assert.Equal(s.BurstAltitude, air.BurstAltitude, 3);
+
+        var ground = s.WithBurst(BurstType.Groundburst);
+        Assert.False(ground.Airburst);
+        Assert.Equal(0f, ground.BurstAltitude, 3);
+    }
+
+    [Fact]
+    public void Burst_altitude_follows_the_yield_like_the_radii()
+    {
+        var s = WarheadSpec.For(WarheadType.Nuclear);
+        Assert.Equal(s.BurstAltitude * 2f, s.Scaled(2f).BurstAltitude, 3);
+        // An incendiary keeps its blast fixed, but the height it is fused at still scales.
+        var wp = WarheadSpec.For(WarheadType.WhitePhosphorus);
+        Assert.Equal(wp.BurstAltitude * 2f, wp.Scaled(2f).BurstAltitude, 3);
     }
 
     [Fact]

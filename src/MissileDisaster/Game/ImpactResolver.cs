@@ -14,7 +14,7 @@ namespace MissileDisaster.Game
             if (spec.SubmunitionCount <= 1)
             {
                 // A single detonation: conventional, thermobaric or nuclear.
-                ApplyBlast(target, spec.CraterRadius, spec.CraterDepth, spec.DestructionRadius, spec.BurnRadius, spec.RaiseCraterEdges);
+                ApplyBlast(target, spec);
             }
             else
             {
@@ -24,7 +24,7 @@ namespace MissileDisaster.Game
                 for (int i = 0; i < offsets.Length; i++)
                 {
                     Vector3 p = new Vector3(target.x + offsets[i].X, target.y, target.z + offsets[i].Z);
-                    ApplyBlast(p, spec.CraterRadius, spec.CraterDepth, spec.DestructionRadius, spec.BurnRadius, spec.RaiseCraterEdges);
+                    ApplyBlast(p, spec);
                 }
             }
 
@@ -40,21 +40,20 @@ namespace MissileDisaster.Game
             ModConfig.Log("Impact resolved: " + spec.Type + " x" + spec.SubmunitionCount + " at " + target);
         }
 
-        /// <summary>Applies one detonation's crater, area destruction and fires. Simulation thread.</summary>
-        private static void ApplyBlast(Vector3 pos, float craterRadius, float craterDepth,
-            float destructionRadius, float burnRadius, bool raiseEdges)
+        /// <summary>Applies one detonation's crater, area destruction and fires, always on the ground below the warhead. Simulation thread.</summary>
+        private static void ApplyBlast(Vector3 pos, WarheadSpec spec)
         {
-            // WithBurst sets craterRadius to 0 for an airburst, which is how ground and air
-            // bursts are told apart here.
-            bool groundburst = craterRadius > 0f;
+            // A warhead digs a crater only if it goes off on the ground and has the punch to
+            // move earth at all - an incendiary such as white phosphorus does not.
+            bool craters = !spec.Airburst && spec.CraterRadius > 0f;
 
-            // Only a groundburst leaves a crater, dug with the game's own MakeCrater. It is
-            // capped so that even a strategic warhead does not wreck the terrain.
-            if (groundburst)
+            // The crater is dug with the game's own MakeCrater, capped so that even a strategic
+            // warhead does not wreck the terrain.
+            float cRadius = spec.CraterRadius > ModConfig.CraterRadiusMax ? ModConfig.CraterRadiusMax : spec.CraterRadius;
+            if (craters)
             {
-                float cRadius = craterRadius > ModConfig.CraterRadiusMax ? ModConfig.CraterRadiusMax : craterRadius;
-                float cDepth = craterDepth > ModConfig.CraterDepthMax ? ModConfig.CraterDepthMax : craterDepth;
-                DisasterHelpers.MakeCrater(new Vector2(pos.x, pos.z), cRadius, cDepth, raiseEdges);
+                float cDepth = spec.CraterDepth > ModConfig.CraterDepthMax ? ModConfig.CraterDepthMax : spec.CraterDepth;
+                DisasterHelpers.MakeCrater(new Vector2(pos.x, pos.z), cRadius, cDepth, spec.RaiseCraterEdges);
             }
 
             // Area destruction and fires. The last two arguments to DestroyStuff, burnMin and
@@ -65,19 +64,24 @@ namespace MissileDisaster.Game
             int seed = (int)SimulationManager.instance.m_randomizer.Int32(1000000u);
             // A high-yield warhead's real radii exceed the map, so they are capped to keep
             // DestroyStuff from an extreme scan.
-            float destMax = destructionRadius > ModConfig.MaxEffectRadius ? ModConfig.MaxEffectRadius : destructionRadius;
-            float burnMax = burnRadius > ModConfig.MaxEffectRadius ? ModConfig.MaxEffectRadius : burnRadius;
+            float destMax = spec.DestructionRadius > ModConfig.MaxEffectRadius ? ModConfig.MaxEffectRadius : spec.DestructionRadius;
+            float burnMax = spec.BurnRadius > ModConfig.MaxEffectRadius ? ModConfig.MaxEffectRadius : spec.BurnRadius;
             float outer = destMax > burnMax ? destMax : burnMax;
             // Falloff in concentric rings: everything within core is destroyed, and from core
             // out to destMax the probability drops off, with destMin equal to core.
             float core = destMax * ModConfig.DestructionCoreFraction;
             // Inside removeRadius everything goes, foundations included - roads, bridges and
-            // footings alike.
+            // footings alike. It is tied to the crater, so only a warhead that actually digs one
+            // takes the ground with it.
             //  - Groundburst: the core becomes the crater and is removed entirely, while further
             //    out only buildings are destroyed, by chance.
-            //  - Airburst: removeRadius is 0, so nothing is removed. Buildings collapse, but the
-            //    footings, roads, water pipes and metro tunnels survive.
-            float removeRadius = groundburst ? core : 0f;
+            //  - Airburst, or an incendiary that leaves no crater: removeRadius is 0, so nothing
+            //    is removed. Buildings collapse or burn, but the footings, roads, water pipes and
+            //    metro tunnels survive.
+            // It never falls short of the crater itself: the ground inside the bowl has been
+            // excavated, so a road left standing over it would hang in mid-air.
+            float removeRadius = 0f;
+            if (craters) removeRadius = core > cRadius ? core : cRadius;
             float destMin = core;
             float burnMin = core;
             if (burnMin > burnMax * 0.5f) burnMin = burnMax * 0.5f; // hold the inner edge back so the burn band cannot invert

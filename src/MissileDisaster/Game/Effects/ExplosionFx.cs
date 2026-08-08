@@ -21,13 +21,15 @@ namespace MissileDisaster.Game.Effects
         private static EffectInfo _meteorEffect;
         private static bool _searched;
 
-        /// <summary>Plays the explosion at the impact point. Main thread. A failure here does not stop the impact resolving.</summary>
+        /// <summary>Plays the explosion at the detonation point - on the ground for a groundburst, up at the burst altitude for an airburst. Main thread. A failure here does not stop the impact resolving.</summary>
         public static void Play(Vector3 center, WarheadSpec spec)
         {
             try
             {
                 EffectInfo effect = ResolveMeteorEffect();
-                float radius = Mathf.Max(spec.DestructionRadius, spec.BurnRadius * 0.5f, 30f);
+                // The size of the fireball follows the yield: the spec's radii have already been
+                // scaled by the charge, and ExplosionScale turns them into the effect scale.
+                float radius = ExplosionScale.VisualRadius(spec);
 
                 if (spec.Type == WarheadType.Nuclear)
                 {
@@ -35,8 +37,7 @@ namespace MissileDisaster.Game.Effects
                     {
                         // With the DLC: the meteor impact effect, that large mushroom-shaped
                         // cloud, scaled with the destruction radius.
-                        float nukeScale = Mathf.Clamp(radius / 60f, 12f, ModConfig.NuclearExplosionScaleMax);
-                        Dispatch(effect, center, nukeScale);
+                        Dispatch(effect, center, ExplosionScale.ForNuclear(spec));
                     }
                     else
                     {
@@ -58,7 +59,7 @@ namespace MissileDisaster.Game.Effects
                 {
                     // Scattering warhead: a smaller effect at each submunition point.
                     Offset2[] offs = SubmunitionScatter.Offsets(spec.SubmunitionCount, spec.SpreadRadius);
-                    float s = Mathf.Clamp(spec.DestructionRadius / 24f, 0.75f, 2.5f);
+                    float s = ExplosionScale.ForSubmunition(spec);
                     for (int i = 0; i < offs.Length; i++)
                     {
                         Dispatch(effect, new Vector3(center.x + offs[i].X, center.y, center.z + offs[i].Z), s);
@@ -66,10 +67,9 @@ namespace MissileDisaster.Game.Effects
                     return;
                 }
 
-                // A single detonation, conventional or thermobaric: one explosion at the impact
-                // point, scaled with the yield.
-                float singleScale = Mathf.Clamp(radius / 50f, 2f, ModConfig.ExplosionBloomScaleMax);
-                Dispatch(effect, center, singleScale);
+                // A single detonation, conventional or thermobaric: one explosion at the
+                // detonation point, scaled with the yield.
+                Dispatch(effect, center, ExplosionScale.ForSingle(spec));
             }
             catch (Exception e)
             {

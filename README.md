@@ -15,15 +15,23 @@ radioactive fallout that you can clean up with a dedicated decontamination facil
   - Nuclear: pick from 10 real weapons (Little Boy … Tsar Bomba) or type a custom **kt** value
   - Non‑nuclear: type a custom charge in **kg TNT**
   - Blast radii follow the real cube‑root scaling law (`radius ∝ yield^(1/3)`)
+  - Craters are deliberately exaggerated (~2.4× for kg‑yield warheads) so a single hit visibly
+    scars the ground, while the destruction radius is pulled back ~10% so it does not flatten the
+    whole block around it
 - **Air burst / ground burst**
   - Ground burst: forms a crater and destroys roads/bridges/foundations; leaves radioactive fallout (nuclear)
-  - Air burst: no crater, wider blast/fire, and roads / water pipes / metro / foundations survive
+  - Air burst: **detonates in mid‑air above the target** — the fireball hangs over the city, no
+    crater is formed, the blast/fire reach wider, and roads / water pipes / metro / foundations
+    survive. Burst altitude follows the yield (≈60–300 m conventional, ~1.8 km for a 150 kt nuclear)
 - **Distance‑based destruction** — total destruction near ground zero, falling off with distance
 - **Fire** for incendiary/thermobaric/nuclear warheads
+  - White Phosphorus is a pure incendiary: no crater and almost no blast **at any charge** —
+    a bigger charge only spreads the fires further
 - **Radioactive fallout** (nuclear ground burst) — persistent soil contamination, expires after 50 in‑game years
 - **Missile defense** — name‑detected interceptor buildings engage incoming missiles with realistic
   single‑shot kill probabilities (PAC‑3 / THAAD / Aegis) and a radar that boosts hit chance
-- **Explosions & sound** — scaled meteor blast, nuclear mushroom cloud, launch/impact/intercept SFX with 3D falloff
+- **Explosions & sound** — the fireball is sized from the yield (a 100 kg charge and a 20 t one no
+  longer look alike), nuclear mushroom cloud, launch/impact/intercept SFX with 3D falloff
 
 ## Required companion assets (important)
 
@@ -39,6 +47,10 @@ subscribe/create building assets whose names contain these keywords:
 | Decontamination | `Decontamination` (e.g. "Decontamination facility") |
 
 Build these anywhere; the mod picks them up automatically once completed.
+
+> Note: interceptors engage by altitude band (PAC‑3 0–800 m, THAAD 800–2500 m, Aegis above).
+> A **nuclear air burst** detonates around 1.8 km up, i.e. above PAC‑3's ceiling — terminal
+> point defense alone cannot stop one, so keep a higher layer if you expect them.
 
 ## How to use
 
