@@ -41,4 +41,8 @@ This mod detects buildings [b]by name[/b]. Subscribe/create building assets whos
 [/olist]
 
 Also cleans reactor fallout from the companion [b]NuclearMeltdown[/b] mod. Water treatment plants
-do not decontaminate. Licensed MIT.
+do not decontaminate.
+
+[h2]Source code[/h2]
+This mod is open source under the MIT licence. Bug reports and pull requests are welcome:
+[url=https://github.com/omoneko/MissileDisaster]github.com/omoneko/MissileDisaster[/url]
