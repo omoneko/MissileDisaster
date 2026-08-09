@@ -39,13 +39,24 @@ radioactive fallout that you can clean up with a dedicated decontamination facil
   - Stem half the cap's width at 20 kt, a seventh of it in the megaton range
   - The cap swells out of the head of the column and rides the rest of the way up with it,
     rather than appearing finished at the cloud top before the stem gets there
-  - Ground dust drawn up by the afterwinds. Only the *time* is compressed (~25×) — a real cloud
-    takes ten minutes to stabilise
-  - **The size never stops following the yield.** Nothing in the effect is hard‑clamped: every
-    dimension is exact up to the point a 17 km map can still carry it and then compressed
-    smoothly towards a ceiling it never reaches, so a B83, an Ivy Mike and a Tsar Bomba are
-    three visibly different clouds (9.4 / 22.5 / 26.0 km caps) instead of the same picture.
-    See [docs/effects](docs/effects) for renders of every stage and of the difference
+  - The canopy's underside is the **tropopause** — the lid that stops a cloud rising and spreads
+    it sideways — or half the cloud's height for a small one that never reaches it. That is why a
+    20 kt cap is a ball and a megaton cap is a sheet, and it reproduces Ivy Mike's and Castle
+    Bravo's measured cap bases to within a few per cent
+  - An **airburst's canopy turns white** as the water in it condenses, over a dark dust column,
+    the way both 1945 photographs show; a groundburst's keeps its dirt
+  - Ground dust drawn up by the afterwinds
+  - **The size never stops following the yield.** Nothing is hard‑clamped: every dimension is
+    exact up to the point the map can still carry it and then compressed smoothly towards a
+    ceiling it never reaches, so a B83, an Ivy Mike and a Tsar Bomba are three visibly different
+    clouds instead of the same picture
+  - **What is deliberately not to scale**, and the only such thing in the model: the cloud is
+    drawn at a fifth of its real size with the height halved again, because a real 150 kt cloud
+    stands 13 km and would leave the top of the screen; the fireball comes down only half way, so
+    it is not lost under it; and the rise is compressed about twelve to one, a strike running
+    about a minute from flash to fading. Three named constants in `Core/NuclearCloudDisplay`.
+    See [docs/effects](docs/effects) for renders of every stage, and for what was checked against
+    the measured tests and the photographs
 - **Shock wave** — a blast front races out across the ground following Sedov–Taylor
   (`r ∝ t^0.4`): it leaves at several times the speed of sound and visibly decelerates, reaching
   the destruction radius at an average 540 m/s. Every warhead gets one
