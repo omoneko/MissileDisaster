@@ -36,10 +36,12 @@ radioactive fallout that you can clean up with a dedicated decontamination facil
     `3.0 km·10^(0.006941L⁴−0.06216L³+0.1526L²+0.1878L)`, `L = log₁₀(W/kt)`
     — at 150 kt that is a 3.6 km cap under a 13 km column, which happens to match the 3.7 km
     destruction radius within a few per cent
-  - The mushroom itself is a **sculpted, textured 3D mesh** (688 vertices, fire baked into its
-    crevices), not billboard particles — that is what makes it read as the solid cauliflower
-    thing in the photographs. It grows out of the fireball with the column shooting up first and
-    the cap billowing after it, stands, and thins away; every strike faces a random way
+  - The mushroom itself is a **textured 3D mesh, procedurally generated from the photographs'
+    proportions** (`tools/cloud-model/generate.py`, fixed seed): cauliflower lobes on the cap,
+    the rim rolling under and overhanging a billowy column a third its width, fire baked into
+    the deep crevices. Billboard particles never read as that solid, which is why they were
+    dropped. It grows out of the fireball with the column shooting up first and the cap
+    billowing after it, stands, and thins away; every strike faces a random way
   - An **airburst's cloud is white**, the way both 1945 photographs show; a groundburst's keeps
     its dirt
   - Ground dust drawn up by the afterwinds
@@ -143,10 +145,5 @@ not by the game's own folder, so it is one of:
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
-
-The mushroom cloud model (`src/MissileDisaster/Models/MushroomCloud.*`) is based on
-["Mushroom cloud low poly"](https://sketchfab.com/3d-models/mushroom-cloud-low-poly-7d37e0570a164eaba038594bf3d664f6)
-by [PROMEIISTER](https://sketchfab.com/PROMEIISTER), licensed under
-[CC-BY-4.0](http://creativecommons.org/licenses/by/4.0/) — converted and re-baked by
-`tools/cloud-model/convert.py`.
+MIT — see [LICENSE](LICENSE). All assets, including the mushroom cloud model and its texture,
+are original: the cloud is procedurally generated (fixed seed) by `tools/cloud-model/generate.py`.

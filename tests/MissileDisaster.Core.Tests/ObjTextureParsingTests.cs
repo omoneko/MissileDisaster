@@ -83,11 +83,11 @@ public class ObjTextureParsingTests
     [Fact]
     public void The_shipped_cloud_model_meets_the_aligned_convention()
     {
-        // The real file, as converted: one vt and one vn per v, in order, so the mesh builder
+        // The real file, as generated: one vt and one vn per v, in order, so the mesh builder
         // can texture it. If a re-export breaks the convention this is the test that says so.
         string path = System.IO.Path.Combine(FindModelsDir(), "MushroomCloud.obj");
         var data = ObjParser.Parse(System.IO.File.ReadAllText(path));
-        Assert.True(data.VertexCount > 500, "the sculpt survived the conversion");
+        Assert.True(data.VertexCount > 500, "the generated sculpt has real detail");
         Assert.True(data.HasAlignedUVs, "one vt per v, in vertex order");
         Assert.True(data.HasAlignedNormals, "one vn per v, in vertex order");
         Assert.Single(data.Submeshes);

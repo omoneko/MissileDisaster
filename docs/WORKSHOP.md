@@ -13,9 +13,6 @@ https://steamcommunity.com/sharedfiles/filedetails/?id=3765194357
 This mod is open source under the MIT licence. Bug reports and pull requests are welcome:
 [url=https://github.com/omoneko/MissileDisaster]github.com/omoneko/MissileDisaster[/url]
 
-[h1]Credits[/h1]
-The mushroom cloud model is based on [url=https://sketchfab.com/3d-models/mushroom-cloud-low-poly-7d37e0570a164eaba038594bf3d664f6]"Mushroom cloud low poly"[/url] by [url=https://sketchfab.com/PROMEIISTER]PROMEIISTER[/url], licensed under [url=http://creativecommons.org/licenses/by/4.0/]CC-BY-4.0[/url].
-
 [h1]Support[/h1]
 If you enjoy the mod, you can support development here:
 https://ko-fi.com/omoneko

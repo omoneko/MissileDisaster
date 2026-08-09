@@ -9,8 +9,8 @@ namespace MissileDisaster.Game.Effects
     /// A nuclear detonation, built to the figures in MissileDisaster.Core.NuclearCloud rather
     /// than to taste. Main thread only.
     ///
-    /// The mushroom itself is a textured mesh - Models/MushroomCloud.obj, a sculpted cloud with
-    /// the fire baked into its crevices - because that is the verdict of trying to build one out
+    /// The mushroom itself is a textured mesh - Models/MushroomCloud.obj, procedurally generated
+    /// with the fire baked into its crevices - because that is the verdict of trying to build one out
     /// of billboard particles: however carefully the column and canopy budgets are solved, a
     /// crowd of round sprites reads as smoke in the shape of a mushroom, never as the solid,
     /// cauliflower thing in the photographs. The mesh is grown out of the fireball over the rise,
