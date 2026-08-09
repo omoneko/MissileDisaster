@@ -46,6 +46,20 @@ namespace MissileDisaster.Game.Effects
         // tenths - and that is a fraction of the column's height, not of the cap's own width.
         private const float CapThicknessFraction = 0.30f;
 
+        // How many particles the column is allowed at once. It has to stand for the whole shot,
+        // so this is what its emission rate is solved from rather than a rate being picked and
+        // the ceiling then quietly starving it.
+        private const int StemMaxParticles = 900;
+
+        // The floor on how long the canopy lingers at the top. A cloud that took longer to climb
+        // lingers for longer still, or a strategic cap starts fading while its own stem is still
+        // rising into it.
+        private const float CapLifetimeMin = 18f;
+
+        // How far up the column climbs, against the cloud top: to the underside of the canopy,
+        // which is half the cap's depth below its middle.
+        private const float StemTopFraction = 1f - CapThicknessFraction * 0.5f;
+
         // Colours, following how a real detonation looks rather than a palette: white hot, then
         // sodium yellow, then orange, then the brown of nitrogen dioxide and lofted earth.
         private static readonly Color FireballCore = new Color(1f, 0.99f, 0.94f, 1f);
@@ -55,26 +69,46 @@ namespace MissileDisaster.Game.Effects
         private static readonly Color Condensation = new Color(0.96f, 0.97f, 1f, 0.42f);
         private static readonly Color DustLight = new Color(0.55f, 0.49f, 0.40f, 0.75f);
         private static readonly Color DustDark = new Color(0.32f, 0.28f, 0.23f, 0.75f);
-        private static readonly Color CapWarm = new Color(0.40f, 0.31f, 0.24f, 0.72f); // NO2 and earth
         private static readonly Color CapCool = new Color(0.24f, 0.23f, 0.22f, 0.72f);
+
+        // The canopy's colour. A cloud is white because the water in it has condensed out, and
+        // brown because of what it tore off the ground - and which of the two wins is decided by
+        // the burst height. Both 1945 photographs are airbursts, and in each the cap is a
+        // brilliant white cauliflower over a dark dust column; a groundburst - Castle Bravo, and
+        // the fallout that came with it - keeps its dirt.
+        // So the canopy is born the colour of the dust it came up with and pales as it
+        // stabilises, and the burst height sets how far it gets. The particle is the pale vapour
+        // and the gradient below tints it, since a colour curve can only ever darken.
+        private static readonly Color CapVapour = new Color(0.90f, 0.91f, 0.93f, 0.72f);
+        private static readonly Color CapVapourShade = new Color(0.70f, 0.71f, 0.74f, 0.72f);
+        private static readonly Color CapTintDust = new Color(0.45f, 0.36f, 0.29f, 1f);    // at birth
+        private static readonly Color CapTintAir = new Color(0.62f, 0.57f, 0.52f, 1f);
+        private static readonly Color CapSettledGround = new Color(0.86f, 0.83f, 0.79f, 1f); // still dirty
+        private static readonly Color CapSettledAir = new Color(1f, 1f, 1f, 1f);             // clean water
 
         /// <summary>
         /// Plays the whole detonation. groundZero is the spot on the ground the cloud rises from,
         /// detonation is where the warhead actually went off - the same point for a groundburst,
-        /// the burst altitude above it for an airburst - and kilotons is the yield everything is
-        /// built from. A yield of zero or less falls back to the 150 kt baseline.
+        /// the burst altitude above it for an airburst - kilotons is the yield everything is
+        /// built from, and airburst decides how dirty the canopy stays. A yield of zero or less
+        /// falls back to the 150 kt baseline.
         /// </summary>
-        public static void Play(Vector3 groundZero, Vector3 detonation, float kilotons)
+        public static void Play(Vector3 groundZero, Vector3 detonation, float kilotons, bool airburst)
         {
             try
             {
                 NuclearCloudDimensions d = NuclearCloudDisplay.For(kilotons);
 
+                // How long the cloud is up for, defined once: the canopy lingers the longest, so
+                // it sets the shot, and the column has to be fed for all of it.
+                float capLifetime = Mathf.Max(CapLifetimeMin, d.RiseSeconds * 0.8f);
+                float showSeconds = d.RiseSeconds * CapEmergeFraction + capLifetime;
+
                 CreateFireball(detonation, d.FireballRadius, d.FireballSeconds);
                 CreateCondensationDome(detonation, d.FireballRadius * CondensationRadiusFactor, d.FireballSeconds);
                 CreateGroundDust(groundZero, d.StemRadius, d.RiseSeconds);
-                CreateStem(groundZero, d.StemRadius, d.CloudTop, d.RiseSeconds);
-                CreateCap(groundZero, d.CapRadius, d.CloudTop, d.RiseSeconds);
+                CreateStem(groundZero, d.StemRadius, d.CloudTop, d.RiseSeconds, showSeconds);
+                CreateCap(groundZero, d.CapRadius, d.CloudTop, d.RiseSeconds, capLifetime, airburst);
             }
             catch (Exception e)
             {
@@ -177,28 +211,50 @@ namespace MissileDisaster.Game.Effects
         /// <summary>
         /// The stem, climbing at the rate the cloud really climbs. Barely any outward speed: the
         /// column has to stay narrow for the whole thing to read as a mushroom under its cap.
+        ///
+        /// Two things keep it a column rather than a slug of smoke thrown upwards. Each particle
+        /// stops climbing once it has covered the cloud's height, instead of carrying on at the
+        /// same rate for the rest of its life and taking the column out through the top of its
+        /// own cap. And it is fed for as long as the canopy is up: emission used to stop when the
+        /// cloud finished rising, after which the column drained away upwards and left the cap
+        /// standing over clear air with its base several kilometres off the ground.
         /// </summary>
-        private static void CreateStem(Vector3 groundZero, float stemR, float top, float rise)
+        private static void CreateStem(Vector3 groundZero, float stemR, float top, float rise,
+            float showSeconds)
         {
+            float life = rise + 8f; // a particle stands well after it has finished rising
+            // Where the particles are born and how large they have grown by the end have to add
+            // up to stemR, exactly as the canopy's do to capR. Emitting them over the full stemR
+            // and then growing each one to nearly as wide again drew a column 1.9 times the one
+            // the figures describe - at 15 kt, a column as wide as its own cap.
+            const float emitFraction = 0.45f;
+            const float growth = 1.6f;
+            float emitRadius = stemR * emitFraction;
+            float finalDiameter = 2f * (stemR - emitRadius);
+
             var go = ParticleBuilder.NewSystem("NuclearStem", groundZero, ParticleAssets.Smoke);
             var ps = go.GetComponent<ParticleSystem>();
             var main = ps.main;
-            main.startLifetime = rise + 8f; // the column stands well after it has finished rising
+            main.startLifetime = life;
             main.startSpeed = stemR * 0.02f;
-            main.startSize = stemR * 1.1f;
+            main.startSize = finalDiameter / growth;
             main.startColor = new ParticleSystem.MinMaxGradient(DustDark, CapCool);
-            main.maxParticles = 500;
-            main.duration = rise;
+            main.maxParticles = StemMaxParticles;
+            main.duration = showSeconds;
             main.loop = false;
 
-            ParticleBuilder.Stream(ps, 40f);
-            ParticleBuilder.Sphere(ps, stemR);
-            ParticleBuilder.Rise(ps, top / rise);
+            // As fast as the budget will carry: emitting faster than maxParticles/life only buys
+            // a burst at the start and then a starved column once the ceiling is hit.
+            ParticleBuilder.Stream(ps, StemMaxParticles * 0.95f / life);
+            ParticleBuilder.Sphere(ps, emitRadius);
+            // It stops under the canopy rather than at the cloud top, so the column runs up into
+            // the cap's underside instead of out through the top of it.
+            ParticleBuilder.Rise(ps, ClimbThenSettle(rise * StemTopFraction, life), top / rise);
             ParticleBuilder.Fade(ps,
                 new GradientAlphaKey(0.6f, 0f), new GradientAlphaKey(0.85f, 0.25f),
                 new GradientAlphaKey(0.7f, 0.7f), new GradientAlphaKey(0f, 1f));
-            ParticleBuilder.SizeCurve(ps, 0.8f, 1.6f);
-            ParticleBuilder.PlayAndDestroy(go, rise + 9f);
+            ParticleBuilder.SizeCurve(ps, 0.8f, growth);
+            ParticleBuilder.PlayAndDestroy(go, showSeconds + life + 1f);
         }
 
         /// <summary>
@@ -221,12 +277,9 @@ namespace MissileDisaster.Game.Effects
         /// on a stick rather than the flattened lens a megaton cloud spreads out along the
         /// tropopause.
         /// </summary>
-        private static void CreateCap(Vector3 groundZero, float capR, float top, float rise)
+        private static void CreateCap(Vector3 groundZero, float capR, float top, float rise,
+            float lifetime, bool airburst)
         {
-            // It lingers at the top for a long time - and a cloud that took longer to climb has
-            // to linger for longer still, or a strategic cap starts fading while its own stem is
-            // still rising into it.
-            float lifetime = Mathf.Max(18f, rise * 0.8f);
             const float emitFraction = 0.35f; // where the particles start, as a fraction of capR
             const float growth = 1.6f;        // how much larger a particle is by the end of its life
 
@@ -262,19 +315,47 @@ namespace MissileDisaster.Game.Effects
             // applied to a particle's whole velocity - it would brake the climb along with the
             // drift.
             main.startSpeed = new ParticleSystem.MinMaxCurve(0f, driftSpeed);
-            main.startSize = thickness / growth; // the size curve grows it to the full depth
-            main.startColor = new ParticleSystem.MinMaxGradient(CapWarm, CapCool);
+            // The size curve grows it to the full depth. The spread is what makes a canopy read
+            // as cauliflower rather than as an airbrushed lens: a real cap is a crowd of lobes
+            // of visibly different sizes. The largest is the one the depth was solved for, so
+            // the spread runs downwards from it and the canopy keeps the depth it was given.
+            float sizeMax = thickness / growth;
+            main.startSize = new ParticleSystem.MinMaxCurve(sizeMax * 0.55f, sizeMax);
+            main.startColor = new ParticleSystem.MinMaxGradient(CapVapour, CapVapourShade);
             main.maxParticles = 500;
             main.gravityModifier = 0.015f;  // the rim droops, which is the cap's rollover
 
             ParticleBuilder.Burst(ps, count);
             ParticleBuilder.FlatDisc(ps, emitRadius);
             ParticleBuilder.Rise(ps, ClimbThenSettle(rise - delay, lifetime), top / rise);
-            ParticleBuilder.Fade(ps,
-                new GradientAlphaKey(0.6f, 0f), new GradientAlphaKey(0.85f, 0.25f),
-                new GradientAlphaKey(0.7f, 0.7f), new GradientAlphaKey(0f, 1f));
+            ParticleBuilder.Colour(ps, CapGradient(airburst));
             ParticleBuilder.SizeCurve(ps, 0.7f, growth);
             ParticleBuilder.PlayAndDestroy(go, delay + lifetime + 2f);
+        }
+
+        /// <summary>
+        /// The canopy's colour and opacity over a particle's life: the dust it came up with,
+        /// clearing as the water condenses out, and stopping short of clean white for a
+        /// groundburst, which has ground to lift and fallout to carry.
+        /// </summary>
+        private static Gradient CapGradient(bool airburst)
+        {
+            Color born = airburst ? CapTintAir : CapTintDust;
+            Color settled = airburst ? CapSettledAir : CapSettledGround;
+            Color half = Color.Lerp(born, settled, 0.55f);
+            var grad = new Gradient();
+            grad.SetKeys(
+                new[]
+                {
+                    new GradientColorKey(born, 0f), new GradientColorKey(half, 0.4f),
+                    new GradientColorKey(settled, 0.75f), new GradientColorKey(settled, 1f),
+                },
+                new[]
+                {
+                    new GradientAlphaKey(0.6f, 0f), new GradientAlphaKey(0.85f, 0.25f),
+                    new GradientAlphaKey(0.7f, 0.7f), new GradientAlphaKey(0f, 1f),
+                });
+            return grad;
         }
 
         /// <summary>

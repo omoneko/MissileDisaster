@@ -70,15 +70,39 @@ Sources for the measured figures: [Castle Bravo](https://en.wikipedia.org/wiki/C
 [Ivy Mike](https://nuclearweaponarchive.org/Usa/Tests/Ivy.html), and Glasstone & Dolan,
 [*The Effects of Nuclear Weapons* (1977) ch. II](https://atomicarchive.com/resources/documents/effects/glasstone-dolan/chapter2.html).
 
+## `nineteen-forty-five.png`
+
+The two bursts there are famous photographs of, at the yield and burst height the mod would
+fly them at, for holding the render against the real thing.
+
+## What the photographs changed
+
+Reading the Hiroshima and Nagasaki photographs against the render turned up three things the
+figures alone had not:
+
+- **A cloud is two colours, not one.** Both are airbursts, and in each a brilliant white
+  cauliflower cap stands over a dark brown dust column. The canopy was one dust colour
+  throughout. It is now born the colour of the dust it came up with and pales as the water in
+  it condenses — to clean white for an airburst, stopping short of it for a groundburst, which
+  has ground to lift and fallout to carry.
+- **The column was drawn 1.9× too wide.** Its particles were emitted across the whole stem
+  radius and then grown nearly as wide again, so at 15 kt the column came out as wide as its
+  own cap. Where a particle starts and how large it grows now add up to the stem radius, the
+  same budget the canopy uses.
+- **The column came off the ground.** Its particles never stopped climbing and emission stopped
+  when the cloud finished rising, so the column drained away upwards and out through the top of
+  its own cap, leaving the canopy over clear air. It now stops under the canopy and is fed for
+  as long as the cap is up.
+
 ## Known gaps against photographs
 
+- **No low-level layer.** Both 1945 photographs show a broad flat sheet of cloud and smoke
+  spread across the ground far wider than the column. The ground dust here is a skirt about
+  twice the stem's width; the blast front that crosses the ground is drawn, but it passes.
 - **No skirt or bell.** Many tests show a cone of condensation sliding down the stem where the
   humid air around it drops below its dew point. Nothing draws one.
 - **No true rollover.** A real cap is a vortex ring: the rim curls down and back under itself.
   Here the rim only sags, under a small gravity.
-- **No ice cap.** Above the tropopause the water in the cloud freezes into one or more bright
-  white domes over the canopy. The cap here is one dust-coloured mass throughout, where
-  photographs show it paling to a grey-white as it stabilises.
 - **The aspect ratio drifts at high yield.** The ceiling bites the cap radius harder than the
   cloud top, so a 10 Mt cloud is drawn 1.9 times wider than tall where the figures say 2.5 and
   Ivy Mike was 4.4. This is the price of the map being 17 km wide.

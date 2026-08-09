@@ -249,7 +249,44 @@ def render_cap_shape(w=660, h=620):
     return path
 
 
+
+# ------------------------------------------------ against the 1945 photographs
+
+def render_1945(w=680, h=780):
+    """The two bursts there are famous photographs of, at the scale and burst height the mod
+    would fly them at, so the render can be held against the real thing."""
+    shots = [("Little Boy — Hiroshima", 15, 580), ("Fat Man — Nagasaki", 22, 503)]
+    fig, axes = plt.subplots(1, 2, figsize=(11.5, 7.2))
+    fig.patch.set_facecolor("#14161a")
+    for ax, (name, kt, real_hob) in zip(axes, shots):
+        d = fx.dimensions(kt)
+        g = fx.cap_geometry(d)
+        t = d["rise"] * 0.55 + g["lifetime"] * 0.5
+        extent = d["top"] * 1.18
+        cam = frame(extent, d["cap"] * 2.6, w, h, look=0.46, elev=0.16)
+        stages = [fx.stage_ground_dust(d, t), fx.stage_stem(d, t),
+                  fx.stage_cap(d, t, airburst=True)]
+        img = scene(cam, stages, 1000, extent * 3.0, w, h)
+        ax.imshow(img); ax.set_xticks([]); ax.set_yticks([])
+        for sp in ax.spines.values(): sp.set_color("#3a3f47")
+        mod_hob = 900.0 * (kt / 150.0) ** (1 / 3)
+        ax.set_title(f"{name} — {kt} kt airburst", color="#ffd479",
+                     fontsize=13, fontweight="bold", pad=8)
+        ax.set_xlabel(
+            f"cap {km(d['cap']*2)} wide · {km(g['thickness'])} deep · top {km(d['top'])}\n"
+            f"stem {km(d['stem']*2)} wide, {fx.stem_fraction(kt)*100:.0f}% of the cap"
+            f"   ·   grid 1 km\n"
+            f"burst height {mod_hob:.0f} m (the real one: {real_hob} m)",
+            fontsize=9.5, color="#b9bec7")
+    fig.suptitle("At the scale of the 1945 photographs — white canopy over a dark dust column",
+                 color="#ffffff", fontsize=16, fontweight="bold", y=0.975)
+    fig.tight_layout(rect=[0, 0.01, 1, 0.92])
+    path = os.path.join(OUT, "nineteen-forty-five.png")
+    fig.savefig(path, dpi=115, facecolor="#14161a"); plt.close(fig)
+    return path
+
+
 if __name__ == "__main__":
     for p in (render_stages(), render_timeline(), render_yields(),
-              render_cap_fix(), render_cap_shape()):
+              render_cap_fix(), render_cap_shape(), render_1945()):
         print("wrote", p)

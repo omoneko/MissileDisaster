@@ -83,8 +83,14 @@ FIREBALL_COOL = (0.42, 0.13, 0.05)
 CONDENSATION = (0.96, 0.97, 1.00, 0.42)
 DUST_LIGHT = (0.55, 0.49, 0.40, 0.75)
 DUST_DARK = (0.32, 0.28, 0.23, 0.75)
-CAP_WARM = (0.40, 0.31, 0.24, 0.72)
+CAP_WARM = (0.40, 0.31, 0.24, 0.72)   # the old flat canopy colour
 CAP_COOL = (0.24, 0.23, 0.22, 0.72)
+CAP_VAPOUR = (0.90, 0.91, 0.93)
+CAP_VAPOUR_SHADE = (0.70, 0.71, 0.74)
+CAP_TINT_DUST = (0.45, 0.36, 0.29)
+CAP_TINT_AIR = (0.62, 0.57, 0.52)
+CAP_SETTLED_GROUND = (0.86, 0.83, 0.79)
+CAP_SETTLED_AIR = (1.0, 1.0, 1.0)
 
 
 def ramp(keys, u):
@@ -203,21 +209,32 @@ def stage_ground_dust(d, t, origin=(0, 0, 0)):
     return p + np.array(origin), size, rgba, False
 
 
+STEM_MAX = 900
+
+
+def show_seconds(d):
+    """How long the cloud is up for: the canopy lingers longest and sets the shot."""
+    return d["rise"] * EMERGE + max(18.0, d["rise"] * 0.8)
+
+
 def stage_stem(d, t, origin=(0, 0, 0)):
     stemR, top, rise = d["stem"], d["top"], d["rise"]
     life = rise + 8.0
-    born, age = _stream(40.0, rise, t, life)
+    born, age = _stream(STEM_MAX * 0.95 / life, show_seconds(d), t, life)
     n = len(age)
     if n == 0: return None
-    p, v = in_sphere(n, stemR)
+    emit_r = stemR * 0.45
+    final_d = 2 * (stemR - emit_r)
+    p, v = in_sphere(n, emit_r)
     step = np.array([travel(stemR * 0.02, a) for a in age])
     p = p + v * step[:, None]
-    p[:, 1] += (top / rise) * age                        # Rise: it climbs the whole column
+    # climbs to the underside of the canopy and stops, instead of out through the top of it
+    p[:, 1] += np.array([_climb(a, rise * (1 - THICKNESS * 0.5), life, top / rise) for a in age])
     u = age / life
     alpha = np.array([ramp([(0.0, 0.6), (0.25, 0.85), (0.7, 0.7), (1.0, 0.0)], x) for x in u])
     base = np.array([mix(DUST_DARK[:3], CAP_COOL[:3], x) for x in rng.random(n)])
     rgba = np.concatenate([base, (alpha * 0.75)[:, None]], axis=1)
-    size = stemR * 1.1 * np.array([ramp([(0.0, 0.8), (1.0, 1.6)], x) for x in u])
+    size = final_d / 1.6 * np.array([ramp([(0.0, 0.8), (1.0, 1.6)], x) for x in u])
     return p + np.array(origin), size, rgba, False
 
 
@@ -301,7 +318,7 @@ def cap_geometry(d):
                 emit_r=emit_r, drift=drift, count=count)
 
 
-def stage_cap(d, t, origin=(0, 0, 0), n=None):
+def stage_cap(d, t, origin=(0, 0, 0), n=None, airburst=False):
     rise, top = d["rise"], d["top"]
     g = cap_geometry(d)
     lifetime, delay = g["lifetime"], rise * EMERGE
@@ -318,10 +335,16 @@ def stage_cap(d, t, origin=(0, 0, 0), n=None):
     p[:, 1] += top * EMERGE + _climb(age, rise - delay, lifetime, top / rise)
     p[:, 1] -= 0.5 * 9.81 * 0.015 * age ** 2             # the rim droops
     alpha = ramp([(0.0, 0.6), (0.25, 0.85), (0.7, 0.7), (1.0, 0.0)], u) * 0.72
-    base = np.array([mix(CAP_WARM[:3], CAP_COOL[:3], x) for x in rng.random(n)])
+    born = CAP_TINT_AIR if airburst else CAP_TINT_DUST
+    settled = CAP_SETTLED_AIR if airburst else CAP_SETTLED_GROUND
+    tint = ramp([(0.0, born), (0.4, mix(born, settled, 0.55)),
+                 (0.75, settled), (1.0, settled)], u)
+    base = np.array([mix(CAP_VAPOUR, CAP_VAPOUR_SHADE, x) for x in rng.random(n)]) * np.array(tint)
     rgba = np.concatenate([base, np.full((n, 1), alpha)], axis=1)
-    size = g["thickness"] / g["growth"] * ramp([(0.0, 0.7), (1.0, g["growth"])], u)
-    return p + np.array(origin), np.full(n, size), rgba, False
+    size_max = g["thickness"] / g["growth"]
+    spread = size_max * (0.55 + 0.45 * rng.random(n))   # a crowd of lobes, not one lens
+    size = spread * ramp([(0.0, 0.7), (1.0, g["growth"])], u)
+    return p + np.array(origin), size, rgba, False
 
 
 STAGES = [
