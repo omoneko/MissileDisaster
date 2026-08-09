@@ -46,10 +46,10 @@ namespace MissileDisaster.Core
     /// </summary>
     public static class CloudPuffs
     {
-        // Playtest: the cloud reads better built of many small puffs than few large ones - the
-        // large ones read as balloons at close zoom. Halving the puff size costs a quadrupling
-        // of the count for the same cover, and the cap gets the lion's share because it is the
-        // part that has to read as a dense, rolling mass.
+        // Sizes, counts and alphas here were set in tools/effect-preview/cloud_preview.py,
+        // which composites the puffs exactly as the game does and measures the opacity across
+        // the cap's body. The target is near-total: a cloud the background shows through is
+        // not a cloud. The shipped profile measures 0.997 standing and 0.955 while fading.
         public const int CapCount = 340;
         public const int ColumnCount = 160;
         public const int TotalCount = CapCount + ColumnCount;
@@ -84,7 +84,7 @@ namespace MissileDisaster.Core
             s.Azimuth = Hash01(index, seed, 1) * (float)(2.0 * Math.PI);
             s.Swirl = (Hash01(index, seed, 2) - 0.5f) * 0.08f;
             // sqrt biases the puffs outward, where the cauliflower is; the column fills the hole.
-            s.Rho01 = 0.25f + 0.75f * (float)Math.Sqrt(Hash01(index, seed, 3));
+            s.Rho01 = 0.1f + 0.9f * (float)Math.Sqrt(Hash01(index, seed, 3));
             s.Theta0 = Hash01(index, seed, 4) * (float)(2.0 * Math.PI);
             // The inner puffs turn faster, as the inside of a vortex does.
             s.Omega = (0.55f + 0.75f * (1f - s.Rho01)) * (0.8f + 0.4f * Hash01(index, seed, 5));
@@ -135,7 +135,7 @@ namespace MissileDisaster.Core
                 dist = ringCore - crossR * (float)Math.Cos(theta);
                 if (dist < 0f) dist = 0f;
                 y = centreY + crossY * (float)Math.Sin(theta);
-                point.Size = capR * (0.13f + 0.11f * p.Size01);
+                point.Size = capR * (0.23f + 0.16f * p.Size01);
                 point.Fade = 1f;
                 point.Dust = 0.15f + 0.15f * (1f - p.Rho01); // the inner cap keeps a little of the column's dust
                 // Early on the fire shows through the folds nearest the core.
@@ -154,7 +154,7 @@ namespace MissileDisaster.Core
                 float radial = 0.25f + 0.75f * p.Rho01;
                 float wobble = 1f + 0.18f * (float)Math.Sin(p.Wobble + u * 9.4f + t * 0.4f);
                 dist = stemR * shape * radial * wobble;
-                point.Size = stemR * (0.5f + 0.42f * p.Size01);
+                point.Size = stemR * (0.7f + 0.5f * p.Size01);
                 point.Fade = LoopFade(u);
                 point.Dust = 0.85f - 0.5f * u; // dust at the base, paling as it climbs
                 point.Ember = EmberEnvelope(t, dims.RiseSeconds) * u * 0.6f; // the glow is up near the fireball

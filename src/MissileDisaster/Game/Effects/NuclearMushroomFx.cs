@@ -194,7 +194,7 @@ namespace MissileDisaster.Game.Effects
         /// </summary>
         private static void CreateCloudPuffs(Vector3 groundZero, NuclearCloudDimensions d, bool airburst)
         {
-            var go = ParticleBuilder.NewSystem("NuclearMushroomCloud", groundZero, ParticleAssets.Smoke);
+            var go = ParticleBuilder.NewSystem("NuclearMushroomCloud", groundZero, ParticleAssets.Cloud);
             var ps = go.GetComponent<ParticleSystem>();
             var main = ps.main;
             main.simulationSpace = ParticleSystemSimulationSpace.Local; // puff positions are metres from ground zero

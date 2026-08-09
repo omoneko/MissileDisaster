@@ -28,10 +28,11 @@ namespace MissileDisaster.Game.Effects
         private static readonly Color DustColorAir = new Color(0.62f, 0.58f, 0.53f, 1f);
         private static readonly Color DustColorGround = new Color(0.52f, 0.45f, 0.37f, 1f);
         private static readonly Color EmberColor = new Color(1f, 0.45f, 0.12f, 1f);
-        // The cap is drawn denser than the column - playtest: it has to read as a solid rolling
-        // mass, where the column reads better with some sky through it.
-        private const float CapAlpha = 0.72f;
-        private const float ColumnAlpha = 0.5f;
+        // Verified in tools/effect-preview/cloud_preview.py: with the opaque-cored cloud
+        // texture these measure 0.997 opacity across the cap's body. The cap is still a touch
+        // denser than the column, which reads better with a hint of depth to it.
+        private const float CapAlpha = 0.97f;
+        private const float ColumnAlpha = 0.88f;
 
         private ParticleSystem _ps;
         private ParticleSystem.Particle[] _buffer;

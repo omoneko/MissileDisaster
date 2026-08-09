@@ -294,6 +294,7 @@ namespace MissileDisaster.Game.Effects
     {
         public static UnityEngine.Material Fire { get { return null; } }
         public static UnityEngine.Material Smoke { get { return null; } }
+        public static UnityEngine.Material Cloud { get { return null; } }
     }
 
     public static class RenderAssets
