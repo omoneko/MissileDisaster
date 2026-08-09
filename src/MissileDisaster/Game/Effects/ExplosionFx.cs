@@ -13,16 +13,12 @@ namespace MissileDisaster.Game.Effects
     /// It dispatches through EffectManager the same way NuclearMeltdown.Game.MeltdownEffect
     /// does, but the size comes from the SpawnArea's radius rather than from the magnitude: see
     /// MissileDisaster.Core.ExplosionScale for why the magnitude cannot do it.
-    /// The nuclear mushroom cloud is always this mod's own NuclearMushroomFx, with or without the
-    /// DLC, because it is the only one whose canopy can be built to the destruction radius; the
-    /// vanilla effect is used for the flash at the point the warhead went off.
+    /// A nuclear detonation does not use the vanilla effect at all - NuclearMushroomFx draws the
+    /// fireball and the cloud to real figures, which nothing in the base game can be stretched to
+    /// - and every warhead sends a blast front out across the ground through ShockWaveFx.
     /// </summary>
     public static class ExplosionFx
     {
-        // The nuclear fireball against what the weapon destroys. At 150 kt the fireball is about
-        // 500 m across and the 5 psi contour 3.7 km, so the ball is roughly a seventh of it.
-        private const float NuclearFireballFraction = 0.15f;
-
         private static EffectInfo _meteorEffect;
         private static bool _searched;
 
@@ -44,25 +40,19 @@ namespace MissileDisaster.Game.Effects
 
                 if (spec.Type == WarheadType.Nuclear)
                 {
-                    // The cloud is always this mod's own, raised from ground zero with a canopy as
-                    // wide as the destruction radius. The vanilla effect cannot be stretched to
-                    // kilometres, so it is not asked to be the cloud.
-                    NuclearMushroomFx.Play(groundZero, spec.DestructionRadius);
-                    // The flash goes where the warhead actually went off - up in the air for an
-                    // airburst - and is the size of the fireball, not of the destruction.
-                    float fireball = spec.DestructionRadius * NuclearFireballFraction;
-                    if (effect != null)
-                    {
-                        Dispatch(effect, center, fireball, ExplosionScale.NuclearParticlesPerSecond);
-                    }
-                    else if (spec.Airburst)
-                    {
-                        // Without the DLC a groundburst already has the cloud's own fireball at
-                        // this point, so only an airburst needs one adding in the air.
-                        ExplosionFallback.Play(center, fireball);
-                    }
+                    // A nuclear detonation is entirely this mod's own, with or without the DLC:
+                    // the fireball where it burst and the cloud rising from the ground, both
+                    // built to real figures. The vanilla effect has no size of its own to speak
+                    // of and cannot be stretched over the kilometres involved.
+                    NuclearMushroomFx.Play(groundZero, center, spec.YieldKilotons);
+                    ShockWaveFx.Play(groundZero, spec.DestructionRadius);
                     return;
                 }
+
+                // The blast front, out across the ground, whatever the warhead. A scattering
+                // warhead gets one from the middle of the pattern rather than one per bomblet.
+                ShockWaveFx.Play(groundZero, spec.SubmunitionCount > 1
+                    ? Mathf.Max(spec.SpreadRadius, radius) : radius);
 
                 if (effect == null)
                 {

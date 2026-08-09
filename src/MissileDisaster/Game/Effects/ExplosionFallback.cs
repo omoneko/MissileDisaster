@@ -10,20 +10,14 @@ namespace MissileDisaster.Game.Effects
     /// </summary>
     public static class ExplosionFallback
     {
-        private static Material _fireMat;
-        private static Material _smokeMat;
-        private static Texture2D _glowTex;
-        private static bool _ready;
-
         public static void Play(Vector3 center, float radius)
         {
             try
             {
-                EnsureAssets();
                 float size = Mathf.Clamp(radius * 0.25f, 10f, 750f);
-                CreateBurst(center, "ExplosionFire", _fireMat, size, 0.8f, 60,
+                CreateBurst(center, "ExplosionFire", ParticleAssets.Fire, size, 0.8f, 60,
                     new Color(1f, 0.8f, 0.35f, 1f), new Color(1f, 0.4f, 0.08f, 1f), 1f, 1.6f);
-                CreateBurst(center, "ExplosionSmoke", _smokeMat, size * 1.2f, 2.4f, 40,
+                CreateBurst(center, "ExplosionSmoke", ParticleAssets.Smoke, size * 1.2f, 2.4f, 40,
                     new Color(0.12f, 0.11f, 0.1f, 0.6f), new Color(0.12f, 0.11f, 0.1f, 0.6f), 0.7f, 2.2f);
             }
             catch (Exception e)
@@ -78,61 +72,5 @@ namespace MissileDisaster.Game.Effects
             UnityEngine.Object.Destroy(go, lifetime + 0.5f);
         }
 
-        private static void EnsureAssets()
-        {
-            if (_ready) return;
-            _ready = true;
-            _glowTex = BuildGlowTexture(64);
-            _fireMat = BuildMaterial(true);
-            _smokeMat = BuildMaterial(false);
-        }
-
-        private static Material BuildMaterial(bool additive)
-        {
-            Shader shader = additive
-                ? RenderAssets.FindFirst("Particles/Additive", "Legacy Shaders/Particles/Additive", "Mobile/Particles/Additive")
-                : RenderAssets.FindFirst("Particles/Alpha Blended", "Legacy Shaders/Particles/Alpha Blended");
-            if (shader == null) shader = additive
-                ? RenderAssets.FindLoadedContaining("additive")
-                : RenderAssets.FindLoadedContaining("alpha blend", "alphablend");
-            if (shader == null) shader = RenderAssets.FindFirst("Sprites/Default", "Unlit/Transparent");
-            if (shader == null) shader = RenderAssets.FindLoadedContaining("particle", "sprite", "unlit");
-            if (shader == null) shader = Shader.Find("Standard");
-            if (shader == null) return null;
-
-            var mat = new Material(shader);
-            if (_glowTex != null)
-            {
-                mat.mainTexture = _glowTex;
-                if (mat.HasProperty("_MainTex")) mat.SetTexture("_MainTex", _glowTex);
-            }
-            if (mat.HasProperty("_TintColor")) mat.SetColor("_TintColor", Color.white);
-            if (mat.HasProperty("_Color")) mat.SetColor("_Color", Color.white);
-            mat.color = Color.white;
-            return mat;
-        }
-
-        private static Texture2D BuildGlowTexture(int size)
-        {
-            var tex = new Texture2D(size, size, TextureFormat.ARGB32, false);
-            tex.wrapMode = TextureWrapMode.Clamp;
-            float half = (size - 1) * 0.5f;
-            var pixels = new Color[size * size];
-            for (int y = 0; y < size; y++)
-            {
-                for (int x = 0; x < size; x++)
-                {
-                    float dx = (x - half) / half;
-                    float dy = (y - half) / half;
-                    float d = Mathf.Sqrt(dx * dx + dy * dy);
-                    float a = Mathf.Clamp01(1f - d);
-                    a = a * a;
-                    pixels[y * size + x] = new Color(1f, 1f, 1f, a);
-                }
-            }
-            tex.SetPixels(pixels);
-            tex.Apply();
-            return tex;
-        }
     }
 }

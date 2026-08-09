@@ -45,6 +45,12 @@ namespace MissileDisaster.Game
         public static void Launch(Vector3 target, WarheadType type, float yieldMultiplier, BurstType burst)
         {
             WarheadSpec spec = WarheadSpec.For(type);
+            if (type == WarheadType.Nuclear)
+            {
+                // The multiplier is cbrt(kt/150), so this recovers the yield the player chose.
+                // The fireball and the cloud are built to real figures that need it.
+                spec.YieldKilotons = NuclearYields.Kilotons(yieldMultiplier);
+            }
             if (yieldMultiplier > 0f)
             {
                 spec = spec.Scaled(yieldMultiplier);

@@ -19,5 +19,16 @@ namespace MissileDisaster.Core
             if (kilotons <= 0) return 0f;
             return (float)Math.Pow(kilotons / (double)StandardKilotons, 1.0 / 3.0);
         }
+
+        /// <summary>
+        /// The inverse: the yield in kilotons a scale factor came from. The launch path only
+        /// carries the multiplier, but the fireball and cloud are built to real figures that need
+        /// the yield itself, so this recovers it exactly.
+        /// </summary>
+        public static float Kilotons(float multiplier)
+        {
+            if (multiplier <= 0f) return 0f;
+            return StandardKilotons * multiplier * multiplier * multiplier;
+        }
     }
 }

@@ -1,53 +1,92 @@
 using System;
+using MissileDisaster.Core;
 using UnityEngine;
 
 namespace MissileDisaster.Game.Effects
 {
     /// <summary>
-    /// Builds the outsized mushroom cloud of a nuclear detonation. Main thread only.
-    /// It always rises from ground zero, even when the warhead went off high above it, and the
-    /// canopy is built to the width of the destruction radius: by the time it has spread, the
-    /// cloud covers exactly the ground the blast wrecked, so it reads as a marker of the damage
-    /// rather than a decoration.
-    /// It has three parts: an additive fireball at the base, the stem rising from it, and the
-    /// cap that swells at the top, emitted on a delay.
-    /// The materials are built from shaders that actually exist in the CS runtime, which avoids
-    /// the magenta error colour.
+    /// A nuclear detonation, built to the figures in MissileDisaster.Core.NuclearCloud rather
+    /// than to taste. Main thread only.
+    ///
+    /// It runs as the real thing does, in five overlapping stages:
+    ///
+    ///  1. the fireball, at the point of burst. It is born small and blindingly white, swells to
+    ///     its full radius over seconds - ten of them at 1 Mt - and cools through yellow and
+    ///     orange to a dull red as it rises off the ground
+    ///  2. the condensation cloud, the white dome that flashes into being a second or two behind
+    ///     the front where the air rarefies behind the shock, and is gone within another second
+    ///  3. the dust the afterwinds tear off the ground and feed into the base of the column
+    ///  4. the stem, climbing at the rate the cloud really climbs, narrow against the cap - half
+    ///     its width at 20 kt, a seventh of it in the megaton range
+    ///  5. the cap, which swells at the top into a canopy of the stabilised cloud radius and
+    ///     rolls over at the rim
+    ///
+    /// The one liberty taken is time. A real cloud takes about ten minutes to stabilise, so the
+    /// rise is compressed by roughly twenty-five to one and held inside a range that is watchable
+    /// without the player having to wait. Every dimension is the real one.
     /// </summary>
     public static class NuclearMushroomFx
     {
-        // Proportions of the cloud, all relative to the canopy radius - which is the destruction
-        // radius - so that the whole thing scales as one shape with the yield.
-        private const float HeightFactor = 2.2f;    // how tall the column stands against the canopy width
-        private const float StemFactor = 0.15f;     // the stem is a narrow column below a broad cap
-        private const float FireballFactor = 0.15f; // the fireball itself is a fraction of what it destroys
         // Engineering limits. The playable map is about 17 km across, so a canopy beyond this
         // already spans it and only costs particle size.
         private const float CapRadiusMin = 200f;
         private const float CapRadiusMax = 8000f;
-        private const float HeightMin = 800f;
-        private const float HeightMax = 12000f;
+        private const float CloudTopMin = 800f;
+        private const float CloudTopMax = 12000f;
+        private const float FireballRadiusMin = 25f;
+        private const float FireballRadiusMax = 3000f;
 
-        private static Material _fireMat;
-        private static Material _smokeMat;
-        private static Texture2D _glowTex;
-        private static bool _ready;
+        // Time. The real rise is minutes; this is what it is divided by, and the bounds it is
+        // then held inside so that a small device is not over in a blink nor a large one still
+        // climbing a minute later.
+        private const float RiseCompression = 25f;
+        private const float RiseSecondsMin = 8f;
+        private const float RiseSecondsMax = 26f;
+        private const float FireballSecondsMin = 0.8f;
+        private const float FireballSecondsMax = 12f;
 
-        /// <summary>Raises the cloud from groundZero. The canopy ends up as wide as destructionRadius.</summary>
-        public static void Play(Vector3 groundZero, float destructionRadius)
+        // The condensation dome forms out where the shock has passed, well beyond the fireball,
+        // and lasts barely a second.
+        private const float CondensationRadiusFactor = 2.6f;
+        private const float CondensationLifetime = 1.3f;
+
+        // Colours, following how a real detonation looks rather than a palette: white hot, then
+        // sodium yellow, then orange, then the brown of nitrogen dioxide and lofted earth.
+        private static readonly Color FireballCore = new Color(1f, 0.99f, 0.94f, 1f);
+        private static readonly Color FireballMid = new Color(1f, 0.82f, 0.35f, 1f);
+        private static readonly Color FireballEdge = new Color(1f, 0.42f, 0.10f, 1f);
+        private static readonly Color FireballCool = new Color(0.42f, 0.13f, 0.05f, 1f);
+        private static readonly Color Condensation = new Color(0.96f, 0.97f, 1f, 0.42f);
+        private static readonly Color DustLight = new Color(0.55f, 0.49f, 0.40f, 0.75f);
+        private static readonly Color DustDark = new Color(0.32f, 0.28f, 0.23f, 0.75f);
+        private static readonly Color CapWarm = new Color(0.40f, 0.31f, 0.24f, 0.72f); // NO2 and earth
+        private static readonly Color CapCool = new Color(0.24f, 0.23f, 0.22f, 0.72f);
+
+        /// <summary>
+        /// Plays the whole detonation. groundZero is the spot on the ground the cloud rises from,
+        /// detonation is where the warhead actually went off - the same point for a groundburst,
+        /// the burst altitude above it for an airburst - and kilotons is the yield everything is
+        /// built from. A yield of zero or less falls back to the 150 kt baseline.
+        /// </summary>
+        public static void Play(Vector3 groundZero, Vector3 detonation, float kilotons)
         {
             try
             {
-                EnsureAssets();
-                float capR = Mathf.Clamp(destructionRadius, CapRadiusMin, CapRadiusMax);
-                float height = Mathf.Clamp(capR * HeightFactor, HeightMin, HeightMax);
-                float stemR = capR * StemFactor;
-                float fireballR = capR * FireballFactor;
-                float riseTime = Mathf.Clamp(height / 450f, 5f, 14f); // it climbs slowly, so it appears to linger
+                float kt = kilotons > 0f ? kilotons : NuclearYields.StandardKilotons;
 
-                CreateFireball(groundZero, fireballR);
-                CreateStem(groundZero, stemR, height, riseTime);
-                CreateCap(groundZero + Vector3.up * height, capR, riseTime);
+                float fireballR = Mathf.Clamp(NuclearCloud.FireballRadius(kt), FireballRadiusMin, FireballRadiusMax);
+                float fireballT = Mathf.Clamp(NuclearCloud.FireballSeconds(kt), FireballSecondsMin, FireballSecondsMax);
+                float capR = Mathf.Clamp(NuclearCloud.CloudRadius(kt), CapRadiusMin, CapRadiusMax);
+                float top = Mathf.Clamp(NuclearCloud.CloudTop(kt), CloudTopMin, CloudTopMax);
+                float stemR = capR * NuclearCloud.StemFraction(kt);
+                float rise = Mathf.Clamp(NuclearCloud.StabiliseSeconds(kt) / RiseCompression,
+                    RiseSecondsMin, RiseSecondsMax);
+
+                CreateFireball(detonation, fireballR, fireballT);
+                CreateCondensationDome(detonation, fireballR * CondensationRadiusFactor, fireballT);
+                CreateGroundDust(groundZero, stemR, rise);
+                CreateStem(groundZero, stemR, top, rise);
+                CreateCap(groundZero + Vector3.up * top, capR, rise);
             }
             catch (Exception e)
             {
@@ -55,242 +94,161 @@ namespace MissileDisaster.Game.Effects
             }
         }
 
-        private static void CreateFireball(Vector3 center, float fireballR)
+        /// <summary>
+        /// The fireball: born a fraction of its final size, swelling to it over fireballT and
+        /// cooling from white through orange to a dull red as it lifts. The size curve does the
+        /// swelling, so the growth is the visible thing rather than a puff appearing full size.
+        /// </summary>
+        private static void CreateFireball(Vector3 center, float radius, float fireballT)
         {
-            var go = NewSystem("MushroomFireball", center, _fireMat);
+            var go = ParticleBuilder.NewSystem("NuclearFireball", center, ParticleAssets.Fire);
             var ps = go.GetComponent<ParticleSystem>();
             var main = ps.main;
-            main.startLifetime = 1.6f;
-            main.startSpeed = fireballR * 0.25f;
-            main.startSize = fireballR * 0.9f;
-            main.startColor = new ParticleSystem.MinMaxGradient(
-                new Color(1f, 0.85f, 0.4f, 1f), new Color(1f, 0.4f, 0.1f, 1f));
-            main.maxParticles = 120;
-            Burst(ps, 40);
-            Sphere(ps, fireballR * 0.4f);
-            AlphaFade(ps);
-            SizeCurve(ps, 1f, 1.8f);
-            ps.Play();
-            UnityEngine.Object.Destroy(go, 3f);
+            main.startLifetime = fireballT * 1.7f;
+            main.startSpeed = radius * 0.05f;
+            main.startSize = radius * 0.55f; // the size curve below takes it from a third of this to full
+            main.startColor = new ParticleSystem.MinMaxGradient(FireballCore, FireballMid);
+            main.maxParticles = 240;
+
+            ParticleBuilder.Burst(ps, 90);
+            ParticleBuilder.Sphere(ps, radius * 0.28f);
+            ParticleBuilder.LimitSpeed(ps, radius * 0.05f, 0.15f);
+            ParticleBuilder.Rise(ps, radius * 0.12f); // the ball lifts as it burns, dragging the stem up after it
+
+            var grad = new Gradient();
+            grad.SetKeys(
+                new[]
+                {
+                    new GradientColorKey(FireballCore, 0f), new GradientColorKey(FireballMid, 0.25f),
+                    new GradientColorKey(FireballEdge, 0.6f), new GradientColorKey(FireballCool, 1f),
+                },
+                new[]
+                {
+                    new GradientAlphaKey(1f, 0f), new GradientAlphaKey(1f, 0.55f),
+                    new GradientAlphaKey(0.55f, 0.8f), new GradientAlphaKey(0f, 1f),
+                });
+            ParticleBuilder.Colour(ps, grad);
+            ParticleBuilder.SizeCurve(ps, 0.35f, 2.0f);
+            ParticleBuilder.PlayAndDestroy(go, fireballT * 1.7f + 1f);
         }
 
-        private static void CreateStem(Vector3 center, float stemR, float height, float riseTime)
+        /// <summary>
+        /// The condensation cloud. It appears a beat after the burst, out where the shock has
+        /// already gone by, as a dome that turns into a ring and vanishes - which is exactly what
+        /// a wide, thin, briefly-lived shell of white particles does on its own.
+        /// </summary>
+        private static void CreateCondensationDome(Vector3 center, float radius, float fireballT)
         {
-            var go = NewSystem("MushroomStem", center, _smokeMat);
+            var go = ParticleBuilder.NewSystem("NuclearCondensation", center, ParticleAssets.Smoke);
             var ps = go.GetComponent<ParticleSystem>();
             var main = ps.main;
-            main.startLifetime = riseTime + 8f; // the stem stays up well after it has risen
-            // Barely any outward speed: the column has to stay narrow for the whole cloud to read
-            // as a mushroom under its much broader cap.
-            main.startSpeed = stemR * 0.02f;
-            main.startSize = stemR * 1.1f;
-            main.startColor = new ParticleSystem.MinMaxGradient(new Color(0.16f, 0.15f, 0.14f, 0.7f));
-            main.maxParticles = 500;
-            main.duration = riseTime;
+            main.startDelay = fireballT * 0.3f; // a second or two at the yields normally used
+            main.startLifetime = CondensationLifetime;
+            main.startSpeed = radius * 0.35f;
+            main.startSize = radius * 0.5f;
+            main.startColor = new ParticleSystem.MinMaxGradient(Condensation);
+            main.maxParticles = 140;
+
+            ParticleBuilder.Burst(ps, 70);
+            ParticleBuilder.Hemisphere(ps, radius * 0.7f);
+            ParticleBuilder.Fade(ps,
+                new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.2f),
+                new GradientAlphaKey(0.6f, 0.6f), new GradientAlphaKey(0f, 1f));
+            ParticleBuilder.SizeCurve(ps, 0.8f, 1.5f);
+            ParticleBuilder.PlayAndDestroy(go, fireballT * 0.3f + CondensationLifetime + 0.5f);
+        }
+
+        /// <summary>
+        /// The dirt the afterwinds tear off the ground. The updraft under the rising ball pulls
+        /// air in along the surface and up into the base of the column, which is where a
+        /// groundburst's fallout comes from.
+        /// </summary>
+        private static void CreateGroundDust(Vector3 groundZero, float stemR, float rise)
+        {
+            float life = rise * 0.55f;
+            var go = ParticleBuilder.NewSystem("NuclearGroundDust", groundZero, ParticleAssets.Smoke);
+            var ps = go.GetComponent<ParticleSystem>();
+            var main = ps.main;
+            main.startLifetime = life;
+            main.startSpeed = stemR * 0.06f;
+            main.startSize = stemR * 0.5f;
+            main.startColor = new ParticleSystem.MinMaxGradient(DustLight, DustDark);
+            main.maxParticles = 300;
+            main.duration = rise * 0.4f;
             main.loop = false;
 
-            var emission = ps.emission;
-            emission.rateOverTime = 40f;
+            ParticleBuilder.Stream(ps, 45f);
+            ParticleBuilder.ConeUp(ps, stemR * 1.7f, 22f); // drawn inwards and up around the base
+            ParticleBuilder.Rise(ps, stemR * 0.25f);
+            ParticleBuilder.Fade(ps,
+                new GradientAlphaKey(0.7f, 0f), new GradientAlphaKey(0.8f, 0.4f), new GradientAlphaKey(0f, 1f));
+            ParticleBuilder.SizeCurve(ps, 0.6f, 1.9f);
+            ParticleBuilder.PlayAndDestroy(go, rise * 0.4f + life + 1f);
+        }
 
-            Sphere(ps, stemR);
+        /// <summary>
+        /// The stem, climbing at the rate the cloud really climbs. Barely any outward speed: the
+        /// column has to stay narrow for the whole thing to read as a mushroom under its cap.
+        /// </summary>
+        private static void CreateStem(Vector3 groundZero, float stemR, float top, float rise)
+        {
+            var go = ParticleBuilder.NewSystem("NuclearStem", groundZero, ParticleAssets.Smoke);
+            var ps = go.GetComponent<ParticleSystem>();
+            var main = ps.main;
+            main.startLifetime = rise + 8f; // the column stands well after it has finished rising
+            main.startSpeed = stemR * 0.02f;
+            main.startSize = stemR * 1.1f;
+            main.startColor = new ParticleSystem.MinMaxGradient(DustDark, CapCool);
+            main.maxParticles = 500;
+            main.duration = rise;
+            main.loop = false;
 
-            // The climb, at a constant upward speed in world space. A longer riseTime makes it
-            // slower.
-            var vel = ps.velocityOverLifetime;
-            vel.enabled = true;
-            vel.space = ParticleSystemSimulationSpace.World;
-            vel.y = new ParticleSystem.MinMaxCurve(height / riseTime);
-
-            AlphaFadeSlow(ps);
-            SizeCurve(ps, 0.8f, 1.6f);
-            ps.Play();
-            UnityEngine.Object.Destroy(go, riseTime + 9f);
+            ParticleBuilder.Stream(ps, 40f);
+            ParticleBuilder.Sphere(ps, stemR);
+            ParticleBuilder.Rise(ps, top / rise);
+            ParticleBuilder.Fade(ps,
+                new GradientAlphaKey(0.6f, 0f), new GradientAlphaKey(0.85f, 0.25f),
+                new GradientAlphaKey(0.7f, 0.7f), new GradientAlphaKey(0f, 1f));
+            ParticleBuilder.SizeCurve(ps, 0.8f, 1.6f);
+            ParticleBuilder.PlayAndDestroy(go, rise + 9f);
         }
 
         /// <summary>
         /// The canopy. Its three contributions - where the particles are emitted, how far they
         /// drift in their lifetime and how large they have grown by the end - are set so that
-        /// they add up to capR, the destruction radius: the cap starts at about half that and
-        /// swells to cover it exactly. Letting the drift run free, as an untuned speed does over
-        /// an 18 second lifetime, is what makes a cloud spread to several times the area the
-        /// blast actually destroyed.
+        /// they add up to capR, the stabilised cloud radius. Letting the drift run free, as an
+        /// untuned speed does over an eighteen second lifetime, is what makes a cloud spread to
+        /// several times the size the yield says it should be.
         /// </summary>
-        private static void CreateCap(Vector3 top, float capR, float riseTime)
+        private static void CreateCap(Vector3 top, float capR, float rise)
         {
             const float lifetime = 18f;       // it lingers at the top for a long time
             const float emitFraction = 0.35f; // where the particles start, as a fraction of capR
             const float sizeFraction = 0.45f; // particle diameter at birth, likewise
             const float growth = 1.6f;        // how much larger a particle is by the end of its life
-            // What is left of capR once the emission spread and the final particle radius are
-            // accounted for is the distance the canopy is allowed to drift outwards, and the
-            // speed is simply that distance over the lifetime.
             float driftDistance = capR * (1f - emitFraction - sizeFraction * growth * 0.5f);
             if (driftDistance < 0f) driftDistance = 0f;
             float driftSpeed = driftDistance / lifetime;
 
-            var go = NewSystem("MushroomCap", top, _smokeMat);
+            var go = ParticleBuilder.NewSystem("NuclearCap", top, ParticleAssets.Smoke);
             var ps = go.GetComponent<ParticleSystem>();
             var main = ps.main;
-            main.startDelay = riseTime * 0.55f; // starts to swell about when the stem reaches the top
+            main.startDelay = rise * 0.55f; // starts to swell about when the stem reaches the top
             main.startLifetime = lifetime;
             main.startSpeed = driftSpeed * 2.5f; // it billows out quickly at first, then is damped
             main.startSize = capR * sizeFraction;
-            main.startColor = new ParticleSystem.MinMaxGradient(
-                new Color(0.18f, 0.16f, 0.15f, 0.7f), new Color(0.1f, 0.09f, 0.085f, 0.7f));
+            main.startColor = new ParticleSystem.MinMaxGradient(CapWarm, CapCool);
             main.maxParticles = 500;
-            main.gravityModifier = 0.015f;      // the rim droops slightly, giving the cap its rollover
+            main.gravityModifier = 0.015f;  // the rim droops, which is the cap's rollover
 
-            Burst(ps, 100);
-            ConeUp(ps, capR * emitFraction, 62f); // a wide upward cone spreads it outwards into the canopy
-            DampenRise(ps, driftSpeed, 0.2f);     // holds it to the drift the canopy width allows
-            AlphaFadeSlow(ps);
-            SizeCurve(ps, 0.7f, growth);
-            ps.Play();
-            UnityEngine.Object.Destroy(go, riseTime * 0.55f + 20f);
-        }
-
-        // ---- helpers ----
-
-        private static GameObject NewSystem(string name, Vector3 pos, Material mat)
-        {
-            var go = new GameObject(name);
-            go.transform.position = pos;
-            var ps = go.AddComponent<ParticleSystem>();
-            var main = ps.main;
-            main.simulationSpace = ParticleSystemSimulationSpace.World;
-            var renderer = ps.GetComponent<ParticleSystemRenderer>();
-            if (mat != null) renderer.material = mat;
-            renderer.renderMode = ParticleSystemRenderMode.Billboard;
-            return go;
-        }
-
-        private static void Burst(ParticleSystem ps, int count)
-        {
-            var emission = ps.emission;
-            emission.enabled = true;
-            emission.rateOverTime = 0f;
-            emission.SetBursts(new[] { new ParticleSystem.Burst(0f, (short)count) });
-        }
-
-        private static void Sphere(ParticleSystem ps, float radius)
-        {
-            var shape = ps.shape;
-            shape.enabled = true;
-            shape.shapeType = ParticleSystemShapeType.Sphere;
-            shape.radius = radius;
-        }
-
-        private static void AlphaFade(ParticleSystem ps)
-        {
-            var col = ps.colorOverLifetime;
-            col.enabled = true;
-            var grad = new Gradient();
-            grad.SetKeys(
-                new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
-                new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0.85f, 0.4f), new GradientAlphaKey(0f, 1f) });
-            col.color = new ParticleSystem.MinMaxGradient(grad);
-        }
-
-        private static void SizeCurve(ParticleSystem ps, float from, float to)
-        {
-            var sol = ps.sizeOverLifetime;
-            sol.enabled = true;
-            sol.size = new ParticleSystem.MinMaxCurve(1f,
-                new AnimationCurve(new Keyframe(0f, from), new Keyframe(1f, to)));
-        }
-
-        /// <summary>An alpha curve that stays visible for a while and then fades slowly, which is what makes it linger.</summary>
-        private static void AlphaFadeSlow(ParticleSystem ps)
-        {
-            var col = ps.colorOverLifetime;
-            col.enabled = true;
-            var grad = new Gradient();
-            grad.SetKeys(
-                new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
-                new[]
-                {
-                    new GradientAlphaKey(0.6f, 0f), new GradientAlphaKey(0.85f, 0.25f),
-                    new GradientAlphaKey(0.7f, 0.7f), new GradientAlphaKey(0f, 1f)
-                });
-            col.color = new ParticleSystem.MinMaxGradient(grad);
-        }
-
-        /// <summary>Emits from a wide upward cone, spreading into the canopy at the top. The cone's +Z is turned upwards.</summary>
-        private static void ConeUp(ParticleSystem ps, float radius, float angle)
-        {
-            var shape = ps.shape;
-            shape.enabled = true;
-            shape.shapeType = ParticleSystemShapeType.Cone;
-            shape.angle = angle;
-            shape.radius = radius;
-            ps.transform.rotation = Quaternion.Euler(-90f, 0f, 0f);
-        }
-
-        /// <summary>Caps the upward speed so it spreads horizontally and lingers.</summary>
-        private static void DampenRise(ParticleSystem ps, float limit, float dampen)
-        {
-            var lv = ps.limitVelocityOverLifetime;
-            lv.enabled = true;
-            lv.dampen = dampen;
-            lv.limit = new ParticleSystem.MinMaxCurve(limit);
-        }
-
-        private static void EnsureAssets()
-        {
-            if (_ready) return;
-            _ready = true;
-            _glowTex = BuildGlowTexture(64);
-            _fireMat = BuildMaterial(true);
-            _smokeMat = BuildMaterial(false);
-        }
-
-        private static Material BuildMaterial(bool additive)
-        {
-            Shader shader = additive
-                ? RenderAssets.FindFirst("Particles/Additive", "Legacy Shaders/Particles/Additive", "Mobile/Particles/Additive")
-                : RenderAssets.FindFirst("Particles/Alpha Blended", "Legacy Shaders/Particles/Alpha Blended");
-            if (shader == null) shader = additive
-                ? RenderAssets.FindLoadedContaining("additive")
-                : RenderAssets.FindLoadedContaining("alpha blend", "alphablend");
-            if (shader == null) shader = RenderAssets.FindFirst("Sprites/Default", "Unlit/Transparent");
-            if (shader == null) shader = RenderAssets.FindLoadedContaining("particle", "sprite", "unlit");
-            if (shader == null) shader = Shader.Find("Standard");
-            if (shader == null) return null;
-
-            var mat = new Material(shader);
-            if (_glowTex != null)
-            {
-                mat.mainTexture = _glowTex;
-                if (mat.HasProperty("_MainTex")) mat.SetTexture("_MainTex", _glowTex);
-            }
-            if (mat.HasProperty("_TintColor")) mat.SetColor("_TintColor", Color.white);
-            if (mat.HasProperty("_Color")) mat.SetColor("_Color", Color.white);
-            mat.color = Color.white;
-            RenderAssets.ApplyDepthOcclusion(mat); // let buildings in front occlude it, instead of showing through
-            return mat;
-        }
-
-        private static Texture2D BuildGlowTexture(int size)
-        {
-            var tex = new Texture2D(size, size, TextureFormat.ARGB32, false);
-            tex.wrapMode = TextureWrapMode.Clamp;
-            float half = (size - 1) * 0.5f;
-            var pixels = new Color[size * size];
-            for (int y = 0; y < size; y++)
-            {
-                for (int x = 0; x < size; x++)
-                {
-                    float dx = (x - half) / half;
-                    float dy = (y - half) / half;
-                    float d = Mathf.Sqrt(dx * dx + dy * dy);
-                    float a = Mathf.Clamp01(1f - d);
-                    a = a * a;
-                    pixels[y * size + x] = new Color(1f, 1f, 1f, a);
-                }
-            }
-            tex.SetPixels(pixels);
-            tex.Apply();
-            return tex;
+            ParticleBuilder.Burst(ps, 100);
+            ParticleBuilder.ConeUp(ps, capR * emitFraction, 62f);
+            ParticleBuilder.LimitSpeed(ps, driftSpeed, 0.2f);
+            ParticleBuilder.Fade(ps,
+                new GradientAlphaKey(0.6f, 0f), new GradientAlphaKey(0.85f, 0.25f),
+                new GradientAlphaKey(0.7f, 0.7f), new GradientAlphaKey(0f, 1f));
+            ParticleBuilder.SizeCurve(ps, 0.7f, growth);
+            ParticleBuilder.PlayAndDestroy(go, rise * 0.55f + lifetime + 2f);
         }
     }
 }

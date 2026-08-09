@@ -25,9 +25,23 @@ radioactive fallout that you can clean up with a dedicated decontamination facil
     crater is formed, the blast/fire reach wider, and roads / water pipes / metro / foundations
     survive. Burst altitude follows the yield (≈30–150 m conventional, ~900 m for a 150 kt
     nuclear) and is capped at 1 km so the explosion stays on screen
-  - The **mushroom cloud always rises from the ground**, even for an air burst, and its canopy is
-    built to the same width as the destruction radius — so the cloud shows you exactly how far
-    the blast reached
+  - The **mushroom cloud always rises from the ground**, even for an air burst
+- **Physically modelled nuclear detonation** — every dimension comes from Glasstone & Dolan,
+  *The Effects of Nuclear Weapons* (1977), ch. II, not from taste:
+  - Fireball radius `55·W^0.4` m, swelling over `10·(W/1Mt)^0.4` s (1 Mt → 869 m in 10 s), cooling
+    white → yellow → orange → dull red
+  - Wilson **condensation cloud** — the white dome that flashes out behind the shock and is gone
+    within a second
+  - Stabilised cap radius `0.6 km·10^(0.0137L³−0.0358L²+0.37L)` and cloud top
+    `3.0 km·10^(0.006941L⁴−0.06216L³+0.1526L²+0.1878L)`, `L = log₁₀(W/kt)`
+    — at 150 kt that is a 3.6 km cap under a 13 km column, which happens to match the 3.7 km
+    destruction radius within a few per cent
+  - Stem half the cap's width at 20 kt, a seventh of it in the megaton range
+  - Ground dust drawn up by the afterwinds. Only the *time* is compressed (~25×) — a real cloud
+    takes ten minutes to stabilise
+- **Shock wave** — a blast front races out across the ground following Sedov–Taylor
+  (`r ∝ t^0.4`): it leaves at several times the speed of sound and visibly decelerates, reaching
+  the destruction radius at an average 540 m/s. Every warhead gets one
 - **Distance‑based destruction** — total destruction near ground zero, falling off with distance
 - **Fire** for incendiary/thermobaric/nuclear warheads
   - White Phosphorus is a pure incendiary: no crater and almost no blast **at any charge** —

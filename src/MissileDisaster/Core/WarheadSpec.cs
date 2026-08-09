@@ -32,6 +32,10 @@ namespace MissileDisaster.Core
         public float ContaminationRadius; // fallout; greater than zero for nuclear warheads only
         public float BurstAltitude;       // height above the target the warhead detonates at when fused for an airburst, in metres
         public bool Airburst;             // set by WithBurst; the detonation happens BurstAltitude above the ground and leaves no crater
+        // The yield in kilotons, for nuclear warheads only, set at launch. The radii above are
+        // all the yield has to say about the damage, but the fireball and the cloud are built to
+        // real figures - see NuclearCloud - which need the yield itself and not a ratio.
+        public float YieldKilotons;
         // An incendiary carries next to no kinetic punch: its charge disperses and ignites fuel
         // rather than driving a shock wave. Scaled therefore leaves its crater and destruction
         // radii alone and grows only the fires, however large the charge gets.
