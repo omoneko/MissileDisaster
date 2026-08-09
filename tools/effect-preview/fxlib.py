@@ -46,11 +46,10 @@ def hard(v, lo, hi): return max(lo, min(hi, v))
 
 # ------------------------------------------------- Core/NuclearCloudDisplay.cs (new)
 
-CLOUD_SCALE = 0.20      # NuclearCloudDisplay.CloudScale - playability, not physics
-FIREBALL_SCALE = 0.50   # the fireball comes down less far than the cloud around it
-HEIGHT_SCALE = 0.35     # a further squash on the height alone
+CLOUD_SCALE = 0.06      # NuclearCloudDisplay.CloudScale - one number for width and height alike
+FIREBALL_SCALE = 0.16   # the fireball comes down less far than the cloud around it
 SCREEN_TOP = 1000.0     # ScreenTopAltitude - nothing is drawn above the top of the screen
-TOP_KNEE = 400.0
+TOP_KNEE = 700.0
 TROPOPAUSE = 11000.0    # real metres, before the scale
 NEW = dict(fb=(25.0, 3000.0, 7000.0), fbs=(0.8, 12.0, 20.0), cap=(200.0, 8000.0, 26000.0),
            top=(800.0, 12000.0, 30000.0), rise=(12.0, 40.0, 60.0))
@@ -73,7 +72,7 @@ def dimensions(kt, ceilings="new"):
         d["fireball"] *= FIREBALL_SCALE
         d["cap"] *= CLOUD_SCALE
         base_fraction = base / d["top"]
-        d["top"] = soft(d["top"] * CLOUD_SCALE * HEIGHT_SCALE, TOP_KNEE, SCREEN_TOP)
+        d["top"] = soft(d["top"] * CLOUD_SCALE, TOP_KNEE, SCREEN_TOP)
         d["base"] = d["top"] * base_fraction
     else:
         d = dict(

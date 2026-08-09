@@ -115,6 +115,34 @@ public class NuclearCloudDisplayTests
     }
 
     [Fact]
+    public void The_column_is_taller_than_it_is_wide()
+    {
+        // A stem wider than it is tall is not a stem, and no arrangement of particles reads as a
+        // mushroom from there. This is the check that squashing the height on its own broke: it
+        // left a 150 kt column 459 m across and 375 m tall, under a canopy three times too wide.
+        foreach (float kt in new[] { 15f, 150f, 1200f })
+        {
+            NuclearCloudDimensions d = NuclearCloudDisplay.For(kt);
+            Assert.True(d.CapBase > d.StemRadius * 2f * 1.3f,
+                $"{kt} kt: column {d.StemRadius * 2f:F0} m wide, {d.CapBase:F0} m tall");
+        }
+    }
+
+    [Fact]
+    public void The_cloud_keeps_the_proportions_the_figures_give_it()
+    {
+        // Width and height come down by one number, so the drawn shape is the real shape.
+        // Scaling them separately is what turned the effect into a pancake on a lump.
+        foreach (float kt in new[] { 15f, 22f, 150f })
+        {
+            NuclearCloudDimensions d = NuclearCloudDisplay.For(kt);
+            float drawn = d.CapRadius * 2f / d.CloudTop;
+            float real = NuclearCloud.CloudRadius(kt) * 2f / NuclearCloud.CloudTop(kt);
+            Assert.InRange(drawn / real, 0.9f, 1.15f);
+        }
+    }
+
+    [Fact]
     public void No_cloud_is_ever_drawn_above_the_top_of_the_screen()
     {
         // The height is what runs off the screen, so it is the one dimension with a hard

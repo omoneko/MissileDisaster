@@ -51,12 +51,11 @@ radioactive fallout that you can clean up with a dedicated decontamination facil
     ceiling it never reaches, so a B83, an Ivy Mike and a Tsar Bomba are three visibly different
     clouds instead of the same picture
   - **What is deliberately not to scale**, and the only such thing in the model: the cloud is
-    drawn at a fifth of its real size, and its height is squashed further and then bounded at
-    1 km — the altitude the mod already refuses to burst above, because that is where the top of
-    the screen is. No cloud is ever drawn over it, so a strike always fits in frame; under it the
-    height still grows with the yield. The fireball comes down only half way, so it is not lost
-    under the cloud, and the rise is compressed about twelve to one, a strike running about a
-    minute from flash to fading. Four named constants in `Core/NuclearCloudDisplay`.
+    drawn at 6% of its real size — one number for width and height alike, so the drawn shape is
+    the real shape — and bounded at 1 km, the altitude the mod already refuses to burst above,
+    because that is where the top of the screen is. The fireball comes down less far, so it is
+    not lost under the cloud, and the rise is compressed about twelve to one, a strike running
+    about a minute from flash to fading. Four named constants in `Core/NuclearCloudDisplay`.
     See [docs/effects](docs/effects) for renders of every stage, and for what was checked against
     the measured tests and the photographs
 - **Shock wave** — a blast front races out across the ground following Sedov–Taylor
@@ -129,12 +128,12 @@ question of whether the DLL the game is running is the one that was built.
 **Options → Mods → Missile Disaster** has a *Build check* group at the top showing two lines:
 
 ```
-150 kt draws: cloud top 751 m, cap 1440 m wide, fireball 408 m across, rise 31.1 s, screen top 1000 m
+150 kt draws: cloud top 781 m, cap 431 m wide, fireball 131 m across, rise 31.1 s, screen top 1000 m
 Loaded from: C:\Users\...\Addons\Mods\MissileDisaster
 ```
 
 The numbers are computed by the code that is running, not written down, so they are a
-fingerprint of the build: a cloud top of about **751 m** is a current build, **13245 m** is the
+fingerprint of the build: a cloud top of about **781 m** is a current build, **13245 m** is the
 original one. The path is where the game actually loaded the DLL from, which settles the case
 where a Steam Workshop subscription is shadowing a local build.
 

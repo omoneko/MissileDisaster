@@ -1,45 +1,40 @@
 # Handover — nuclear effect work
 
-Branch `claude/mushroom-cloud-explosion-effects-anxonz`, 13 commits on top of `master` (`c8b7822`).
+Branch `claude/mushroom-cloud-explosion-effects-anxonz`, on top of `master` (`c8b7822`).
 Everything described here is pushed. Nothing in this work exists on `master`.
 
-## Read this first: the build in the game is not this build
+## The one thing this work got wrong, and how it was found
 
-The game log from the last session showed the mod loading correctly —
+For four rounds the game was running a DLL that did not contain the changes, so the reports coming
+back were about code that had never loaded. The log settled it: the mod was loading fine from the
+local Addons folder, but the `[MissileDisaster] build check` line that `Mod.OnEnabled` writes
+unconditionally as its first statement was absent.
 
-```
-No source files found: MissileDisaster            <- normal. A DLL mod has no .cs sources
-Loading ...\Addons\Mods\MissileDisaster\MissileDisaster.dll
-Assembly MissileDisaster, Version=1.0.0.0 loaded.
-```
+Once a correct build finally ran, the first real report was that it did not look like a mushroom.
+It did not, and the reason was in this work rather than in the build: the height had been squashed
+on its own, twice, to answer "the cloud is too tall". Width and height had separate scales, and a
+150 kt column came out **459 m across and 375 m tall** under a canopy three and a half times too
+wide for it. A stem wider than it is tall is not a stem.
 
-— but **no `[MissileDisaster] build check - ...` line**, which `Mod.OnEnabled` writes as its first
-statement, unconditionally. The DLL the game is running therefore predates `e85d401`.
+The fix was to collapse the two scales into one. `CloudScale` now moves cap, stem and height
+together, so the drawn shape is the shape the figures give it, and the height ceiling is a
+guarantee rather than a shaping tool. **If a cloud has to be smaller, lower `CloudScale` and let
+it take the width with it.** Two tests now pin the silhouette so this cannot come back.
 
-That matters because four rounds of tuning were done on reports from a build that did not contain
-them. Settle this before judging anything:
+## Checking which build is running
 
-```powershell
-cd <repo>
-git fetch origin
-git checkout claude/mushroom-cloud-explosion-effects-anxonz
-git pull
-git log --oneline -1          # expect f55952c or later
-
-# with Cities: Skylines fully closed - the DLL is locked while it runs
-.\build.ps1
-```
-
-Then in game: **Options → Mods → Missile Disaster → Build check**. Two lines:
+**Options → Mods → Missile Disaster → Build check**:
 
 ```
-150 kt draws: cloud top 751 m, cap 1440 m wide, fireball 408 m across, rise 31.1 s, screen top 1000 m
+150 kt draws: cloud top 781 m, cap 431 m wide, fireball 131 m across, rise 31.1 s, screen top 1000 m
 Loaded from: C:\...\Addons\Mods\MissileDisaster
 ```
 
-The numbers are computed by the running code, so they are a fingerprint: a cloud top near **751 m**
-is this build, **13245 m** is the original, and **no Build check group at all** is a DLL older than
-`f55952c`. The path line settles the case where a Workshop subscription shadows a local build.
+The numbers are computed by the running code, so they are a fingerprint: a cloud top near **781 m**
+is this build, **13245 m** is the original, and **no Build check group at all** is an older DLL. The
+path line settles the case where a Workshop subscription shadows a local build.
+
+Rebuild with Cities: Skylines fully closed — the DLL is locked while it runs.
 
 ### One more thing to rule out
 
@@ -54,10 +49,9 @@ that are taste rather than physics, and they are where to go for "bigger", "smal
 
 | constant | now | what it does |
 |---|---|---|
-| `CloudScale` | 0.20 | the whole cloud against its real size. Raise for a bigger strike |
-| `CloudHeightScale` | 0.35 | a further squash on the height alone, before the ceiling |
-| `ScreenTopAltitude` | 1000 | hard bound on the drawn height. **Also `ModConfig.MaxBurstAltitude`** — lowering it lowers the airburst ceiling too |
-| `FireballScale` | 0.50 | the fireball, which comes down less far than the cloud so it is not lost under it |
+| `CloudScale` | 0.06 | the whole cloud against its real size — **width and height alike**. Raise for a bigger strike, lower for a smaller one. Do not scale height on its own: that is what broke the mushroom shape once already |
+| `ScreenTopAltitude` | 1000 | soft bound on the drawn height, knee at 700. **Also `ModConfig.MaxBurstAltitude`** — lowering it lowers the airburst ceiling too |
+| `FireballScale` | 0.16 | the fireball, which comes down less far than the cloud so it is not lost under it |
 | `RiseCompression` | 12 | real seconds per drawn second. Lower is slower |
 | `CapLifetime*` in `NuclearMushroomFx` | 35–60 s | how long the canopy stands |
 
@@ -65,23 +59,24 @@ What these currently produce:
 
 | | cloud top | cap width | fireball | whole shot |
 |---|---|---|---|---|
-| Little Boy 15 kt | 461 m | 0.61 km | 162 m | 45 s |
-| 150 kt baseline | 751 m | 1.44 km | 408 m | 67 s |
-| B83 1.2 Mt | 869 m | 3.78 km | 938 m | 87 s |
-| Tsar Bomba 50 Mt | 952 m | 10.4 km | 4013 m | 93 s |
+| Little Boy 15 kt | 398 m | 184 m | 52 m | 45 s |
+| 150 kt baseline | 781 m | 431 m | 131 m | 67 s |
+| B83 1.2 Mt | 927 m | 1133 m | 300 m | 87 s |
+| Tsar Bomba 50 Mt | 987 m | 3119 m | 1284 m | 93 s |
 
-If the height is still wrong once a correct build is running, `ScreenTopAltitude` is the lever — but
-note it is shared with the airburst ceiling, so decouple them first if only the cloud should move.
+If the size is still wrong, **`CloudScale` is the lever** — it moves width and height together and
+so cannot break the silhouette. `ScreenTopAltitude` is a guarantee, not a shaping tool, and it is
+shared with the airburst ceiling; decouple them first if only the cloud should move.
 
 ## Verification: what is proven and what is not
 
 | | status |
 |---|---|
-| `Core/**` logic | **232 xUnit tests pass.** `dotnet test tests/MissileDisaster.Core.Tests/` |
+| `Core/**` logic | **234 xUnit tests pass.** `dotnet test tests/MissileDisaster.Core.Tests/` |
 | effect code compiles | **passes.** `dotnet build tools/compile-check/CompileCheck.csproj` |
 | `ExplosionFx`, `ImpactResolver`, `ModConfig`, `Mod` changes | inspected only — not in the compile check, which does not stub the Colossal API |
 | the members exist in Unity 5.6 | **not verified.** See below |
-| how any of it looks in game | **not verified.** Never ran |
+| how it looks in game | **partly.** One session with a correct build, which found the silhouette bug above. Everything since is unverified again |
 
 Three Unity members are used that were not used before this branch. If the real build fails, suspect
 these first:
@@ -119,10 +114,11 @@ narrative.
 4. **`de19d69`** — the canopy's base is the tropopause, or half the cloud height below it. That
    reproduces Ivy Mike's and Castle Bravo's measured cap bases and is why a 20 kt cap is a ball and
    a megaton cap a sheet.
-5. **`18fb3d4`, `bbce362`, `57cfbff`** — playability: the cloud brought down to a fifth, the height
-   squashed and then bounded at the altitude the mod already calls the top of the screen; the
-   fireball's own radius budget fixed and given a larger scale; the whole shot stretched from 26 s
-   to about a minute.
+5. **`18fb3d4`, `bbce362`, `57cfbff`** — playability: the cloud brought down in size and its height
+   bounded at the altitude the mod already calls the top of the screen; the fireball's own radius
+   budget fixed and given a scale of its own; the whole shot stretched from 26 s to about a minute.
+   The height was squashed independently of the width here, which is the mistake the next commit
+   undoes.
 6. **`2c35cfc`, `e85d401`, `f55952c`** — the tooling: a compile check that works without the game,
    and the build fingerprint in the log and on the options screen.
 
@@ -134,8 +130,7 @@ they were checked against.
 - **No low-level layer.** Both 1945 photographs show a broad sheet of cloud across the ground far
   wider than the column. The ground dust here is a skirt about twice the stem's width.
 - **No skirt or bell**, and **no true vortex rollover** — the canopy's rim only sags under gravity.
-- **The cap is far flatter than the real thing**, because its depth is measured down from a cloud
-  top that has been squashed for playability. A 10 Mt canopy comes out eighteen times wider than
-  deep where the figures say four. The width is untouched, so the yield still reads.
+- **The largest clouds are wider than their share**, because the height ceiling compresses them
+  while the width is untouched. Below about a megaton the drawn shape is the real shape.
 - **Particle budget**: a nuclear strike now holds up to 900 stem + 420 dust + 400 cap particles for
   as long as 93 s. `StemMaxParticles` in `NuclearMushroomFx` is the one to lower if it costs frames.

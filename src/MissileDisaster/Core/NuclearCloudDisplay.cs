@@ -47,18 +47,22 @@ namespace MissileDisaster.Core
         /// Skylines is played at the player sees a column disappearing off the top of the screen
         /// rather than a mushroom.
         ///
-        /// It is applied to the cloud - cap, stem and height alike - so every proportion the
-        /// model was checked against the photographs for survives it unchanged.
+        /// It is applied to the cloud - cap, stem and height alike, one number for all three - so
+        /// every proportion the model was checked against the photographs for survives it. That
+        /// is not a nicety. Height is what runs off the top of a screen, so the temptation is to
+        /// squash the height alone; doing exactly that is what turned the effect into a pancake
+        /// on a lump, with a 150 kt column 459 m across and 375 m tall. A stem wider than it is
+        /// tall is not a stem, and no arrangement of particles reads as a mushroom from there.
+        /// If a cloud has to be shorter, this is the number to lower - it takes the width with
+        /// it, which is the point.
         ///
-        /// This is the number to change to make clouds larger or smaller across the board. At
-        /// 0.20 a 150 kt cloud stands 2.6 km, which fits in frame from a few kilometres back at
-        /// the height the game is normally played at; 0.30 is a taller cloud that starts to run
-        /// off the top of the screen.
+        /// At 0.06 a 150 kt cloud stands 783 m over a 431 m canopy, which is the shape the
+        /// figures give it and fits in frame at the zoom the game is played at.
         /// </summary>
-        public const float CloudScale = 0.20f;
+        public const float CloudScale = 0.06f;
 
         /// <summary>
-        /// The fireball gets its own, larger scale - two and a half times the cloud's.
+        /// The fireball gets its own, larger scale - nearly three times the cloud's.
         ///
         /// It is the smallest part of the effect and the only part judged against the buildings
         /// around it rather than against the cloud, so shrinking it in step with a cloud brought
@@ -68,7 +72,7 @@ namespace MissileDisaster.Core
         /// its share puts it at about a third of the canopy's width at every yield, against the
         /// tenth to a seventh it really is.
         /// </summary>
-        public const float FireballScale = 0.50f;
+        public const float FireballScale = 0.16f;
 
         /// <summary>
         /// The altitude the top of the screen is, near enough, at the zoom the game is played at.
@@ -82,23 +86,14 @@ namespace MissileDisaster.Core
         public const float ScreenTopAltitude = 1000f;
 
         /// <summary>
-        /// A further squash applied to the cloud's height alone, on top of CloudScale, and then
-        /// a soft ceiling at ScreenTopAltitude.
-        ///
-        /// Even at a fifth of its real size a cloud is a tall thing - the figures make one taller
-        /// than it is wide at every yield below a megaton, because that is what a real one is -
-        /// and height is what runs off the top of a screen. The squash brings the whole range
-        /// down; the ceiling then guarantees it, so that no yield, however absurd, can put its
-        /// canopy where the player cannot see it. Between the knee and the ceiling the height
-        /// still grows with the yield, so a Tsar Bomba still stands twice a Little Boy.
-        ///
-        /// This is the one place where a proportion checked against the photographs is knowingly
-        /// broken: the canopy comes out several times flatter than the real thing, because its
-        /// depth is measured down from the cloud top and the top is what moved. Set the squash to
-        /// 1 and the ceiling out of the way to have the cloud back in proportion.
+        /// Where the soft ceiling on the drawn height starts to bite. It sits high enough that
+        /// everything up to about a megaton is drawn in proportion and the ceiling is only a
+        /// safety net - a guarantee that no yield, however absurd, can put its canopy where the
+        /// player cannot see it. Above it the height is compressed while the width is not, so
+        /// the very largest clouds do come out wider than their share; that is the price of the
+        /// guarantee, and it is paid only by weapons nobody has ever built but Tsar Bomba.
         /// </summary>
-        public const float CloudHeightScale = 0.35f;
-        public const float CloudTopDrawnKnee = 400f;
+        public const float CloudTopDrawnKnee = 700f;
 
         // The tropopause: the lid the canopy spreads out under, in real metres, before the
         // scale. Through the troposphere the air gets colder with height, so a fireball that
@@ -172,7 +167,7 @@ namespace MissileDisaster.Core
             d.FireballSeconds = EffectCeiling.Soft(NuclearCloud.FireballSeconds(kt),
                 FireballSecondsMin, FireballSecondsKnee, FireballSecondsCeiling);
             d.CapRadius = capRadius * CloudScale;
-            d.CloudTop = EffectCeiling.Soft(cloudTop * CloudScale * CloudHeightScale,
+            d.CloudTop = EffectCeiling.Soft(cloudTop * CloudScale,
                 CloudTopDrawnKnee, ScreenTopAltitude);
             d.CapBase = d.CloudTop * baseFraction;
             d.CapDepth = d.CloudTop - d.CapBase;
