@@ -51,10 +51,12 @@ radioactive fallout that you can clean up with a dedicated decontamination facil
     ceiling it never reaches, so a B83, an Ivy Mike and a Tsar Bomba are three visibly different
     clouds instead of the same picture
   - **What is deliberately not to scale**, and the only such thing in the model: the cloud is
-    drawn at a fifth of its real size with the height halved again, because a real 150 kt cloud
-    stands 13 km and would leave the top of the screen; the fireball comes down only half way, so
-    it is not lost under it; and the rise is compressed about twelve to one, a strike running
-    about a minute from flash to fading. Three named constants in `Core/NuclearCloudDisplay`.
+    drawn at a fifth of its real size, and its height is squashed further and then bounded at
+    1 km — the altitude the mod already refuses to burst above, because that is where the top of
+    the screen is. No cloud is ever drawn over it, so a strike always fits in frame; under it the
+    height still grows with the yield. The fireball comes down only half way, so it is not lost
+    under the cloud, and the rise is compressed about twelve to one, a strike running about a
+    minute from flash to fading. Four named constants in `Core/NuclearCloudDisplay`.
     See [docs/effects](docs/effects) for renders of every stage, and for what was checked against
     the measured tests and the photographs
 - **Shock wave** — a blast front races out across the ground following Sedov–Taylor

@@ -1,3 +1,4 @@
+using MissileDisaster.Core;
 using UnityEngine;
 
 namespace MissileDisaster.Game
@@ -149,7 +150,9 @@ namespace MissileDisaster.Game
         // approaching it would leave the missile no distance to fall - and partly a playability
         // one, since an explosion much higher than this is off the top of the screen at the zoom
         // the game is normally played at.
-        public const float MaxBurstAltitude = 1000f;
+        // It is that second reading - where the top of the screen is - that the mushroom cloud
+        // is also held under, so the two share one number rather than drifting apart.
+        public const float MaxBurstAltitude = NuclearCloudDisplay.ScreenTopAltitude;
 
         // Sound: loaded from Sounds at runtime and played as positional 3D audio. Main thread.
         public const string SoundsFolderName = "Sounds";

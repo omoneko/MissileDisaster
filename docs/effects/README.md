@@ -101,11 +101,8 @@ Sources for the measured figures: [Castle Bravo](https://en.wikipedia.org/wiki/C
 
 ## `cloud-scale.png`
 
-The same 150 kt burst at four values of `NuclearCloudDisplay.CloudScale`, from a camera at the
-height and distance the game is actually played at, with a city for a ruler. This is the figure
-to look at when deciding how large clouds should be. With `CloudHeightScale` at 0.5 every one of
-the four is in frame, so the choice is about how much of the sky a strike should fill rather
-than about whether it fits.
+Four yields from a close game camera, with the 1000 m line marked across the frame — the
+altitude the mod already calls the top of the screen. Every cloud is drawn under it.
 
 ## `nineteen-forty-five.png`
 
@@ -140,12 +137,19 @@ ones in the model that are:
   stands 13.2 km, which from a game camera is a column leaving the top of the screen rather than
   a mushroom. It is applied to cap, stem and height together, so every proportion checked
   against the photographs survives it. Raise it for taller clouds; see `cloud-scale.png`.
-- **`CloudHeightScale = 0.50`** — the height alone is halved again on top of that. Even at a
-  fifth of its real size a cloud is a tall thing, because the figures make one taller than it is
-  wide at every yield below a megaton, and height is what runs off the top of a screen. This is
-  the one proportion checked against the photographs that is knowingly broken: the canopy comes
-  out about twice as flat as the real thing, since its depth is measured from the cloud top and
-  the top is what moved. Set it to 1 to have the cloud back in proportion at twice the height.
+- **`CloudHeightScale = 0.35`, then a soft ceiling at `ScreenTopAltitude = 1000`** — the height
+  alone is squashed further and then bounded outright. Even at a fifth of its real size a cloud
+  is a tall thing, because the figures make one taller than it is wide at every yield below a
+  megaton, and height is what runs off the top of a screen. `ScreenTopAltitude` is not a figure
+  about clouds: it is the altitude the mod already refuses to detonate an airburst above
+  (`ModConfig.MaxBurstAltitude` is the same constant now, for the same reason), arrived at the
+  only way it can be, by looking at the game. Nothing is ever drawn over it, at any yield.
+  Under it the height still grows: 461 m at 15 kt to 952 m at 50 Mt.
+
+  This is the one proportion checked against the photographs that is knowingly broken. The
+  canopy's depth is measured down from the cloud top, so squashing the top flattens the cap with
+  it: a 10 Mt canopy comes out eighteen times wider than deep where the figures say four. The
+  width is untouched, so the yield still reads — from the cap, not the column.
 - **`FireballScale = 0.50`** — the fireball comes down only half way, so it keeps two and a half
   times its share of a cloud that has been brought down to a fifth. At full size it would be
   nearly as wide as a compressed 50 Mt canopy; in step with the cloud it is a spark. At 0.50 it

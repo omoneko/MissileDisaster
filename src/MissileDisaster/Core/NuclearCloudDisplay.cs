@@ -71,19 +71,34 @@ namespace MissileDisaster.Core
         public const float FireballScale = 0.50f;
 
         /// <summary>
-        /// A further squash applied to the cloud's height alone, on top of CloudScale.
+        /// The altitude the top of the screen is, near enough, at the zoom the game is played at.
+        ///
+        /// This is not a figure about clouds. It is the height the mod already refuses to
+        /// detonate an airburst above - ModConfig.MaxBurstAltitude is this same number, for this
+        /// same reason - and it was arrived at the only way it can be, by looking at the game.
+        /// A cloud drawn taller than the highest thing the mod is willing to put in the sky is a
+        /// cloud whose top the player cannot see, so nothing is ever drawn above it.
+        /// </summary>
+        public const float ScreenTopAltitude = 1000f;
+
+        /// <summary>
+        /// A further squash applied to the cloud's height alone, on top of CloudScale, and then
+        /// a soft ceiling at ScreenTopAltitude.
         ///
         /// Even at a fifth of its real size a cloud is a tall thing - the figures make one taller
         /// than it is wide at every yield below a megaton, because that is what a real one is -
-        /// and height is what runs off the top of a screen. Halving it leaves the canopy as wide
-        /// as it was and brings its top down to where the whole mushroom is comfortably in frame.
+        /// and height is what runs off the top of a screen. The squash brings the whole range
+        /// down; the ceiling then guarantees it, so that no yield, however absurd, can put its
+        /// canopy where the player cannot see it. Between the knee and the ceiling the height
+        /// still grows with the yield, so a Tsar Bomba still stands twice a Little Boy.
         ///
         /// This is the one place where a proportion checked against the photographs is knowingly
-        /// broken: the canopy comes out about twice as flat as the real thing, because its depth
-        /// is measured from the cloud top and the top is what moved. Set it to 1 to have the
-        /// cloud back in proportion, at twice the height.
+        /// broken: the canopy comes out several times flatter than the real thing, because its
+        /// depth is measured down from the cloud top and the top is what moved. Set the squash to
+        /// 1 and the ceiling out of the way to have the cloud back in proportion.
         /// </summary>
-        public const float CloudHeightScale = 0.5f;
+        public const float CloudHeightScale = 0.35f;
+        public const float CloudTopDrawnKnee = 400f;
 
         // The tropopause: the lid the canopy spreads out under, in real metres, before the
         // scale. Through the troposphere the air gets colder with height, so a fireball that
@@ -146,6 +161,9 @@ namespace MissileDisaster.Core
                 CloudTopMin, CloudTopKnee, CloudTopCeiling);
             float capBase = cloudTop * 0.5f;
             if (capBase > TropopauseAltitude) capBase = TropopauseAltitude;
+            // Where the canopy's underside sits as a fraction of the cloud - the tropopause rule,
+            // carried across as a ratio so that squashing the height cannot break it.
+            float baseFraction = capBase / cloudTop;
 
             var d = new NuclearCloudDimensions();
             // The fireball is brought down less far than the cloud around it.
@@ -153,10 +171,10 @@ namespace MissileDisaster.Core
                 FireballRadiusMin, FireballRadiusKnee, FireballRadiusCeiling) * FireballScale;
             d.FireballSeconds = EffectCeiling.Soft(NuclearCloud.FireballSeconds(kt),
                 FireballSecondsMin, FireballSecondsKnee, FireballSecondsCeiling);
-            float vertical = CloudScale * CloudHeightScale;
             d.CapRadius = capRadius * CloudScale;
-            d.CloudTop = cloudTop * vertical;
-            d.CapBase = capBase * vertical;
+            d.CloudTop = EffectCeiling.Soft(cloudTop * CloudScale * CloudHeightScale,
+                CloudTopDrawnKnee, ScreenTopAltitude);
+            d.CapBase = d.CloudTop * baseFraction;
             d.CapDepth = d.CloudTop - d.CapBase;
             d.StemRadius = d.CapRadius * NuclearCloud.StemFraction(kt);
             d.RiseSeconds = EffectCeiling.Soft(NuclearCloud.StabiliseSeconds(kt) / RiseCompression,

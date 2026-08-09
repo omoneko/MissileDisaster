@@ -9,7 +9,6 @@ using Xunit;
 public class NuclearCloudDisplayTests
 {
     private const float S = NuclearCloudDisplay.CloudScale;
-    private const float V = NuclearCloudDisplay.CloudScale * NuclearCloudDisplay.CloudHeightScale;
 
     [Fact]
     public void Every_weapon_in_the_catalogue_is_drawn_larger_than_the_one_below_it()
@@ -95,8 +94,8 @@ public class NuclearCloudDisplayTests
         NuclearCloudDimensions small = NuclearCloudDisplay.For(15f);
         Assert.Equal(small.CloudTop * 0.5f, small.CapBase, 1);
 
+        // The rule is carried as a ratio, so squashing the height cannot break it.
         NuclearCloudDimensions big = NuclearCloudDisplay.For(10400f);
-        Assert.Equal(NuclearCloudDisplay.TropopauseAltitude * V, big.CapBase, 1);
         Assert.InRange(big.CapBase / big.CloudTop, 0.40f, 0.50f);
     }
 
@@ -105,16 +104,37 @@ public class NuclearCloudDisplayTests
     {
         // The whole point of taking the depth from where the cloud stopped rising: a fixed
         // fraction made every canopy exactly twice as wide as it was deep, at every yield.
-        // The absolute figures here carry CloudHeightScale, which flattens both of them by the
-        // same factor - a small canopy is a ball at CloudHeightScale = 1 - so what is pinned is
-        // that a 10 Mt cap is several times the flatter of the two.
+        // The absolute flatness carries the height squash and the screen ceiling, both of which
+        // flatten everything, so what is pinned is the ordering the physics decides.
         NuclearCloudDimensions small = NuclearCloudDisplay.For(15f);
         NuclearCloudDimensions large = NuclearCloudDisplay.For(10400f);
         float smallFlatness = small.CapRadius * 2f / small.CapDepth;
         float largeFlatness = large.CapRadius * 2f / large.CapDepth;
-        Assert.InRange(smallFlatness * NuclearCloudDisplay.CloudHeightScale, 0.7f, 1.3f);
         Assert.True(largeFlatness > smallFlatness * 3f,
             "a 10 Mt canopy spreads out along the tropopause");
+    }
+
+    [Fact]
+    public void No_cloud_is_ever_drawn_above_the_top_of_the_screen()
+    {
+        // The height is what runs off the screen, so it is the one dimension with a hard
+        // guarantee rather than a soft one: whatever yield is asked for, the canopy stays where
+        // the player can see it - under the altitude the mod already refuses to burst above.
+        foreach (float kt in new[] { 1f, 15f, 150f, 1200f, 10400f, 50000f, 1000000f, 1e9f })
+        {
+            NuclearCloudDimensions d = NuclearCloudDisplay.For(kt);
+            Assert.InRange(d.CloudTop, 1f, NuclearCloudDisplay.ScreenTopAltitude);
+        }
+    }
+
+    [Fact]
+    public void The_height_still_grows_with_the_yield_under_that_ceiling()
+    {
+        // Bounded, but never flattened: a Tsar Bomba still stands visibly taller than a
+        // Little Boy, and every step of the catalogue in between is a step up.
+        Assert.True(NuclearCloudDisplay.For(50000f).CloudTop >
+                    NuclearCloudDisplay.For(15f).CloudTop * 1.5f,
+            "the largest weapon stands half again the smallest");
     }
 
     [Fact]
@@ -149,8 +169,7 @@ public class NuclearCloudDisplayTests
                 NuclearCloudDisplay.FireballRadiusCeiling * NuclearCloudDisplay.FireballScale);
             Assert.InRange(d.CapRadius, NuclearCloudDisplay.CapRadiusMin * S,
                 NuclearCloudDisplay.CapRadiusCeiling * S);
-            Assert.InRange(d.CloudTop, NuclearCloudDisplay.CloudTopMin * V,
-                NuclearCloudDisplay.CloudTopCeiling * V);
+            Assert.InRange(d.CloudTop, 1f, NuclearCloudDisplay.ScreenTopAltitude);
             Assert.InRange(d.RiseSeconds, NuclearCloudDisplay.RiseSecondsMin,
                 NuclearCloudDisplay.RiseSecondsCeiling);
             Assert.InRange(d.FireballSeconds, NuclearCloudDisplay.FireballSecondsMin,

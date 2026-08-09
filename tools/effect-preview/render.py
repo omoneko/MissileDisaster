@@ -290,49 +290,49 @@ def render_1945(w=680, h=780):
 
 # ---------------------------------------------- how much of it fits on screen
 
-def render_scale_choice(kt=150.0, w=700, h=520):
-    """The same 150 kt burst at four cloud scales, from a camera at the height and distance
-    Cities: Skylines is actually played at, with a city for a ruler. Top row is the fireball,
-    bottom row the mature cloud."""
-    scales = [0.40, 0.30, 0.20, 0.14]
-    fig, axes = plt.subplots(2, 4, figsize=(20.5, 8.2))
+WEAPON_ROW = [("Little Boy", 15), ("150 kt", 150), ("B83", 1200), ("Tsar Bomba", 50000)]
+
+
+def render_heights(w=720, h=560):
+    """Every yield from a close game camera, with the altitude the mod calls the top of the
+    screen marked across the frame."""
+    fig, axes = plt.subplots(1, 4, figsize=(21, 5.0))
     fig.patch.set_facecolor("#14161a")
-    # a game camera: 600 m up, 3.5 km back, 45 degrees
-    cam = fx.Camera((0, 600, -3500), (0, 1200, 0), w, h, 45.0)
+    # a close game camera: 300 m up, 1.6 km back, 45 degrees - a normal playing zoom
+    cam = fx.Camera((0, 300, -1600), (0, 420, 0), w, h, 45.0)
     horizon = int(cam.project(np.array([[0.0, 0.0, 1e7]]))[1][0])
-    for col, sc in enumerate(scales):
-        fx.CLOUD_SCALE = sc
+    for ax, (name, kt) in zip(axes, WEAPON_ROW):
         d = fx.dimensions(kt)
         g = fx.cap_geometry(d)
-        for row, t in enumerate((d["fireball_t"] * 0.7,
-                                 d["rise"] * 0.55 + g["lifetime"] * 0.45)):
-            ax = axes[row, col]
-            img = fx.sky(w, h, max(0, min(h, horizon)))
-            ground_grid(img, cam, 500, 9000)
-            fx.city(img, cam)
-            fx.draw(img, cam, [b for b in (st(d, t) for _, st in fx.STAGES) if b is not None])
-            ax.imshow(img); ax.set_xticks([]); ax.set_yticks([])
-            for sp in ax.spines.values(): sp.set_color("#3a3f47")
-            if row == 0:
-                ax.set_title(f"CloudScale = {sc:.2f}", color="#ffd479", fontsize=14,
-                             fontweight="bold", pad=7)
-                ax.set_xlabel(f"fireball {d['fireball']*2:.0f} m across", fontsize=9.5,
-                              color="#b9bec7")
-            else:
-                ax.set_xlabel(f"top {km(d['top'])} · cap {km(d['cap']*2)} wide",
-                              fontsize=9.5, color="#b9bec7")
-    fx.CLOUD_SCALE = 0.20
-    fig.suptitle(f"A {kt:.0f} kt burst from a game camera — 600 m up, 3.5 km back, 45°, "
-                 f"buildings to 100 m", color="#ffffff", fontsize=17, fontweight="bold", y=0.985)
-    fig.tight_layout(rect=[0, 0.015, 1, 0.93])
-    fig.subplots_adjust(hspace=0.13)
+        t = d["rise"] * 0.55 + g["lifetime"] * 0.45
+        img = fx.sky(w, h, max(0, min(h, horizon)))
+        ground_grid(img, cam, 500, 9000)
+        fx.city(img, cam, reach=1800.0)
+        fx.draw(img, cam, [b for b in (st(d, t) for _, st in fx.STAGES) if b is not None])
+        # the ceiling, at ground zero's distance
+        yline = int(cam.project(np.array([[0.0, fx.SCREEN_TOP, 0.0]]))[1][0])
+        if 0 <= yline < h:
+            img[yline, ::9] = np.array([0.95, 0.72, 0.35])
+        ax.imshow(img); ax.set_xticks([]); ax.set_yticks([])
+        for sp in ax.spines.values(): sp.set_color("#3a3f47")
+        ax.set_title(f"{name} — {kt:,} kt", color="#ffd479", fontsize=14,
+                     fontweight="bold", pad=7)
+        ax.set_xlabel(f"cloud top {d['top']:.0f} m · cap {km(d['cap']*2)} wide · "
+                      f"fireball {d['fireball']*2:.0f} m", fontsize=9.5, color="#b9bec7")
+        if yline < 0:
+            ax.set_xlabel(ax.get_xlabel() + "\n(1000 m line is above the frame)",
+                          fontsize=9.5, color="#b9bec7")
+    fig.suptitle("Heights from a close game camera — 300 m up, 1.6 km back, 45°.  "
+                 "The dotted line is 1000 m, the altitude the mod calls the top of the screen",
+                 color="#ffffff", fontsize=15, fontweight="bold", y=0.985)
+    fig.tight_layout(rect=[0, 0.02, 1, 0.92])
     path = os.path.join(OUT, "cloud-scale.png")
-    fig.savefig(path, dpi=110, facecolor="#14161a"); plt.close(fig)
+    fig.savefig(path, dpi=112, facecolor="#14161a"); plt.close(fig)
     return path
 
 
 if __name__ == "__main__":
     for p in (render_stages(), render_timeline(), render_yields(),
               render_cap_fix(), render_cap_shape(), render_1945(),
-              render_scale_choice()):
+              render_heights()):
         print("wrote", p)
