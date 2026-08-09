@@ -219,7 +219,9 @@ def show_seconds(d):
 
 def stage_stem(d, t, origin=(0, 0, 0)):
     stemR, top, rise = d["stem"], d["top"], d["rise"]
-    life = rise + 8.0
+    g = cap_geometry(d)
+    climb = rise * ((g["base"] + (g["centre"] - g["base"]) * 0.6) / top)
+    life = climb * 1.35
     born, age = _stream(STEM_MAX * 0.95 / life, show_seconds(d), t, life)
     n = len(age)
     if n == 0: return None
@@ -229,7 +231,7 @@ def stage_stem(d, t, origin=(0, 0, 0)):
     step = np.array([travel(stemR * 0.02, a) for a in age])
     p = p + v * step[:, None]
     # climbs to the underside of the canopy and stops, instead of out through the top of it
-    p[:, 1] += np.array([_climb(a, rise * (1 - THICKNESS * 0.5), life, top / rise) for a in age])
+    p[:, 1] += np.array([_climb(a, climb, life, top / rise) for a in age])
     u = age / life
     alpha = np.array([ramp([(0.0, 0.6), (0.25, 0.85), (0.7, 0.7), (1.0, 0.0)], x) for x in u])
     base = np.array([mix(DUST_DARK[:3], CAP_COOL[:3], x) for x in rng.random(n)])
@@ -283,7 +285,10 @@ def stage_cap_thick(d, t, origin=(0, 0, 0), n=100):
     u = age / lifetime
     p, v = in_cone(n, capR * emit_f, 62.0)
     p = p + v * (drift * age)
-    p[:, 1] += top * EMERGE + _climb(age, rise - delay, lifetime, top / rise)
+    # placed exactly as the new one is, so the figure isolates the depth and nothing else
+    centre = top - capR * 1.01 * 0.5
+    birth = centre * EMERGE
+    p[:, 1] += birth + _climb(age, (centre - birth) / (top / rise), lifetime, top / rise)
     p[:, 1] -= 0.5 * 9.81 * 0.015 * age ** 2
     alpha = ramp([(0.0, 0.6), (0.25, 0.85), (0.7, 0.7), (1.0, 0.0)], u) * 0.72
     base = np.array([mix(CAP_WARM[:3], CAP_COOL[:3], x) for x in rng.random(n)])
@@ -292,7 +297,13 @@ def stage_cap_thick(d, t, origin=(0, 0, 0), n=100):
     return p + np.array(origin), np.full(n, size), rgba, False
 
 
-THICKNESS = 0.30   # CapThicknessFraction - Glasstone: the cap's base at 0.7 of its top
+TROPOPAUSE = 11000.0   # TropopauseAltitude - the lid the canopy spreads out under
+
+
+def cap_base(top):
+    """The canopy's underside: the tropopause once the cloud punches through, half the
+    cloud's height while it is still inside the troposphere."""
+    return min(top * 0.5, TROPOPAUSE)
 
 
 def in_disc(n, radius):
@@ -308,14 +319,16 @@ def cap_geometry(d):
     capR, top = d["cap"], d["top"]
     lifetime = max(18.0, d["rise"] * 0.8)
     growth = 1.6
-    thickness = top * THICKNESS
+    base = cap_base(top)
+    thickness = top - base
+    centre = top - thickness * 0.5
     sprite_r = thickness * 0.5
     emit_r = min(capR * 0.35, max(0.0, capR - sprite_r))
     drift = max(0.0, capR - emit_r - sprite_r)
     cover = capR / max(sprite_r, 1.0)
     count = int(min(400, max(100, round(8 * cover * cover))))
     return dict(lifetime=lifetime, growth=growth, thickness=thickness, sprite_r=sprite_r,
-                emit_r=emit_r, drift=drift, count=count)
+                emit_r=emit_r, drift=drift, count=count, base=base, centre=centre)
 
 
 def stage_cap(d, t, origin=(0, 0, 0), n=None, airburst=False):
@@ -332,7 +345,8 @@ def stage_cap(d, t, origin=(0, 0, 0), n=None, airburst=False):
     speed = rng.random(n) * (g["drift"] / lifetime)
     p = p + v * (speed * age)[:, None]
     # born at the head of the column, riding the rest of the way up with it
-    p[:, 1] += top * EMERGE + _climb(age, rise - delay, lifetime, top / rise)
+    birth = g["centre"] * EMERGE
+    p[:, 1] += birth + _climb(age, (g["centre"] - birth) / (top / rise), lifetime, top / rise)
     p[:, 1] -= 0.5 * 9.81 * 0.015 * age ** 2             # the rim droops
     alpha = ramp([(0.0, 0.6), (0.25, 0.85), (0.7, 0.7), (1.0, 0.0)], u) * 0.72
     born = CAP_TINT_AIR if airburst else CAP_TINT_DUST

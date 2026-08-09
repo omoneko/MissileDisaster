@@ -41,10 +41,33 @@ namespace MissileDisaster.Game.Effects
         // canopy appears somewhere the column is not.
         private const float CapEmergeFraction = 0.55f;
 
-        // How deep the canopy is against the height of the whole cloud. Glasstone puts the base
-        // of the cap at about 0.7 of the altitude of its top, so the cap is the remaining three
-        // tenths - and that is a fraction of the column's height, not of the cap's own width.
-        private const float CapThicknessFraction = 0.30f;
+        // The tropopause, and the whole reason a mushroom is mushroom-shaped.
+        //
+        // Through the troposphere the air gets colder with height, so a fireball that cools as
+        // it expands is still warmer than what surrounds it and keeps climbing. At the
+        // tropopause the temperature stops falling and begins to rise, and the cloud runs into
+        // a lid: it goes on cooling as it climbs while the air around it warms, so its buoyancy
+        // is gone within a kilometre or two and it has nowhere left to go but sideways. That is
+        // what spreads the canopy out flat - the same lid that gives a thunderstorm its anvil.
+        //
+        // So the base of the cap is not a fixed fraction of anything. It is the tropopause, for
+        // any cloud with the energy to punch through - and about half the cloud's height for a
+        // small one that tops out inside the troposphere and stays a rising ball. Both are
+        // Glasstone's; the two together are why a 20 kt cap is round and a megaton cap is a
+        // sheet. A fixed fraction gets a 20 kt cap half again too flat and a 10 Mt cap twice too
+        // flat, which is exactly what it was doing.
+        //
+        // 11 km is the mid-latitude tropopause, where most of the charts the model is fitted to
+        // were measured. It is higher over the tropics - the Pacific tests punched through at
+        // nearer 17 km - which is part of why their canopies spread wider than the fit expects.
+        private const float TropopauseAltitude = 11000f;
+
+        // How far up the cloud the canopy's underside sits.
+        private static float CapBase(float top)
+        {
+            float half = top * 0.5f;
+            return half < TropopauseAltitude ? half : TropopauseAltitude;
+        }
 
         // How many particles the column is allowed at once. It has to stand for the whole shot,
         // so this is what its emission rate is solved from rather than a rate being picked and
@@ -56,9 +79,9 @@ namespace MissileDisaster.Game.Effects
         // rising into it.
         private const float CapLifetimeMin = 18f;
 
-        // How far up the column climbs, against the cloud top: to the underside of the canopy,
-        // which is half the cap's depth below its middle.
-        private const float StemTopFraction = 1f - CapThicknessFraction * 0.5f;
+        // How far into the canopy's depth the column runs before it is spent.
+        private const float StemIntoCapFraction = 0.3f;
+
 
         // Colours, following how a real detonation looks rather than a palette: white hot, then
         // sodium yellow, then orange, then the brown of nitrogen dioxide and lofted earth.
@@ -104,11 +127,26 @@ namespace MissileDisaster.Game.Effects
                 float capLifetime = Mathf.Max(CapLifetimeMin, d.RiseSeconds * 0.8f);
                 float showSeconds = d.RiseSeconds * CapEmergeFraction + capLifetime;
 
+                // Where the canopy sits: from its base up to the cloud top, with its particles
+                // centred half its depth below that top so the cloud ends where the figures say
+                // it does. The column climbs to the underside and stops there.
+                float capBase = CapBase(d.CloudTop);
+                float capDepth = d.CloudTop - capBase;
+                float capCentre = d.CloudTop - capDepth * 0.5f;
+                // The column runs a little way into the canopy's underside rather than stopping
+                // dead at it. A round billboard fades from its middle outwards, so a cap whose
+                // particles sit at its centre only looks solid across the middle of its depth:
+                // a column that stops at the nominal underside stops short of anything visible,
+                // and leaves a gap between the two. The stem's own fade is what keeps this from
+                // drawing a dark line up the front of the cap.
+                float stemTop = capBase + capDepth * StemIntoCapFraction;
+
                 CreateFireball(detonation, d.FireballRadius, d.FireballSeconds);
                 CreateCondensationDome(detonation, d.FireballRadius * CondensationRadiusFactor, d.FireballSeconds);
                 CreateGroundDust(groundZero, d.StemRadius, d.RiseSeconds);
-                CreateStem(groundZero, d.StemRadius, d.CloudTop, d.RiseSeconds, showSeconds);
-                CreateCap(groundZero, d.CapRadius, d.CloudTop, d.RiseSeconds, capLifetime, airburst);
+                CreateStem(groundZero, d.StemRadius, d.CloudTop, stemTop, d.RiseSeconds, showSeconds);
+                CreateCap(groundZero, d.CapRadius, capCentre, capDepth, d.CloudTop, d.RiseSeconds,
+                    capLifetime, airburst);
             }
             catch (Exception e)
             {
@@ -219,10 +257,15 @@ namespace MissileDisaster.Game.Effects
         /// cloud finished rising, after which the column drained away upwards and left the cap
         /// standing over clear air with its base several kilometres off the ground.
         /// </summary>
-        private static void CreateStem(Vector3 groundZero, float stemR, float top, float rise,
-            float showSeconds)
+        private static void CreateStem(Vector3 groundZero, float stemR, float top, float climbTo,
+            float rise, float showSeconds)
         {
-            float life = rise + 8f; // a particle stands well after it has finished rising
+            // A particle climbs into the canopy and is spent there. Letting it outlive the climb
+            // by much only piles every particle that ever rose into one dark knot under the cap,
+            // since they all stop at the same height; the column is a conveyor, and what reaches
+            // the top is absorbed. The tail is what fades it into the canopy's underside.
+            float climb = rise * (climbTo / top);
+            float life = climb * 1.35f;
             // Where the particles are born and how large they have grown by the end have to add
             // up to stemR, exactly as the canopy's do to capR. Emitting them over the full stemR
             // and then growing each one to nearly as wide again drew a column 1.9 times the one
@@ -247,9 +290,10 @@ namespace MissileDisaster.Game.Effects
             // a burst at the start and then a starved column once the ceiling is hit.
             ParticleBuilder.Stream(ps, StemMaxParticles * 0.95f / life);
             ParticleBuilder.Sphere(ps, emitRadius);
-            // It stops under the canopy rather than at the cloud top, so the column runs up into
-            // the cap's underside instead of out through the top of it.
-            ParticleBuilder.Rise(ps, ClimbThenSettle(rise * StemTopFraction, life), top / rise);
+            // It climbs at the rate the cloud climbs, and stops at the canopy's underside. Not
+            // at its middle: the column is dark and the canopy is pale, so a column that carries
+            // on into the cap is drawn straight through the front of it.
+            ParticleBuilder.Rise(ps, ClimbThenSettle(climb, life), top / rise);
             ParticleBuilder.Fade(ps,
                 new GradientAlphaKey(0.6f, 0f), new GradientAlphaKey(0.85f, 0.25f),
                 new GradientAlphaKey(0.7f, 0.7f), new GradientAlphaKey(0f, 1f));
@@ -269,37 +313,35 @@ namespace MissileDisaster.Game.Effects
         /// it used to be - hangs a finished canopy in clear air seconds before the stem arrives
         /// under it, which is the one thing that gives the effect away as particles.
         ///
-        /// How deep it is comes from the cloud top rather than from its own width. Glasstone puts
-        /// the base of the cap at about 0.7 of the altitude of its top, which makes the canopy
-        /// three tenths of the column deep whatever the yield. Taking the depth from the width
-        /// instead - which is what falls out of sizing the particles off capR - is right at
-        /// 150 kt only by coincidence, and by 10 Mt gives a canopy three times too deep: a ball
-        /// on a stick rather than the flattened lens a megaton cloud spreads out along the
-        /// tropopause.
+        /// How deep it is is decided by the tropopause - see TropopauseAltitude. Its own width has
+        /// nothing to say about it, and taking the depth from the width, which is what falls out
+        /// of sizing the particles off capR, gives a 10 Mt canopy three times too deep: a ball on
+        /// a stick rather than the sheet a megaton cloud spreads out along the tropopause.
         /// </summary>
-        private static void CreateCap(Vector3 groundZero, float capR, float top, float rise,
-            float lifetime, bool airburst)
+        private static void CreateCap(Vector3 groundZero, float capR, float capCentre,
+            float capDepth, float top, float rise, float lifetime, bool airburst)
         {
             const float emitFraction = 0.35f; // where the particles start, as a fraction of capR
             const float growth = 1.6f;        // how much larger a particle is by the end of its life
 
-            // The canopy is a flat lens: a round billboard grown to the cap's depth, spread
-            // across a horizontal disc until the three together - where it starts, how far it
-            // spreads and how large it has grown - add up to capR.
-            float thickness = top * CapThicknessFraction;
-            float spriteRadius = thickness * 0.5f;
+            // A round billboard grown to the cap's depth, spread across a horizontal disc until
+            // the three together - where it starts, how far it spreads and how large it has
+            // grown - add up to capR.
+            float spriteRadius = capDepth * 0.5f;
             float emitRadius = Mathf.Min(capR * emitFraction, Mathf.Max(0f, capR - spriteRadius));
             float driftDistance = Mathf.Max(0f, capR - emitRadius - spriteRadius);
             float driftSpeed = driftDistance / lifetime;
             // Enough of them to cover the disc several times over at any yield: a 10 Mt canopy is
-            // six times wider against its own depth than a 150 kt one, so a fixed count that
+            // four times wider against its own depth than a 20 kt one, so a fixed count that
             // reads as solid at one would be gauze at the other.
             float cover = capR / Mathf.Max(spriteRadius, 1f);
             int count = Mathf.Clamp(Mathf.RoundToInt(8f * cover * cover), 100, 400);
 
-            // The head of the column when the cap starts to swell, and the climb left to do.
+            // The head of the column when the cap starts to swell, and the climb left to do. It
+            // climbs at the cloud's own rate and settles at the canopy's middle.
             float delay = rise * CapEmergeFraction;
-            float birthHeight = top * CapEmergeFraction;
+            float birthHeight = capCentre * CapEmergeFraction;
+            float climbSeconds = (capCentre - birthHeight) / (top / rise);
 
             var go = ParticleBuilder.NewSystem("NuclearCap", groundZero + Vector3.up * birthHeight,
                 ParticleAssets.Smoke);
@@ -319,7 +361,7 @@ namespace MissileDisaster.Game.Effects
             // as cauliflower rather than as an airbrushed lens: a real cap is a crowd of lobes
             // of visibly different sizes. The largest is the one the depth was solved for, so
             // the spread runs downwards from it and the canopy keeps the depth it was given.
-            float sizeMax = thickness / growth;
+            float sizeMax = capDepth / growth;
             main.startSize = new ParticleSystem.MinMaxCurve(sizeMax * 0.55f, sizeMax);
             main.startColor = new ParticleSystem.MinMaxGradient(CapVapour, CapVapourShade);
             main.maxParticles = 500;
@@ -327,7 +369,7 @@ namespace MissileDisaster.Game.Effects
 
             ParticleBuilder.Burst(ps, count);
             ParticleBuilder.FlatDisc(ps, emitRadius);
-            ParticleBuilder.Rise(ps, ClimbThenSettle(rise - delay, lifetime), top / rise);
+            ParticleBuilder.Rise(ps, ClimbThenSettle(climbSeconds, lifetime), top / rise);
             ParticleBuilder.Colour(ps, CapGradient(airburst));
             ParticleBuilder.SizeCurve(ps, 0.7f, growth);
             ParticleBuilder.PlayAndDestroy(go, delay + lifetime + 2f);

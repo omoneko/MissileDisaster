@@ -232,15 +232,14 @@ def render_cap_shape(w=660, h=620):
             if row == 0:
                 ax.set_title(f"{name} — {kt:,} kt\ncap {km(d['cap']*2)} wide, top {km(d['top'])}",
                              color="#ffd479", fontsize=12, fontweight="bold", pad=8)
-            ax.set_xlabel(f"cap depth {km(thick)}   ({thick/(0.3*d['top']):.1f}× Glasstone's "
-                          f"{km(0.3*d['top'])})", fontsize=9.5,
-                          color="#d9a06a" if row == 0 else "#8fd6a6")
+            ax.set_xlabel(f"cap depth {km(thick)} · {d['cap']*2/thick:.1f}× wider than deep",
+                          fontsize=9.5, color="#d9a06a" if row == 0 else "#8fd6a6")
     for row, label, colour in (
             (0, "BEFORE — depth from the cap's own width", "#d9a06a"),
-            (1, "AFTER — depth from the cloud top (0.3 × top)", "#8fd6a6")):
+            (1, "AFTER — from the tropopause: base at half the top", "#8fd6a6")):
         axes[row, 0].text(-0.09, 0.5, label, transform=axes[row, 0].transAxes, rotation=90,
                           va="center", ha="center", fontsize=11.5, fontweight="bold", color=colour)
-    fig.suptitle("How deep the canopy is — Glasstone puts its base at 0.7 of the cloud top",
+    fig.suptitle("How deep the canopy is — its base is where the cloud stops rising",
                  color="#ffffff", fontsize=18, fontweight="bold", y=0.98)
     fig.tight_layout(rect=[0.012, 0.01, 1, 0.93])
     fig.subplots_adjust(hspace=0.16)

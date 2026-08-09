@@ -36,10 +36,39 @@ top it hung finished in clear air for several seconds before the stem arrived un
 
 ## `cap-shape.png`
 
-Why the canopy's depth now comes from the cloud top rather than from its own width. Glasstone
-puts the base of the cap at about 0.7 of the altitude of its top, so a cap is three tenths of
-the column deep at any yield. Sizing its particles off the cap radius instead happens to be
-right at 150 kt and is 3.3× too deep by 10 Mt — a ball on a stick rather than a lens.
+Why the canopy's depth comes from where the cloud stopped rising rather than from its own
+width. Sizing the particles off the cap radius made the cap exactly twice as wide as it was
+deep at *every* yield — the one thing that cannot be true, since a 20 kt cap is a ball and a
+10 Mt cap is a sheet.
+
+## The tropopause, and why a mushroom is mushroom-shaped
+
+Through the troposphere the air gets colder with height, so a fireball that cools as it expands
+is still warmer than what surrounds it and keeps climbing. At the tropopause the temperature
+stops falling and begins to rise: the cloud goes on cooling as it climbs while the air around it
+warms, loses its buoyancy within a kilometre or two, and has nowhere left to go but sideways.
+That lid is what spreads the canopy flat — the same one that gives a thunderstorm its anvil.
+
+So the canopy's base is where the cloud stopped rising, and its depth is everything from there
+to the top. `NuclearMushroomFx.CapBase` puts it at half the cloud top, never above the 11 km
+mid-latitude tropopause. That reproduces what was measured:
+
+| | cloud top | cap base | base ÷ top |
+|---|---|---|---|
+| Ivy Mike, measured | 37 km | ≈ 17 km (tropical tropopause) | 0.46 |
+| Castle Bravo, measured | 40 km | ≈ 17 km | 0.42 |
+| the model at 10.4 Mt | 23.2 km | 11.0 km | 0.47 |
+| the model at 50 Mt | 27.3 km | 11.0 km | 0.40 |
+| the model at 15–22 kt | 6.6–7.5 km | half the top | 0.50 |
+
+and it is why the model's canopy is round at 15 kt (0.9× as wide as deep, which is what the
+1945 photographs show) and a sheet at 10 Mt (3.7×).
+
+The lid is in the cloud-height fit too, not just the cap. Differentiating
+`NuclearCloud.CloudTop`, the height goes as `W^0.33` up to about 20 kt — free rise through the
+troposphere — flattens to `W^0.16` in the megaton range as the tropopause brakes it, and steepens
+again to `W^0.31` above 10 Mt, where a cloud has the energy to punch through and rise freely in
+the stratosphere. Glasstone's charts have that flattening in them, and the fit inherited it.
 
 ## Against the measured tests
 
