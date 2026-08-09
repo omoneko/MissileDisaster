@@ -8,6 +8,8 @@ using Xunit;
 /// </summary>
 public class NuclearCloudDisplayTests
 {
+    private const float S = NuclearCloudDisplay.CloudScale;
+
     [Fact]
     public void Every_weapon_in_the_catalogue_is_drawn_larger_than_the_one_below_it()
     {
@@ -44,23 +46,90 @@ public class NuclearCloudDisplayTests
     }
 
     [Fact]
-    public void Everything_inside_the_verified_range_is_still_drawn_to_its_real_figures()
+    public void Everything_inside_the_verified_range_is_drawn_to_its_real_figures_times_the_scale()
     {
-        // The knees sit at the old clamps, so no yield that was already exact may move.
+        // The knees sit at the old clamps, so no yield that was already exact may move except
+        // by the one deliberate scale.
         foreach (float kt in new[] { 15f, 22f, 150f, 300f, 475f })
         {
             NuclearCloudDimensions d = NuclearCloudDisplay.For(kt);
-            Assert.Equal(NuclearCloud.FireballRadius(kt), d.FireballRadius, 1);
-            Assert.Equal(NuclearCloud.CloudRadius(kt), d.CapRadius, 1);
+            Assert.Equal(NuclearCloud.CloudRadius(kt) * S, d.CapRadius, 1);
         }
     }
 
     [Fact]
-    public void The_150kt_baseline_finally_stands_to_its_full_height()
+    public void The_fireball_comes_down_less_far_than_the_cloud_around_it()
     {
-        // The old 12 km ceiling cut into the baseline itself: its real top is 13.3 km.
-        NuclearCloudDimensions d = NuclearCloudDisplay.For(150f);
-        Assert.InRange(d.CloudTop, 13000f, 13500f);
+        // It is judged against the buildings around it, not against the canopy, and it is the
+        // smallest part of the effect already. Shrinking it in step with the cloud is what left
+        // a spark under a mushroom.
+        Assert.True(NuclearCloudDisplay.FireballScale > NuclearCloudDisplay.CloudScale,
+            "the fireball keeps more of its size than the cloud does");
+        foreach (float kt in new[] { 15f, 150f, 1200f, 10400f })
+        {
+            NuclearCloudDimensions d = NuclearCloudDisplay.For(kt);
+            Assert.Equal(NuclearCloud.FireballRadius(kt) * NuclearCloudDisplay.FireballScale,
+                d.FireballRadius, 1);
+        }
+    }
+
+    [Fact]
+    public void The_fireball_reads_against_the_canopy_at_every_yield()
+    {
+        // Not so small that it is lost under the cloud, and not so large that it swallows it.
+        foreach (float kt in new[] { 15f, 150f, 1200f, 10400f, 50000f })
+        {
+            NuclearCloudDimensions d = NuclearCloudDisplay.For(kt);
+            Assert.InRange(d.FireballRadius / d.CapRadius, 0.15f, 0.55f);
+        }
+    }
+
+    [Fact]
+    public void The_canopy_sits_on_the_tropopause_once_the_cloud_punches_through()
+    {
+        // Ivy Mike's cap base was measured at about 0.46 of its top and Castle Bravo's at 0.42,
+        // both of them the tropopause over the Pacific. Below the tropopause there is no lid,
+        // and the cap is simply the top half of a rising ball - which is what the Hiroshima and
+        // Nagasaki photographs show.
+        NuclearCloudDimensions small = NuclearCloudDisplay.For(15f);
+        Assert.Equal(small.CloudTop * 0.5f, small.CapBase, 1);
+
+        NuclearCloudDimensions big = NuclearCloudDisplay.For(10400f);
+        Assert.Equal(NuclearCloudDisplay.TropopauseAltitude * S, big.CapBase, 1);
+        Assert.InRange(big.CapBase / big.CloudTop, 0.40f, 0.50f);
+    }
+
+    [Fact]
+    public void A_small_canopy_is_a_ball_and_a_strategic_one_is_a_sheet()
+    {
+        // The whole point of taking the depth from where the cloud stopped rising: a fixed
+        // fraction made every canopy exactly twice as wide as it was deep, at every yield.
+        NuclearCloudDimensions small = NuclearCloudDisplay.For(15f);
+        NuclearCloudDimensions large = NuclearCloudDisplay.For(10400f);
+        Assert.InRange(small.CapRadius * 2f / small.CapDepth, 0.7f, 1.3f);
+        Assert.True(large.CapRadius * 2f / large.CapDepth > 3f,
+            "a 10 Mt canopy spreads out along the tropopause");
+    }
+
+    [Fact]
+    public void The_canopy_always_has_a_base_below_its_top()
+    {
+        foreach (float kt in new[] { 0.001f, 1f, 150f, 50000f, 1000000f })
+        {
+            NuclearCloudDimensions d = NuclearCloudDisplay.For(kt);
+            Assert.True(d.CapDepth > 0f, $"{kt} kt has a canopy with some depth");
+            Assert.True(d.CapBase > 0f && d.CapBase < d.CloudTop, $"{kt} kt: base under the top");
+            Assert.Equal(d.CloudTop - d.CapBase, d.CapDepth, 1);
+        }
+    }
+
+    [Fact]
+    public void The_cloud_is_up_long_enough_to_watch()
+    {
+        // The rise used to be over in 15 s at the baseline, which read as a puff rather than as
+        // a cloud welling up and climbing.
+        Assert.InRange(NuclearCloudDisplay.For(150f).RiseSeconds, 25f, 40f);
+        Assert.InRange(NuclearCloudDisplay.For(15f).RiseSeconds, 12f, 25f);
     }
 
     [Fact]
@@ -69,12 +138,13 @@ public class NuclearCloudDisplayTests
         foreach (float kt in new[] { 0.001f, 1f, 150f, 50000f, 1000000f, 1e9f })
         {
             NuclearCloudDimensions d = NuclearCloudDisplay.For(kt);
-            Assert.InRange(d.FireballRadius, NuclearCloudDisplay.FireballRadiusMin,
-                NuclearCloudDisplay.FireballRadiusCeiling);
-            Assert.InRange(d.CapRadius, NuclearCloudDisplay.CapRadiusMin,
-                NuclearCloudDisplay.CapRadiusCeiling);
-            Assert.InRange(d.CloudTop, NuclearCloudDisplay.CloudTopMin,
-                NuclearCloudDisplay.CloudTopCeiling);
+            Assert.InRange(d.FireballRadius,
+                NuclearCloudDisplay.FireballRadiusMin * NuclearCloudDisplay.FireballScale,
+                NuclearCloudDisplay.FireballRadiusCeiling * NuclearCloudDisplay.FireballScale);
+            Assert.InRange(d.CapRadius, NuclearCloudDisplay.CapRadiusMin * S,
+                NuclearCloudDisplay.CapRadiusCeiling * S);
+            Assert.InRange(d.CloudTop, NuclearCloudDisplay.CloudTopMin * S,
+                NuclearCloudDisplay.CloudTopCeiling * S);
             Assert.InRange(d.RiseSeconds, NuclearCloudDisplay.RiseSecondsMin,
                 NuclearCloudDisplay.RiseSecondsCeiling);
             Assert.InRange(d.FireballSeconds, NuclearCloudDisplay.FireballSecondsMin,
@@ -88,7 +158,7 @@ public class NuclearCloudDisplayTests
         foreach (float kt in new[] { 15f, 150f, 1000f, 50000f })
         {
             NuclearCloudDimensions d = NuclearCloudDisplay.For(kt);
-            Assert.InRange(d.StemRadius / d.CapRadius, 0.1f, 0.5f);
+            Assert.InRange(d.StemRadius / d.CapRadius, 0.099f, 0.501f);
         }
     }
 

@@ -99,6 +99,13 @@ Sources for the measured figures: [Castle Bravo](https://en.wikipedia.org/wiki/C
 [Ivy Mike](https://nuclearweaponarchive.org/Usa/Tests/Ivy.html), and Glasstone & Dolan,
 [*The Effects of Nuclear Weapons* (1977) ch. II](https://atomicarchive.com/resources/documents/effects/glasstone-dolan/chapter2.html).
 
+## `cloud-scale.png`
+
+The same 150 kt burst at four values of `NuclearCloudDisplay.CloudScale`, from a camera at the
+height and distance the game is actually played at, with a city for a ruler. This is the figure
+to look at when deciding how large clouds should be: at 0.30 and above the canopy runs off the
+top of the screen, at 0.20 the whole mushroom is in frame.
+
 ## `nineteen-forty-five.png`
 
 The two bursts there are famous photographs of, at the yield and burst height the mod would
@@ -122,6 +129,26 @@ figures alone had not:
   when the cloud finished rising, so the column drained away upwards and out through the top of
   its own cap, leaving the canopy over clear air. It now stops under the canopy and is fed for
   as long as the cap is up.
+
+## Playability: what is deliberately not to scale
+
+Two numbers in `NuclearCloudDisplay` are admissions rather than figures, and they are the only
+ones in the model that are:
+
+- **`CloudScale = 0.20`** — the cloud is drawn at a fifth of its real size. A real 150 kt cloud
+  stands 13.2 km, which from a game camera is a column leaving the top of the screen rather than
+  a mushroom. It is applied to cap, stem and height together, so every proportion checked
+  against the photographs survives it. Raise it for taller clouds; see `cloud-scale.png`.
+- **`FireballScale = 0.50`** — the fireball comes down only half way, so it keeps two and a half
+  times its share of a cloud that has been brought down to a fifth. At full size it would be
+  nearly as wide as a compressed 50 Mt canopy; in step with the cloud it is a spark. At 0.50 it
+  reads as about a quarter to a third of the canopy's width at every yield, against the tenth to
+  a seventh it really is.
+
+The timings are stretched for the same reason. The rise is compressed 12:1 rather than the
+real ten minutes, and the canopy then stands for 35 to 60 seconds, so a 150 kt strike runs
+about 67 seconds from flash to fading — long enough to watch the dust well up, the column
+climb, and the cap form and hold.
 
 ## Known gaps against photographs
 

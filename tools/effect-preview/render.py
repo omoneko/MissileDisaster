@@ -111,7 +111,9 @@ def render_stages(kt=150.0, w=760, h=560):
 
 def render_timeline(kt=150.0, w=620, h=620):
     d = fx.dimensions(kt)
-    times = [0.6, 2.5, 6.0, d["rise"] * 0.6, d["rise"] * 0.95, d["rise"] * 0.55 + 14.0]
+    show = fx.show_seconds(d)
+    times = [1.0, d["rise"] * 0.20, d["rise"] * 0.55, d["rise"] * 0.95,
+             d["rise"] * 0.55 + (show - d["rise"] * 0.55) * 0.45, show * 0.97]
     extent = d["top"] * 1.15
     cam = frame(extent, max(extent * 0.85, d["cap"] * 2.4), w, h)
     fig, axes = plt.subplots(1, 6, figsize=(22, 4.6))
@@ -122,7 +124,7 @@ def render_timeline(kt=150.0, w=620, h=620):
         for sp in ax.spines.values(): sp.set_color("#3a3f47")
         ax.set_title(f"t = {t:.1f} s", color="#ffd479", fontsize=12, fontweight="bold", pad=6)
     axes[0].set_xlabel("grid 1 km · one fixed camera", fontsize=9, color="#b9bec7")
-    fig.suptitle(f"The same {kt:.0f} kt detonation over time — one camera, 1 km grid",
+    fig.suptitle(f"The same {kt:.0f} kt detonation over its {show:.0f} s — one camera, 1 km grid",
                  color="#ffffff", fontsize=17, fontweight="bold", y=0.99)
     fig.tight_layout(rect=[0, 0.02, 1, 0.93])
     path = os.path.join(OUT, "timeline.png")
@@ -147,7 +149,7 @@ def render_yields(w=560, h=680):
     for col, (name, kt) in enumerate(WEAPONS):
         for row, mode in enumerate(("old", "new")):
             d = fx.dimensions(kt, mode)
-            t = d["rise"] * 0.55 + max(18.0, d["rise"] * 0.8) * 0.7
+            t = d["rise"] * 0.55 + min(60.0, max(35.0, d["rise"] * 1.6)) * 0.45
             ax = axes[row, col]
             img = scene(cam, [s(d, t) for _, s in fx.STAGES], 2000, extent * 3.0, w, h)
             ax.imshow(img); ax.set_xticks([]); ax.set_yticks([])
@@ -176,7 +178,7 @@ def render_yields(w=560, h=680):
 def render_cap_fix(kt=150.0, w=620, h=660):
     """The canopy used to be emitted at the cloud top, finished, before the stem arrived."""
     d = fx.dimensions(kt)
-    times = [d["rise"] * 0.62, d["rise"] * 0.75, d["rise"] * 0.95]
+    times = [d["rise"] * 0.66, d["rise"] * 0.80, d["rise"] * 1.0]
     extent = d["top"] * 1.12
     cam = frame(extent, d["cap"] * 2.4, w, h)
     others = [fx.stage_ground_dust, fx.stage_stem]
@@ -217,7 +219,7 @@ def render_cap_shape(w=660, h=620):
     for col, (name, kt) in enumerate(SHAPE_WEAPONS):
         d = fx.dimensions(kt)
         g = fx.cap_geometry(d)
-        t = d["rise"] * 0.55 + g["lifetime"] * 0.8
+        t = d["rise"] * 0.55 + g["lifetime"] * 0.45
         extent = max(d["top"] * 1.25, d["cap"] * 2.4)
         cam = frame(extent, d["cap"] * 2.5, w, h)
         others = [fx.stage_ground_dust, fx.stage_stem]
@@ -260,7 +262,7 @@ def render_1945(w=680, h=780):
     for ax, (name, kt, real_hob) in zip(axes, shots):
         d = fx.dimensions(kt)
         g = fx.cap_geometry(d)
-        t = d["rise"] * 0.55 + g["lifetime"] * 0.5
+        t = d["rise"] * 0.55 + g["lifetime"] * 0.45
         extent = d["top"] * 1.18
         cam = frame(extent, d["cap"] * 2.6, w, h, look=0.46, elev=0.16)
         stages = [fx.stage_ground_dust(d, t), fx.stage_stem(d, t),
@@ -285,7 +287,52 @@ def render_1945(w=680, h=780):
     return path
 
 
+
+# ---------------------------------------------- how much of it fits on screen
+
+def render_scale_choice(kt=150.0, w=700, h=520):
+    """The same 150 kt burst at four cloud scales, from a camera at the height and distance
+    Cities: Skylines is actually played at, with a city for a ruler. Top row is the fireball,
+    bottom row the mature cloud."""
+    scales = [0.40, 0.30, 0.20, 0.14]
+    fig, axes = plt.subplots(2, 4, figsize=(20.5, 8.2))
+    fig.patch.set_facecolor("#14161a")
+    # a game camera: 600 m up, 3.5 km back, 45 degrees
+    cam = fx.Camera((0, 600, -3500), (0, 1200, 0), w, h, 45.0)
+    horizon = int(cam.project(np.array([[0.0, 0.0, 1e7]]))[1][0])
+    for col, sc in enumerate(scales):
+        fx.CLOUD_SCALE = sc
+        d = fx.dimensions(kt)
+        g = fx.cap_geometry(d)
+        for row, t in enumerate((d["fireball_t"] * 0.7,
+                                 d["rise"] * 0.55 + g["lifetime"] * 0.45)):
+            ax = axes[row, col]
+            img = fx.sky(w, h, max(0, min(h, horizon)))
+            ground_grid(img, cam, 500, 9000)
+            fx.city(img, cam)
+            fx.draw(img, cam, [b for b in (st(d, t) for _, st in fx.STAGES) if b is not None])
+            ax.imshow(img); ax.set_xticks([]); ax.set_yticks([])
+            for sp in ax.spines.values(): sp.set_color("#3a3f47")
+            if row == 0:
+                ax.set_title(f"CloudScale = {sc:.2f}", color="#ffd479", fontsize=14,
+                             fontweight="bold", pad=7)
+                ax.set_xlabel(f"fireball {d['fireball']*2:.0f} m across", fontsize=9.5,
+                              color="#b9bec7")
+            else:
+                ax.set_xlabel(f"top {km(d['top'])} · cap {km(d['cap']*2)} wide",
+                              fontsize=9.5, color="#b9bec7")
+    fx.CLOUD_SCALE = 0.20
+    fig.suptitle(f"A {kt:.0f} kt burst from a game camera — 600 m up, 3.5 km back, 45°, "
+                 f"buildings to 100 m", color="#ffffff", fontsize=17, fontweight="bold", y=0.985)
+    fig.tight_layout(rect=[0, 0.015, 1, 0.93])
+    fig.subplots_adjust(hspace=0.13)
+    path = os.path.join(OUT, "cloud-scale.png")
+    fig.savefig(path, dpi=110, facecolor="#14161a"); plt.close(fig)
+    return path
+
+
 if __name__ == "__main__":
     for p in (render_stages(), render_timeline(), render_yields(),
-              render_cap_fix(), render_cap_shape(), render_1945()):
+              render_cap_fix(), render_cap_shape(), render_1945(),
+              render_scale_choice()):
         print("wrote", p)

@@ -46,8 +46,11 @@ def hard(v, lo, hi): return max(lo, min(hi, v))
 
 # ------------------------------------------------- Core/NuclearCloudDisplay.cs (new)
 
+CLOUD_SCALE = 0.20      # NuclearCloudDisplay.CloudScale - playability, not physics
+FIREBALL_SCALE = 0.50   # the fireball comes down less far than the cloud around it
+TROPOPAUSE = 11000.0    # real metres, before the scale
 NEW = dict(fb=(25.0, 3000.0, 7000.0), fbs=(0.8, 12.0, 20.0), cap=(200.0, 8000.0, 26000.0),
-           top=(800.0, 12000.0, 30000.0), rise=(8.0, 26.0, 40.0))
+           top=(800.0, 12000.0, 30000.0), rise=(12.0, 40.0, 60.0))
 # the hard clamps that were in NuclearMushroomFx.cs before this change
 OLD = dict(fb=(25.0, 3000.0), fbs=(0.8, 12.0), cap=(200.0, 8000.0),
            top=(800.0, 12000.0), rise=(8.0, 26.0))
@@ -61,8 +64,13 @@ def dimensions(kt, ceilings="new"):
             fireball_t=soft_floor(fireball_seconds(kt), *NEW["fbs"]),
             cap=soft_floor(cloud_radius(kt), *NEW["cap"]),
             top=soft_floor(cloud_top(kt), *NEW["top"]),
-            rise=soft_floor(stabilise_seconds(kt) / 25.0, *NEW["rise"]),
+            rise=soft_floor(stabilise_seconds(kt) / 12.0, *NEW["rise"]),
         )
+        base = min(d["top"] * 0.5, TROPOPAUSE)
+        d["fireball"] *= FIREBALL_SCALE
+        d["cap"] *= CLOUD_SCALE
+        d["top"] *= CLOUD_SCALE
+        d["base"] = base * CLOUD_SCALE
     else:
         d = dict(
             fireball=hard(fireball_radius(kt), *OLD["fb"]),
@@ -71,6 +79,7 @@ def dimensions(kt, ceilings="new"):
             top=hard(cloud_top(kt), *OLD["top"]),
             rise=hard(stabilise_seconds(kt) / 25.0, *OLD["rise"]),
         )
+        d["base"] = min(d["top"] * 0.5, TROPOPAUSE)
     d["stem"] = d["cap"] * stem_fraction(kt)
     return d
 
@@ -150,12 +159,12 @@ def travel(v0, t, limit=None, tau=0.4):
 # Each returns (positions Nx3, diameters N, rgba Nx4, additive?) at wall-clock time `t`.
 
 
-def stage_fireball(d, t, origin=(0, 0, 0), n=90):
+def stage_fireball(d, t, origin=(0, 0, 0), n=120):
     R, T = d["fireball"], d["fireball_t"]
     life = T * 1.7
     if t < 0 or t > life: return None
     u = t / life
-    p, v = in_sphere(n, R * 0.28)
+    p, v = in_sphere(n, R * 0.35)
     dist = travel(R * 0.05, t, limit=R * 0.05, tau=0.3)
     p = p + v * dist
     p[:, 1] += R * 0.12 * t                              # Rise
@@ -164,7 +173,7 @@ def stage_fireball(d, t, origin=(0, 0, 0), n=90):
     alpha = ramp([(0.0, 1.0), (0.55, 1.0), (0.8, 0.55), (1.0, 0.0)], u)
     start = np.array([mix(FIREBALL_CORE, FIREBALL_MID, x) for x in rng.random(n)])
     rgba = np.concatenate([start * np.array(col), np.full((n, 1), alpha)], axis=1)
-    size = R * 0.55 * ramp([(0.0, 0.35), (1.0, 2.0)], u)
+    size = 2 * R * 0.65 / 2.0 * ramp([(0.0, 0.35), (1.0, 2.0)], u)
     return p + np.array(origin), np.full(n, size), rgba, True
 
 
@@ -194,10 +203,10 @@ def _stream(rate, duration, t, life):
 def stage_ground_dust(d, t, origin=(0, 0, 0)):
     stemR, rise = d["stem"], d["rise"]
     life = rise * 0.55
-    born, age = _stream(45.0, rise * 0.4, t, life)
+    born, age = _stream(420 * 0.95 / life, rise * 0.75, t, life)
     n = len(age)
     if n == 0: return None
-    p, v = in_cone(n, stemR * 1.7, 22.0)
+    p, v = in_cone(n, stemR * 2.4, 22.0)
     step = np.array([travel(stemR * 0.06, a) for a in age])
     p = p + v * step[:, None]
     p[:, 1] += stemR * 0.25 * age                        # Rise
@@ -214,7 +223,7 @@ STEM_MAX = 900
 
 def show_seconds(d):
     """How long the cloud is up for: the canopy lingers longest and sets the shot."""
-    return d["rise"] * EMERGE + max(18.0, d["rise"] * 0.8)
+    return d["rise"] * EMERGE + min(60.0, max(35.0, d["rise"] * 1.6))
 
 
 def stage_stem(d, t, origin=(0, 0, 0)):
@@ -256,7 +265,7 @@ def _climb(age, climb_seconds, lifetime, rate):
 def stage_cap_legacy(d, t, origin=(0, 0, 0), n=100):
     """The cap as it was: emitted at the cloud top, finished, before the stem gets there."""
     capR, rise, top = d["cap"], d["rise"], d["top"]
-    lifetime = max(18.0, rise * 0.8)
+    lifetime = min(60.0, max(35.0, rise * 1.6))
     delay = rise * EMERGE
     emit_f, size_f, growth = 0.35, 0.45, 1.6
     drift = max(0.0, capR * (1 - emit_f - size_f * growth * 0.5)) / lifetime
@@ -276,7 +285,7 @@ def stage_cap_legacy(d, t, origin=(0, 0, 0), n=100):
 def stage_cap_thick(d, t, origin=(0, 0, 0), n=100):
     """The cap sized off its own width: born at the column head, but a ball rather than a lens."""
     capR, rise, top = d["cap"], d["rise"], d["top"]
-    lifetime = max(18.0, rise * 0.8)
+    lifetime = min(60.0, max(35.0, rise * 1.6))
     delay = rise * EMERGE
     emit_f, size_f, growth = 0.35, 0.45, 1.6
     drift = max(0.0, capR * (1 - emit_f - size_f * growth * 0.5)) / lifetime
@@ -297,13 +306,7 @@ def stage_cap_thick(d, t, origin=(0, 0, 0), n=100):
     return p + np.array(origin), np.full(n, size), rgba, False
 
 
-TROPOPAUSE = 11000.0   # TropopauseAltitude - the lid the canopy spreads out under
 
-
-def cap_base(top):
-    """The canopy's underside: the tropopause once the cloud punches through, half the
-    cloud's height while it is still inside the troposphere."""
-    return min(top * 0.5, TROPOPAUSE)
 
 
 def in_disc(n, radius):
@@ -317,9 +320,9 @@ def in_disc(n, radius):
 def cap_geometry(d):
     """The cap's depth, sprite size, emission disc and drift - the C# budget, verbatim."""
     capR, top = d["cap"], d["top"]
-    lifetime = max(18.0, d["rise"] * 0.8)
+    lifetime = min(60.0, max(35.0, d["rise"] * 1.6))
     growth = 1.6
-    base = cap_base(top)
+    base = d["base"]
     thickness = top - base
     centre = top - thickness * 0.5
     sprite_r = thickness * 0.5
@@ -389,6 +392,34 @@ class Camera:
         x = self.w * 0.5 + rel[:, 0] * self.focal / z
         y = self.h * 0.5 - rel[:, 1] * self.focal / z
         return x, y, z, rel[:, 2]
+
+
+def city(img, cam, centre=(0.0, 0.0), reach=2600.0, seed=7):
+    """Blocks of buildings around ground zero, as a scale reference. Drawn before the
+    particles, so the cloud always passes in front - it is a ruler, not a screenshot."""
+    r = np.random.default_rng(seed)
+    h, w = img.shape[:2]
+    blocks = []
+    for _ in range(260):
+        a = r.random() * 2 * math.pi
+        d = reach * math.sqrt(r.random())
+        x, z = centre[0] + d * math.cos(a), centre[1] + d * math.sin(a)
+        near = 1.0 - min(d / reach, 1.0)
+        blocks.append((x, z, 14 + 26 * r.random(), 12 + 95 * near * r.random()))
+    items = []
+    for x, z, bw, bh in blocks:
+        px, py, pz, fwd = cam.project(np.array([[x, 0.0, z], [x, bh, z]]))
+        if fwd[0] <= 1: continue
+        items.append((pz[0], px[0], py[0], py[1], bw * cam.focal / pz[0]))
+    items.sort(key=lambda it: -it[0])
+    for z, cx, ybase, ytop, sw in items:
+        x0, x1 = int(cx - sw / 2), int(cx + sw / 2) + 1
+        y0, y1 = int(min(ytop, ybase)), int(max(ytop, ybase)) + 1
+        x0, x1 = max(0, x0), min(w, x1); y0, y1 = max(0, y0), min(h, y1)
+        if x0 >= x1 or y0 >= y1: continue
+        shade = 0.10 + 0.16 * np.clip(1.0 - z / 9000.0, 0.0, 1.0)
+        img[y0:y1, x0:x1] = shade
+    return img
 
 
 def sky(w, h, ground_y):
