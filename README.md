@@ -118,6 +118,23 @@ reactor‑meltdown fallout. (Water treatment plants do **not** decontaminate in 
   a stub compiles whatever is written in it, so it cannot tell you a member exists in Unity 5.6.
 - `tools/effect-preview` renders the nuclear effect offline; see [docs/effects](docs/effects).
 
+## Checking which build is running
+
+The mod prints one line at load, whatever the log level, into the game log
+(`%LOCALAPPDATA%\Colossal Order\Cities_Skylines\Player.log`):
+
+```
+[MissileDisaster] build check - 150 kt draws: cloud top 751 m, cap 1440 m wide, fireball 408 m across, rise 31.1 s, screen top 1000 m
+```
+
+The numbers are computed by the code that is running, not written down, so they are a
+fingerprint of the build. A cloud top of about **751 m** is a current build; **13245 m** is the
+original one. Each nuclear detonation logs the same figures again.
+
+If the numbers are the old ones, the game is not loading the DLL you built. The usual causes:
+the mod is also subscribed on the Steam Workshop and that copy is winning; the game was running
+while `build.ps1` copied; or the branch that was built is not the one with the change.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

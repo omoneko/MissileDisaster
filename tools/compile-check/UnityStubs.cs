@@ -214,6 +214,7 @@ namespace MissileDisaster.Game
     {
         public static void Log(string message) { }
         public static void LogError(string message) { }
+        public static void LogAlways(string message) { }
     }
 }
 

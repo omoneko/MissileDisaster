@@ -191,5 +191,12 @@ namespace MissileDisaster.Game
 
         public static void Log(string msg) { if (DebugLogging) Debug.Log(LogPrefix + msg); }
         public static void LogError(string msg) { Debug.LogError(LogPrefix + msg); }
+
+        /// <summary>
+        /// Logs whatever DebugLogging is set to. Reserved for the handful of lines that answer
+        /// "which build is actually running" - a question a quiet log cannot answer, and the one
+        /// that has to be settled before any report of "it did not change" means anything.
+        /// </summary>
+        public static void LogAlways(string msg) { Debug.Log(LogPrefix + msg); }
     }
 }

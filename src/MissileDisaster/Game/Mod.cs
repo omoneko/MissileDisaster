@@ -3,6 +3,7 @@ using System.Reflection;
 using ColossalFramework;
 using ColossalFramework.Plugins;
 using ICities;
+using MissileDisaster.Core;
 using MissileDisaster.Game.Models;
 
 namespace MissileDisaster.Game
@@ -17,6 +18,7 @@ namespace MissileDisaster.Game
 
         public void OnEnabled()
         {
+            LogBuildStamp();
             ModSettings.Ensure();
             // Assembly.GetExecutingAssembly().Location can come back empty the way CS loads
             // mods, which then throws. The mod path is taken from the game's own PluginManager
@@ -38,6 +40,30 @@ namespace MissileDisaster.Game
             catch (System.Exception e)
             {
                 ModConfig.LogError("OnEnabled error: " + e);
+            }
+        }
+
+        /// <summary>
+        /// Prints, once at load and whatever the log level, the dimensions this build would draw
+        /// a 150 kt cloud at. It is a fingerprint of the code that is actually running: the
+        /// numbers are computed, not written down, so they cannot go stale the way a version
+        /// string does. If the game is loading an old copy of the DLL - a Workshop subscription
+        /// shadowing a local build, a copy that never got overwritten - this line says so.
+        /// </summary>
+        private static void LogBuildStamp()
+        {
+            try
+            {
+                NuclearCloudDimensions d = NuclearCloudDisplay.For(NuclearYields.StandardKilotons);
+                ModConfig.LogAlways(string.Format(
+                    "build check - 150 kt draws: cloud top {0:F0} m, cap {1:F0} m wide, " +
+                    "fireball {2:F0} m across, rise {3:F1} s, screen top {4:F0} m",
+                    d.CloudTop, d.CapRadius * 2f, d.FireballRadius * 2f, d.RiseSeconds,
+                    NuclearCloudDisplay.ScreenTopAltitude));
+            }
+            catch (Exception e)
+            {
+                ModConfig.LogError("LogBuildStamp error: " + e);
             }
         }
 

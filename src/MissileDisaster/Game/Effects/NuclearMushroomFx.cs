@@ -118,6 +118,15 @@ namespace MissileDisaster.Game.Effects
                 // drawing a dark line up the front of the cap.
                 float stemTop = d.CapBase + d.CapDepth * StemIntoCapFraction;
 
+                // A nuclear strike is rare enough that one line about it is not noise, and it is
+                // the only way to tell from a log what the effect actually drew.
+                ModConfig.LogAlways(string.Format(
+                    "nuclear {0:F0} kt {1}: cloud top {2:F0} m, cap {3:F0} m wide, " +
+                    "fireball {4:F0} m across, up for {5:F0} s",
+                    kilotons > 0f ? kilotons : NuclearYields.StandardKilotons,
+                    airburst ? "airburst" : "groundburst",
+                    d.CloudTop, d.CapRadius * 2f, d.FireballRadius * 2f, showSeconds));
+
                 CreateFireball(detonation, d.FireballRadius, d.FireballSeconds);
                 CreateCondensationDome(detonation, d.FireballRadius * CondensationRadiusFactor, d.FireballSeconds);
                 CreateGroundDust(groundZero, d.StemRadius, d.RiseSeconds);
