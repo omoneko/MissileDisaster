@@ -95,9 +95,15 @@ reactor‑meltdown fallout. (Water treatment plants do **not** decontaminate in 
 ## Building from source
 
 - `build.ps1` builds the mod (MSBuild, .NET Framework 3.5 target for Unity 5.6) and deploys the
-  DLL plus `Models/` and `Sounds/` assets to the local Addons folder.
+  DLL plus `Models/` and `Sounds/` assets to the local Addons folder. It needs the game's managed
+  DLLs, so it only runs on a machine that owns Cities: Skylines.
 - Pure logic lives in `src/MissileDisaster/Core` (UnityEngine‑free) and is covered by xUnit tests
-  in `tests/` (`dotnet test`).
+  in `tests/` (`dotnet test`). No game install needed.
+- `tools/compile-check` type-checks the particle-effect code against stand-ins for the Unity
+  types, so a change to the effects can be caught without the game
+  (`dotnet build tools/compile-check/CompileCheck.csproj`). It is a syntax and shape check only —
+  a stub compiles whatever is written in it, so it cannot tell you a member exists in Unity 5.6.
+- `tools/effect-preview` renders the nuclear effect offline; see [docs/effects](docs/effects).
 
 ## License
 
