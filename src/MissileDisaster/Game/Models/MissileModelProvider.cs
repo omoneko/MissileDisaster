@@ -26,6 +26,7 @@ namespace MissileDisaster.Game.Models
         private static bool _initialized;
         private static readonly Dictionary<string, BuiltModel> _cache = new Dictionary<string, BuiltModel>();
         private static readonly Dictionary<string, Mesh> _meshCache = new Dictionary<string, Mesh>();
+        private static readonly Dictionary<string, Texture2D> _textureCache = new Dictionary<string, Texture2D>();
 
         public static void Initialize(string modDirectory)
         {
@@ -158,6 +159,8 @@ namespace MissileDisaster.Game.Models
                     return null;
                 }
 
+                ApplyTextures(data, mtl, materials, modelsDir);
+
                 ModConfig.Log("MissileModelProvider: built the model from its OBJ, name=" + name);
                 var built = new BuiltModel();
                 built.Mesh = mesh;
@@ -167,6 +170,65 @@ namespace MissileDisaster.Game.Models
             catch (Exception e)
             {
                 ModConfig.LogError("MissileModelProvider.BuildFromObj(" + name + ") error: " + e);
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Assigns each submesh's map_Kd texture to its material, when the MTL declared one. A
+        /// missing or unreadable file just leaves the plain colour - the model stays usable.
+        /// </summary>
+        private static void ApplyTextures(ObjData data, Dictionary<string, MtlColor> mtl,
+            Material[] materials, string modelsDir)
+        {
+            if (mtl == null || materials == null) return;
+            for (int s = 0; s < data.Submeshes.Count && s < materials.Length; s++)
+            {
+                try
+                {
+                    if (materials[s] == null || data.Submeshes[s] == null) continue;
+                    MtlColor entry;
+                    if (!mtl.TryGetValue(data.Submeshes[s].Material ?? "", out entry)) continue;
+                    if (entry == null || string.IsNullOrEmpty(entry.TextureFile)) continue;
+
+                    Texture2D tex = LoadTexture(Path.Combine(modelsDir, entry.TextureFile));
+                    if (tex == null) continue;
+                    materials[s].mainTexture = tex;
+                    if (materials[s].HasProperty("_MainTex")) materials[s].SetTexture("_MainTex", tex);
+                }
+                catch (Exception e)
+                {
+                    ModConfig.LogError("MissileModelProvider.ApplyTextures error: " + e);
+                }
+            }
+        }
+
+        /// <summary>Loads a PNG or JPG from disk into a Texture2D, cached by path. Null when the file is missing or does not decode.</summary>
+        private static Texture2D LoadTexture(string path)
+        {
+            Texture2D cached;
+            if (_textureCache.TryGetValue(path, out cached) && cached != null) return cached;
+            try
+            {
+                if (!File.Exists(path))
+                {
+                    ModConfig.LogError("MissileModelProvider.LoadTexture: not found, path=" + path);
+                    return null;
+                }
+                byte[] bytes = File.ReadAllBytes(path);
+                var tex = new Texture2D(2, 2);
+                if (!tex.LoadImage(bytes)) // decodes PNG and JPG, resizing the texture to fit
+                {
+                    ModConfig.LogError("MissileModelProvider.LoadTexture: could not decode, path=" + path);
+                    return null;
+                }
+                tex.wrapMode = TextureWrapMode.Clamp;
+                _textureCache[path] = tex;
+                return tex;
+            }
+            catch (Exception e)
+            {
+                ModConfig.LogError("MissileModelProvider.LoadTexture(" + path + ") error: " + e);
                 return null;
             }
         }

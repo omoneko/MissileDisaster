@@ -1,5 +1,13 @@
 # Handover — nuclear effect work
 
+> **Superseded in part.** After the playtest ("forms too slowly, stays too long, still not a
+> mushroom"), the particle stem and cap described below were replaced wholesale by a textured
+> 3D mesh (`Models/MushroomCloud.*`, CC-BY-4.0, converted by `tools/cloud-model/convert.py`),
+> animated by `Core/CloudAnimation` + `Game/Effects/MushroomCloudAnimator`. Timings were cut to
+> about a third (150 kt: 8.3 s rise, ~24 s total). The knobs table and fingerprint below are
+> updated; the commit-by-commit history further down describes the particle era and is kept for
+> the record.
+
 Branch `claude/mushroom-cloud-explosion-effects-anxonz`, on top of `master` (`c8b7822`).
 Everything described here is pushed. Nothing in this work exists on `master`.
 
@@ -52,17 +60,19 @@ that are taste rather than physics, and they are where to go for "bigger", "smal
 | `CloudScale` | 0.06 | the whole cloud against its real size — **width and height alike**. Raise for a bigger strike, lower for a smaller one. Do not scale height on its own: that is what broke the mushroom shape once already |
 | `ScreenTopAltitude` | 1000 | soft bound on the drawn height, knee at 700. **Also `ModConfig.MaxBurstAltitude`** — lowering it lowers the airburst ceiling too |
 | `FireballScale` | 0.16 | the fireball, which comes down less far than the cloud so it is not lost under it |
-| `RiseCompression` | 12 | real seconds per drawn second. Lower is slower |
-| `CapLifetime*` in `NuclearMushroomFx` | 35–60 s | how long the canopy stands |
+| `RiseCompression` | 45 | real seconds per drawn second. Lower is slower; bounds 5/10/16 s |
+| `HoldFactor` / `HoldSecondsMin/Max` | 1.2 / 8–16 s | how long the cloud stands at full size |
+| `FadeSeconds` | 6 | how long it takes to thin away |
+| `BirthFraction`, `WidthLagPower` in `Core/CloudAnimation` | 0.12 / 1.6 | how small the mesh is born, and how far the cap trails the column |
 
 What these currently produce:
 
 | | cloud top | cap width | fireball | whole shot |
 |---|---|---|---|---|
-| Little Boy 15 kt | 398 m | 184 m | 52 m | 45 s |
-| 150 kt baseline | 781 m | 431 m | 131 m | 67 s |
-| B83 1.2 Mt | 927 m | 1133 m | 300 m | 87 s |
-| Tsar Bomba 50 Mt | 987 m | 3119 m | 1284 m | 93 s |
+| Little Boy 15 kt | 398 m | 184 m | 52 m | 19 s |
+| 150 kt baseline | 781 m | 431 m | 131 m | 24 s |
+| B83 1.2 Mt | 927 m | 1133 m | 300 m | 33 s |
+| Tsar Bomba 50 Mt | 987 m | 3119 m | 1284 m | 38 s |
 
 If the size is still wrong, **`CloudScale` is the lever** — it moves width and height together and
 so cannot break the silhouette. `ScreenTopAltitude` is a guarantee, not a shaping tool, and it is
@@ -72,16 +82,16 @@ shared with the airburst ceiling; decouple them first if only the cloud should m
 
 | | status |
 |---|---|
-| `Core/**` logic | **234 xUnit tests pass.** `dotnet test tests/MissileDisaster.Core.Tests/` |
-| effect code compiles | **passes.** `dotnet build tools/compile-check/CompileCheck.csproj` |
-| `ExplosionFx`, `ImpactResolver`, `ModConfig`, `Mod` changes | inspected only — not in the compile check, which does not stub the Colossal API |
-| the members exist in Unity 5.6 | **not verified.** See below |
-| how it looks in game | **partly.** One session with a correct build, which found the silhouette bug above. Everything since is unverified again |
+| `Core/**` logic | **251 xUnit tests pass.** `dotnet test tests/MissileDisaster.Core.Tests/` — includes a test that parses the shipped `MushroomCloud.obj` and checks its normalisation |
+| effect code compiles | **passes**, against both the stubs (`tools/compile-check`) and the real game assemblies (`build.ps1`, 0 warnings) |
+| the mesh-cloud Unity members exist in 5.6 | **verified by reflection against the game's own UnityEngine.dll**: `Texture2D.LoadImage`, `MeshRenderer.materials`, `ParticleSystemShapeType.Circle`, both `MinMaxCurve` ctors. The transparent-fade shader is probed at runtime and falls back to a smoke-covered teardown if absent |
+| how it looks in game | **not verified since the mesh rework.** The next playtest is the judge |
 
-Three Unity members are used that were not used before this branch. If the real build fails, suspect
-these first:
+The particle-era warnings that used to sit here (three unverified members) are resolved — the
+build now compiles against the real assemblies on this machine. Suspects if something still looks
+wrong in game:
 
-- `ParticleSystemShapeType.Circle` — the canopy's flat disc emitter
+- `ParticleSystemShapeType.Circle` — the canopy's flat disc emitter (still used by ShockWaveFx)
 - `ParticleSystem.MinMaxCurve(float min, float max)` — random size and drift
 - `ParticleSystem.MinMaxCurve(float multiplier, AnimationCurve)` via `ParticleBuilder.Rise` —
   the climb-then-settle curve. `SpeedCurve` already used this shape, so it is the safest of the three

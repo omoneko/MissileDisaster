@@ -178,12 +178,35 @@ public class NuclearCloudDisplayTests
     }
 
     [Fact]
-    public void The_cloud_is_up_long_enough_to_watch()
+    public void The_cloud_forms_fast_and_does_not_outstay_its_welcome()
     {
-        // The rise used to be over in 15 s at the baseline, which read as a puff rather than as
-        // a cloud welling up and climbing.
-        Assert.InRange(NuclearCloudDisplay.For(150f).RiseSeconds, 25f, 40f);
-        Assert.InRange(NuclearCloudDisplay.For(15f).RiseSeconds, 12f, 25f);
+        // The playtest verdict on the previous pace - a 31 s rise, then most of a minute of
+        // lingering - was "too slow to form and stays too long". The cloud now forms in seconds
+        // and the whole 150 kt shot is under half a minute.
+        NuclearCloudDimensions d = NuclearCloudDisplay.For(150f);
+        Assert.InRange(d.RiseSeconds, 5f, 12f);
+        Assert.InRange(d.RiseSeconds + d.HoldSeconds + d.FadeSeconds, 15f, 30f);
+    }
+
+    [Fact]
+    public void A_bigger_yield_still_plays_longer()
+    {
+        Assert.True(NuclearCloudDisplay.For(50000f).RiseSeconds > NuclearCloudDisplay.For(15f).RiseSeconds,
+            "Tsar Bomba climbs for longer than Little Boy");
+        // But even Tsar Bomba's whole shot stays under a minute.
+        NuclearCloudDimensions tsar = NuclearCloudDisplay.For(50000f);
+        Assert.True(tsar.RiseSeconds + tsar.HoldSeconds + tsar.FadeSeconds < 60f);
+    }
+
+    [Fact]
+    public void The_hold_and_fade_are_always_present()
+    {
+        foreach (float kt in new[] { 0.001f, 15f, 150f, 50000f })
+        {
+            NuclearCloudDimensions d = NuclearCloudDisplay.For(kt);
+            Assert.InRange(d.HoldSeconds, NuclearCloudDisplay.HoldSecondsMin, NuclearCloudDisplay.HoldSecondsMax);
+            Assert.Equal(NuclearCloudDisplay.FadeSeconds, d.FadeSeconds, 3);
+        }
     }
 
     [Fact]

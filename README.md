@@ -36,15 +36,12 @@ radioactive fallout that you can clean up with a dedicated decontamination facil
     `3.0 km·10^(0.006941L⁴−0.06216L³+0.1526L²+0.1878L)`, `L = log₁₀(W/kt)`
     — at 150 kt that is a 3.6 km cap under a 13 km column, which happens to match the 3.7 km
     destruction radius within a few per cent
-  - Stem half the cap's width at 20 kt, a seventh of it in the megaton range
-  - The cap swells out of the head of the column and rides the rest of the way up with it,
-    rather than appearing finished at the cloud top before the stem gets there
-  - The canopy's underside is the **tropopause** — the lid that stops a cloud rising and spreads
-    it sideways — or half the cloud's height for a small one that never reaches it. That is why a
-    20 kt cap is a ball and a megaton cap is a sheet, and it reproduces Ivy Mike's and Castle
-    Bravo's measured cap bases to within a few per cent
-  - An **airburst's canopy turns white** as the water in it condenses, over a dark dust column,
-    the way both 1945 photographs show; a groundburst's keeps its dirt
+  - The mushroom itself is a **sculpted, textured 3D mesh** (688 vertices, fire baked into its
+    crevices), not billboard particles — that is what makes it read as the solid cauliflower
+    thing in the photographs. It grows out of the fireball with the column shooting up first and
+    the cap billowing after it, stands, and thins away; every strike faces a random way
+  - An **airburst's cloud is white**, the way both 1945 photographs show; a groundburst's keeps
+    its dirt
   - Ground dust drawn up by the afterwinds
   - **The size never stops following the yield.** Nothing is hard‑clamped: every dimension is
     exact up to the point the map can still carry it and then compressed smoothly towards a
@@ -54,10 +51,9 @@ radioactive fallout that you can clean up with a dedicated decontamination facil
     drawn at 6% of its real size — one number for width and height alike, so the drawn shape is
     the real shape — and bounded at 1 km, the altitude the mod already refuses to burst above,
     because that is where the top of the screen is. The fireball comes down less far, so it is
-    not lost under the cloud, and the rise is compressed about twelve to one, a strike running
-    about a minute from flash to fading. Four named constants in `Core/NuclearCloudDisplay`.
-    See [docs/effects](docs/effects) for renders of every stage, and for what was checked against
-    the measured tests and the photographs
+    not lost under the cloud. Time is compressed hard: the cloud forms in seconds and the whole
+    150 kt shot is about 24 s, because the playtest verdict on a slower cloud was that it was a
+    wait, not a spectacle. The knobs are named constants in `Core/NuclearCloudDisplay`
 - **Shock wave** — a blast front races out across the ground following Sedov–Taylor
   (`r ∝ t^0.4`): it leaves at several times the speed of sound and visibly decelerates, reaching
   the destruction radius at an average 540 m/s. Every warhead gets one
@@ -148,3 +144,9 @@ not by the game's own folder, so it is one of:
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+The mushroom cloud model (`src/MissileDisaster/Models/MushroomCloud.*`) is based on
+["Mushroom cloud low poly"](https://sketchfab.com/3d-models/mushroom-cloud-low-poly-7d37e0570a164eaba038594bf3d664f6)
+by [PROMEIISTER](https://sketchfab.com/PROMEIISTER), licensed under
+[CC-BY-4.0](http://creativecommons.org/licenses/by/4.0/) — converted and re-baked by
+`tools/cloud-model/convert.py`.

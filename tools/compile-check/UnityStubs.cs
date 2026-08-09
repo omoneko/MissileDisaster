@@ -14,6 +14,7 @@ namespace UnityEngine
         public Vector3(float x, float y, float z) { this.x = x; this.y = y; this.z = z; }
         public static Vector3 up { get { return new Vector3(0, 1, 0); } }
         public static Vector3 zero { get { return new Vector3(0, 0, 0); } }
+        public static Vector3 one { get { return new Vector3(1, 1, 1); } }
         public static Vector3 operator +(Vector3 a, Vector3 b) { return new Vector3(a.x + b.x, a.y + b.y, a.z + b.z); }
         public static Vector3 operator *(Vector3 a, float f) { return new Vector3(a.x * f, a.y * f, a.z * f); }
         public static Vector3 operator *(float f, Vector3 a) { return a * f; }
@@ -73,6 +74,7 @@ namespace UnityEngine
     public class Object
     {
         public string name { get; set; }
+        public static void Destroy(Object obj) { }
         public static void Destroy(Object obj, float t) { }
     }
 
@@ -80,18 +82,64 @@ namespace UnityEngine
     {
         public Vector3 position { get; set; }
         public Quaternion rotation { get; set; }
+        public Vector3 localScale { get; set; }
     }
 
     public class Component : Object
     {
         public Transform transform { get { return null; } }
+        public GameObject gameObject { get { return null; } }
         public T GetComponent<T>() where T : Component { return null; }
+    }
+
+    public class MonoBehaviour : Component { }
+
+    public static class Time
+    {
+        public static float deltaTime { get { return 0f; } }
+    }
+
+    public static class Random
+    {
+        public static float value { get { return 0f; } }
     }
 
     public class Shader : Object { }
     public class Texture : Object { }
     public class Texture2D : Texture { }
-    public class Material : Object { }
+
+    public class Material : Object
+    {
+        public Material(Shader shader) { }
+        public Color color { get; set; }
+        public Texture mainTexture { get; set; }
+        public bool HasProperty(string name) { return false; }
+        public void SetFloat(string name, float value) { }
+        public void SetTexture(string name, Texture value) { }
+    }
+
+    public struct Bounds
+    {
+        public Bounds(Vector3 center, Vector3 size) { }
+        public Vector3 size { get { return new Vector3(0, 0, 0); } }
+        public Vector3 extents { get { return new Vector3(0, 0, 0); } }
+    }
+
+    public class Mesh : Object
+    {
+        public Bounds bounds { get { return new Bounds(); } }
+    }
+
+    public class MeshFilter : Component
+    {
+        public Mesh sharedMesh { get; set; }
+    }
+
+    public class MeshRenderer : Component
+    {
+        public Material[] materials { get; set; }
+        public Material[] sharedMaterials { get; set; }
+    }
 
     public class GameObject : Object
     {
@@ -207,11 +255,13 @@ namespace UnityEngine
     }
 }
 
-// The two pieces of the mod the effect files lean on that are not UnityEngine.
+// The pieces of the mod the effect files lean on that are not UnityEngine and not in the
+// compile list themselves.
 namespace MissileDisaster.Game
 {
     public static class ModConfig
     {
+        public const string MushroomCloudModelName = "MushroomCloud";
         public static void Log(string message) { }
         public static void LogError(string message) { }
         public static void LogAlways(string message) { }
@@ -224,5 +274,24 @@ namespace MissileDisaster.Game.Effects
     {
         public static UnityEngine.Material Fire { get { return null; } }
         public static UnityEngine.Material Smoke { get { return null; } }
+    }
+
+    public static class RenderAssets
+    {
+        public static UnityEngine.Shader FindFirst(params string[] names) { return null; }
+        public static void ApplyDepthOcclusion(UnityEngine.Material mat) { }
+    }
+
+    public static class ExplosionFallback
+    {
+        public static void Play(UnityEngine.Vector3 center, float radius) { }
+    }
+}
+
+namespace MissileDisaster.Game.Models
+{
+    public static class MissileModelProvider
+    {
+        public static UnityEngine.GameObject CreateInstance(string name) { return null; }
     }
 }

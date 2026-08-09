@@ -14,7 +14,9 @@ namespace MissileDisaster.Core
         public float CloudTop;         // the height of the top of the cap above the ground
         public float CapBase;          // the canopy's underside - where the cloud stopped rising
         public float CapDepth;         // CloudTop - CapBase
-        public float RiseSeconds;      // how long the column takes to climb, after time compression
+        public float RiseSeconds;      // how long the cloud takes to form, after time compression
+        public float HoldSeconds;      // how long it then stands at full size
+        public float FadeSeconds;      // how long it takes to thin away at the end
     }
 
     /// <summary>
@@ -132,14 +134,21 @@ namespace MissileDisaster.Core
         public const float CloudTopKnee = 12000f;
         public const float CloudTopCeiling = 30000f;
 
-        // Time. A real cloud takes ten minutes to stabilise and then stands for an hour. This is
-        // what the rise is divided by, and the bounds it is then held inside: long enough that
-        // the dust visibly wells up and the column visibly climbs, and bounded so that a
-        // strategic warhead is not still rising two minutes later.
-        public const float RiseCompression = 12f;
-        public const float RiseSecondsMin = 12f;
-        public const float RiseSecondsKnee = 40f;
-        public const float RiseSecondsCeiling = 60f;
+        // Time. A real cloud takes ten minutes to stabilise and then stands for an hour; the
+        // playtest verdict on a 31 s rise and a minute of lingering was "too slow to form and
+        // stays too long". So the compression is steep: the cloud forms in seconds - fast enough
+        // to be a spectacle rather than a wait - stands for a moment at full size, and thins
+        // away. The whole 150 kt shot is about 25 s.
+        public const float RiseCompression = 45f;
+        public const float RiseSecondsMin = 5f;
+        public const float RiseSecondsKnee = 10f;
+        public const float RiseSecondsCeiling = 16f;
+
+        // How long it stands, against how long it rose, and how long the fade takes.
+        public const float HoldFactor = 1.2f;
+        public const float HoldSecondsMin = 8f;
+        public const float HoldSecondsMax = 16f;
+        public const float FadeSeconds = 6f;
 
         /// <summary>
         /// The dimensions for a yield in kilotons. Zero or less falls back to the 150 kt
@@ -174,6 +183,11 @@ namespace MissileDisaster.Core
             d.StemRadius = d.CapRadius * NuclearCloud.StemFraction(kt);
             d.RiseSeconds = EffectCeiling.Soft(NuclearCloud.StabiliseSeconds(kt) / RiseCompression,
                 RiseSecondsMin, RiseSecondsKnee, RiseSecondsCeiling);
+            float hold = d.RiseSeconds * HoldFactor;
+            if (hold < HoldSecondsMin) hold = HoldSecondsMin;
+            if (hold > HoldSecondsMax) hold = HoldSecondsMax;
+            d.HoldSeconds = hold;
+            d.FadeSeconds = FadeSeconds;
             return d;
         }
     }

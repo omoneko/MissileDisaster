@@ -42,6 +42,29 @@ namespace MissileDisaster.Core
                     data.Positions.Add(y);
                     data.Positions.Add(z);
                 }
+                else if (keyword == "vt")
+                {
+                    // Kept in file order. They are only ever applied when there is exactly one
+                    // per vertex, in the same order - see ObjData.HasAlignedUVs.
+                    if (tokens.Length < 3) continue;
+                    float u, v;
+                    if (!TryParseFloat(tokens[1], out u)) continue;
+                    if (!TryParseFloat(tokens[2], out v)) continue;
+                    data.UVs.Add(u);
+                    data.UVs.Add(v);
+                }
+                else if (keyword == "vn")
+                {
+                    // X mirrored to match the positions, or the lighting comes out inside out.
+                    if (tokens.Length < 4) continue;
+                    float x, y, z;
+                    if (!TryParseFloat(tokens[1], out x)) continue;
+                    if (!TryParseFloat(tokens[2], out y)) continue;
+                    if (!TryParseFloat(tokens[3], out z)) continue;
+                    data.Normals.Add(-x);
+                    data.Normals.Add(y);
+                    data.Normals.Add(z);
+                }
                 else if (keyword == "usemtl")
                 {
                     int spaceIndex = line.IndexOf(' ');
@@ -88,7 +111,7 @@ namespace MissileDisaster.Core
                         currentSubmesh.Triangles.Add(a);
                     }
                 }
-                // vn, vt, o, g, s, mtllib and anything else are ignored.
+                // o, g, s, mtllib and anything else are ignored.
             }
 
             return data;
