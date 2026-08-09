@@ -118,6 +118,12 @@ reactor‑meltdown fallout. (Water treatment plants do **not** decontaminate in 
   a stub compiles whatever is written in it, so it cannot tell you a member exists in Unity 5.6.
 - `tools/effect-preview` renders the nuclear effect offline; see [docs/effects](docs/effects).
 
+## Handover
+
+[docs/HANDOVER.md](docs/HANDOVER.md) — the state of the nuclear-effect work: the tuning
+constants and what they currently produce, what is verified and what is not, and the open
+question of whether the DLL the game is running is the one that was built.
+
 ## Checking which build is running
 
 **Options → Mods → Missile Disaster** has a *Build check* group at the top showing two lines:
