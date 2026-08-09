@@ -51,13 +51,14 @@ radioactive fallout that you can clean up with a dedicated decontamination facil
     exact up to the point the map can still carry it and then compressed smoothly towards a
     ceiling it never reaches, so a B83, an Ivy Mike and a Tsar Bomba are three visibly different
     clouds instead of the same picture
-  - **What is deliberately not to scale**, and the only such thing in the model: the cloud is
-    drawn at 6% of its real size — one number for width and height alike, so the drawn shape is
-    the real shape — and bounded at 1 km, the altitude the mod already refuses to burst above,
-    because that is where the top of the screen is. The fireball comes down less far, so it is
-    not lost under the cloud. Time is compressed hard: the cloud forms in seconds and the whole
-    150 kt shot is about 24 s, because the playtest verdict on a slower cloud was that it was a
-    wait, not a spectacle. The knobs are named constants in `Core/NuclearCloudDisplay`
+  - **What is deliberately not to scale**: the cloud is drawn at 6% of its real size — one
+    number for width and height alike, so the drawn shape is the real shape — with two declared
+    departures from it: the cap alone is spread a further 1.3× sideways, and the drawn height is
+    bounded at 2 km (the airburst ceiling stays at 1 km; the two are decoupled). The fireball
+    comes down less far, so it is not lost under the cloud. Time is compressed hard: the cloud
+    forms in seconds and the whole 150 kt shot is about 24 s, because the playtest verdict on a
+    slower cloud was that it was a wait, not a spectacle. The knobs are named constants in
+    `Core/NuclearCloudDisplay`
 - **Shock wave** — a blast front races out across the ground following Sedov–Taylor
   (`r ∝ t^0.4`): it leaves at several times the speed of sound and visibly decelerates, reaching
   the destruction radius at an average 540 m/s. Every warhead gets one

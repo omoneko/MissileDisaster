@@ -35,12 +35,13 @@ it take the width with it.** Two tests now pin the silhouette so this cannot com
 **Options → Mods → Missile Disaster → Build check**:
 
 ```
-150 kt draws: cloud top 781 m, cap 431 m wide, fireball 131 m across, rise 31.1 s, screen top 1000 m
+150 kt draws: cloud top 795 m, cap 559 m wide, fireball 131 m across, rise 8.3 s, screen top 2000 m
 Loaded from: C:\...\Addons\Mods\MissileDisaster
 ```
 
-The numbers are computed by the running code, so they are a fingerprint: a cloud top near **781 m**
-is this build, **13245 m** is the original, and **no Build check group at all** is an older DLL. The
+The numbers are computed by the running code, so they are a fingerprint: a cloud top near **795 m**
+with a **559 m** cap is this build, **781/431** the previous round, **13245 m** the original, and
+**no Build check group at all** is an older DLL. The
 path line settles the case where a Workshop subscription shadows a local build.
 
 Rebuild with Cities: Skylines fully closed — the DLL is locked while it runs.
@@ -59,7 +60,8 @@ that are taste rather than physics, and they are where to go for "bigger", "smal
 | constant | now | what it does |
 |---|---|---|
 | `CloudScale` | 0.06 | the whole cloud against its real size — **width and height alike**. Raise for a bigger strike, lower for a smaller one. Do not scale height on its own: that is what broke the mushroom shape once already |
-| `ScreenTopAltitude` | 1000 | soft bound on the drawn height, knee at 700. **Also `ModConfig.MaxBurstAltitude`** — lowering it lowers the airburst ceiling too |
+| `CapWidthScale` | 1.3 | the cap's extra sideways spread on top of CloudScale (playtest). The stem deliberately does not follow it |
+| `ScreenTopAltitude` | 2000 | soft bound on the drawn height, knee at 1400. **Decoupled from `ModConfig.MaxBurstAltitude`** (still 1000) since the playtest asked for taller clouds |
 | `FireballScale` | 0.16 | the fireball, which comes down less far than the cloud so it is not lost under it |
 | `RiseCompression` | 45 | real seconds per drawn second. Lower is slower; bounds 5/10/16 s |
 | `HoldFactor` / `HoldSecondsMin/Max` | 1.2 / 8–16 s | how long the cloud stands at full size |
@@ -70,10 +72,10 @@ What these currently produce:
 
 | | cloud top | cap width | fireball | whole shot |
 |---|---|---|---|---|
-| Little Boy 15 kt | 398 m | 184 m | 52 m | 19 s |
-| 150 kt baseline | 781 m | 431 m | 131 m | 24 s |
-| B83 1.2 Mt | 927 m | 1133 m | 300 m | 33 s |
-| Tsar Bomba 50 Mt | 987 m | 3119 m | 1284 m | 38 s |
+| Little Boy 15 kt | 398 m | 240 m | 52 m | 19 s |
+| 150 kt baseline | 795 m | 559 m | 131 m | 24 s |
+| B83 1.2 Mt | 1124 m | 1473 m | 300 m | 33 s |
+| Tsar Bomba 50 Mt | 1599 m | 4054 m | 1284 m | 38 s |
 
 If the size is still wrong, **`CloudScale` is the lever** — it moves width and height together and
 so cannot break the silhouette. `ScreenTopAltitude` is a guarantee, not a shaping tool, and it is

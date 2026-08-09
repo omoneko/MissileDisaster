@@ -77,15 +77,14 @@ namespace MissileDisaster.Core
         public const float FireballScale = 0.16f;
 
         /// <summary>
-        /// The altitude the top of the screen is, near enough, at the zoom the game is played at.
-        ///
-        /// This is not a figure about clouds. It is the height the mod already refuses to
-        /// detonate an airburst above - ModConfig.MaxBurstAltitude is this same number, for this
-        /// same reason - and it was arrived at the only way it can be, by looking at the game.
-        /// A cloud drawn taller than the highest thing the mod is willing to put in the sky is a
-        /// cloud whose top the player cannot see, so nothing is ever drawn above it.
+        /// The ceiling on the drawn cloud height. It began life equal to the airburst ceiling
+        /// (ModConfig.MaxBurstAltitude, 1000 m), on the argument that nothing should be drawn
+        /// above the highest thing the mod will put in the sky; the playtest overruled that -
+        /// the clouds read better standing taller than the camera's usual frame, which pans up
+        /// a mushroom naturally - so it is now double, and deliberately decoupled from the
+        /// burst ceiling, which has its own flight-path reasons to stay where it is.
         /// </summary>
-        public const float ScreenTopAltitude = 1000f;
+        public const float ScreenTopAltitude = 2000f;
 
         /// <summary>
         /// Where the soft ceiling on the drawn height starts to bite. It sits high enough that
@@ -95,7 +94,16 @@ namespace MissileDisaster.Core
         /// the very largest clouds do come out wider than their share; that is the price of the
         /// guarantee, and it is paid only by weapons nobody has ever built but Tsar Bomba.
         /// </summary>
-        public const float CloudTopDrawnKnee = 700f;
+        public const float CloudTopDrawnKnee = 1400f;
+
+        /// <summary>
+        /// How much further the cap spreads sideways than the true proportion, on top of
+        /// CloudScale. The playtest verdict on the honest shape was that the cap wanted to be
+        /// broader - a game is watched from low angles the photographs were not taken at - so
+        /// the cap alone is widened; the column keeps its true width against the unwidened cap,
+        /// or the mushroom loses its stem-to-cap contrast.
+        /// </summary>
+        public const float CapWidthScale = 1.3f;
 
         // The tropopause: the lid the canopy spreads out under, in real metres, before the
         // scale. Through the troposphere the air gets colder with height, so a fireball that
@@ -175,12 +183,14 @@ namespace MissileDisaster.Core
                 FireballRadiusMin, FireballRadiusKnee, FireballRadiusCeiling) * FireballScale;
             d.FireballSeconds = EffectCeiling.Soft(NuclearCloud.FireballSeconds(kt),
                 FireballSecondsMin, FireballSecondsKnee, FireballSecondsCeiling);
-            d.CapRadius = capRadius * CloudScale;
+            d.CapRadius = capRadius * CloudScale * CapWidthScale;
             d.CloudTop = EffectCeiling.Soft(cloudTop * CloudScale,
                 CloudTopDrawnKnee, ScreenTopAltitude);
             d.CapBase = d.CloudTop * baseFraction;
             d.CapDepth = d.CloudTop - d.CapBase;
-            d.StemRadius = d.CapRadius * NuclearCloud.StemFraction(kt);
+            // The stem's width is taken from the cap as the figures give it, before the lateral
+            // spread, so widening the cap cannot thicken the column under it.
+            d.StemRadius = capRadius * CloudScale * NuclearCloud.StemFraction(kt);
             d.RiseSeconds = EffectCeiling.Soft(NuclearCloud.StabiliseSeconds(kt) / RiseCompression,
                 RiseSecondsMin, RiseSecondsKnee, RiseSecondsCeiling);
             float hold = d.RiseSeconds * HoldFactor;

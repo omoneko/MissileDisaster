@@ -28,7 +28,10 @@ namespace MissileDisaster.Game.Effects
         private static readonly Color DustColorAir = new Color(0.62f, 0.58f, 0.53f, 1f);
         private static readonly Color DustColorGround = new Color(0.52f, 0.45f, 0.37f, 1f);
         private static readonly Color EmberColor = new Color(1f, 0.45f, 0.12f, 1f);
-        private const float BaseAlpha = 0.55f;
+        // The cap is drawn denser than the column - playtest: it has to read as a solid rolling
+        // mass, where the column reads better with some sky through it.
+        private const float CapAlpha = 0.72f;
+        private const float ColumnAlpha = 0.5f;
 
         private ParticleSystem _ps;
         private ParticleSystem.Particle[] _buffer;
@@ -70,7 +73,7 @@ namespace MissileDisaster.Game.Effects
 
                 Color c = Color.Lerp(VapourColor, dust, pt.Dust);
                 c = Color.Lerp(c, EmberColor, pt.Ember);
-                float alpha = BaseAlpha * anim.Alpha * pt.Fade;
+                float alpha = (_specs[i].Cap ? CapAlpha : ColumnAlpha) * anim.Alpha * pt.Fade;
 
                 _buffer[i].position = new Vector3(pt.X, pt.Y, pt.Z); // local space; the transform sits at ground zero
                 _buffer[i].startSize = pt.Size;

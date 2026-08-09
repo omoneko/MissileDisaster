@@ -46,15 +46,29 @@ public class NuclearCloudDisplayTests
     }
 
     [Fact]
-    public void Everything_inside_the_verified_range_is_drawn_to_its_real_figures_times_the_scale()
+    public void Everything_inside_the_verified_range_is_drawn_to_its_real_figures_times_the_scales()
     {
         // The knees sit at the old clamps, so no yield that was already exact may move except
-        // by the one deliberate scale.
+        // by the two deliberate scales: the overall CloudScale and the cap's lateral spread.
         foreach (float kt in new[] { 15f, 22f, 150f, 300f, 475f })
         {
             NuclearCloudDimensions d = NuclearCloudDisplay.For(kt);
-            Assert.Equal(NuclearCloud.CloudRadius(kt) * S, d.CapRadius, 1);
+            Assert.Equal(NuclearCloud.CloudRadius(kt) * S * NuclearCloudDisplay.CapWidthScale,
+                d.CapRadius, 1);
         }
+    }
+
+    [Fact]
+    public void The_cap_spreads_wider_than_true_but_the_column_does_not_thicken_with_it()
+    {
+        // The playtest asked for a broader cap. The spread must not leak into the stem, or the
+        // mushroom loses the contrast that makes it read: the stem is taken from the cap as the
+        // figures give it, before the widening.
+        NuclearCloudDimensions d = NuclearCloudDisplay.For(150f);
+        float unwidenedCap = NuclearCloud.CloudRadius(150f) * S;
+        Assert.Equal(unwidenedCap * NuclearCloud.StemFraction(150f), d.StemRadius, 1);
+        Assert.True(d.StemRadius / d.CapRadius < NuclearCloud.StemFraction(150f),
+            "against the widened cap, the stem is proportionally narrower still");
     }
 
     [Fact]
@@ -131,12 +145,14 @@ public class NuclearCloudDisplayTests
     [Fact]
     public void The_cloud_keeps_the_proportions_the_figures_give_it()
     {
-        // Width and height come down by one number, so the drawn shape is the real shape.
-        // Scaling them separately is what turned the effect into a pancake on a lump.
+        // Width and height come down by one number, so the drawn shape is the real shape -
+        // except for the cap's declared lateral spread, which is divided back out here.
+        // Scaling width and height separately by accident is what turned the effect into a
+        // pancake on a lump; the spread is the deliberate, bounded version of the same thing.
         foreach (float kt in new[] { 15f, 22f, 150f })
         {
             NuclearCloudDimensions d = NuclearCloudDisplay.For(kt);
-            float drawn = d.CapRadius * 2f / d.CloudTop;
+            float drawn = d.CapRadius / NuclearCloudDisplay.CapWidthScale * 2f / d.CloudTop;
             float real = NuclearCloud.CloudRadius(kt) * 2f / NuclearCloud.CloudTop(kt);
             Assert.InRange(drawn / real, 0.9f, 1.15f);
         }
@@ -219,7 +235,7 @@ public class NuclearCloudDisplayTests
                 NuclearCloudDisplay.FireballRadiusMin * NuclearCloudDisplay.FireballScale,
                 NuclearCloudDisplay.FireballRadiusCeiling * NuclearCloudDisplay.FireballScale);
             Assert.InRange(d.CapRadius, NuclearCloudDisplay.CapRadiusMin * S,
-                NuclearCloudDisplay.CapRadiusCeiling * S);
+                NuclearCloudDisplay.CapRadiusCeiling * S * NuclearCloudDisplay.CapWidthScale);
             Assert.InRange(d.CloudTop, 1f, NuclearCloudDisplay.ScreenTopAltitude);
             Assert.InRange(d.RiseSeconds, NuclearCloudDisplay.RiseSecondsMin,
                 NuclearCloudDisplay.RiseSecondsCeiling);
@@ -231,10 +247,13 @@ public class NuclearCloudDisplayTests
     [Fact]
     public void The_stem_stays_narrow_against_the_cap()
     {
+        // Glasstone's stem fraction runs 0.5 down to 0.1 with yield; against the deliberately
+        // widened cap the drawn ratio is that divided by CapWidthScale.
         foreach (float kt in new[] { 15f, 150f, 1000f, 50000f })
         {
             NuclearCloudDimensions d = NuclearCloudDisplay.For(kt);
-            Assert.InRange(d.StemRadius / d.CapRadius, 0.099f, 0.501f);
+            Assert.InRange(d.StemRadius / d.CapRadius,
+                0.099f / NuclearCloudDisplay.CapWidthScale, 0.501f / NuclearCloudDisplay.CapWidthScale);
         }
     }
 
