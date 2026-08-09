@@ -41,6 +41,11 @@ namespace MissileDisaster.Game.Effects
         // canopy appears somewhere the column is not.
         private const float CapEmergeFraction = 0.55f;
 
+        // How deep the canopy is against the height of the whole cloud. Glasstone puts the base
+        // of the cap at about 0.7 of the altitude of its top, so the cap is the remaining three
+        // tenths - and that is a fraction of the column's height, not of the cap's own width.
+        private const float CapThicknessFraction = 0.30f;
+
         // Colours, following how a real detonation looks rather than a palette: white hot, then
         // sodium yellow, then orange, then the brown of nitrogen dioxide and lofted earth.
         private static readonly Color FireballCore = new Color(1f, 0.99f, 0.94f, 1f);
@@ -207,6 +212,14 @@ namespace MissileDisaster.Game.Effects
         /// way up at the column's own rate before settling. Emitting it at the top instead - as
         /// it used to be - hangs a finished canopy in clear air seconds before the stem arrives
         /// under it, which is the one thing that gives the effect away as particles.
+        ///
+        /// How deep it is comes from the cloud top rather than from its own width. Glasstone puts
+        /// the base of the cap at about 0.7 of the altitude of its top, which makes the canopy
+        /// three tenths of the column deep whatever the yield. Taking the depth from the width
+        /// instead - which is what falls out of sizing the particles off capR - is right at
+        /// 150 kt only by coincidence, and by 10 Mt gives a canopy three times too deep: a ball
+        /// on a stick rather than the flattened lens a megaton cloud spreads out along the
+        /// tropopause.
         /// </summary>
         private static void CreateCap(Vector3 groundZero, float capR, float top, float rise)
         {
@@ -215,11 +228,21 @@ namespace MissileDisaster.Game.Effects
             // still rising into it.
             float lifetime = Mathf.Max(18f, rise * 0.8f);
             const float emitFraction = 0.35f; // where the particles start, as a fraction of capR
-            const float sizeFraction = 0.45f; // particle diameter at birth, likewise
             const float growth = 1.6f;        // how much larger a particle is by the end of its life
-            float driftDistance = capR * (1f - emitFraction - sizeFraction * growth * 0.5f);
-            if (driftDistance < 0f) driftDistance = 0f;
+
+            // The canopy is a flat lens: a round billboard grown to the cap's depth, spread
+            // across a horizontal disc until the three together - where it starts, how far it
+            // spreads and how large it has grown - add up to capR.
+            float thickness = top * CapThicknessFraction;
+            float spriteRadius = thickness * 0.5f;
+            float emitRadius = Mathf.Min(capR * emitFraction, Mathf.Max(0f, capR - spriteRadius));
+            float driftDistance = Mathf.Max(0f, capR - emitRadius - spriteRadius);
             float driftSpeed = driftDistance / lifetime;
+            // Enough of them to cover the disc several times over at any yield: a 10 Mt canopy is
+            // six times wider against its own depth than a 150 kt one, so a fixed count that
+            // reads as solid at one would be gauze at the other.
+            float cover = capR / Mathf.Max(spriteRadius, 1f);
+            int count = Mathf.Clamp(Mathf.RoundToInt(8f * cover * cover), 100, 400);
 
             // The head of the column when the cap starts to swell, and the climb left to do.
             float delay = rise * CapEmergeFraction;
@@ -231,18 +254,21 @@ namespace MissileDisaster.Game.Effects
             var main = ps.main;
             main.startDelay = delay; // it starts to swell once the column is well up
             main.startLifetime = lifetime;
-            // A steady outward drift that covers exactly driftDistance over the lifetime. It is
-            // set here rather than through a speed limit because the climb below already uses
-            // velocityOverLifetime, and the limit module is applied to a particle's whole
-            // velocity - it would brake the climb along with the drift.
-            main.startSpeed = driftSpeed;
-            main.startSize = capR * sizeFraction;
+            // An outward drift of anywhere from nothing up to the full driftDistance over the
+            // lifetime. The spread is what fills the canopy: give every particle the same speed
+            // and they all leave the middle together, and the cap comes out a ring with a hole
+            // in it rather than a disc. The speed is set here rather than through a speed limit
+            // because the climb below already uses velocityOverLifetime, and the limit module is
+            // applied to a particle's whole velocity - it would brake the climb along with the
+            // drift.
+            main.startSpeed = new ParticleSystem.MinMaxCurve(0f, driftSpeed);
+            main.startSize = thickness / growth; // the size curve grows it to the full depth
             main.startColor = new ParticleSystem.MinMaxGradient(CapWarm, CapCool);
             main.maxParticles = 500;
             main.gravityModifier = 0.015f;  // the rim droops, which is the cap's rollover
 
-            ParticleBuilder.Burst(ps, 100);
-            ParticleBuilder.ConeUp(ps, capR * emitFraction, 62f);
+            ParticleBuilder.Burst(ps, count);
+            ParticleBuilder.FlatDisc(ps, emitRadius);
             ParticleBuilder.Rise(ps, ClimbThenSettle(rise - delay, lifetime), top / rise);
             ParticleBuilder.Fade(ps,
                 new GradientAlphaKey(0.6f, 0f), new GradientAlphaKey(0.85f, 0.25f),

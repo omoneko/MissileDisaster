@@ -72,6 +72,22 @@ namespace MissileDisaster.Game.Effects
         }
 
         /// <summary>
+        /// A horizontal filled disc: particles start anywhere inside the circle and travel
+        /// straight outwards along it, staying in its plane. This is what a cloud cap spreads
+        /// across - unlike a cone, nothing is sent upwards, so the canopy's depth is left to the
+        /// particle size instead of being set by how far it spreads.
+        /// </summary>
+        public static void FlatDisc(ParticleSystem ps, float radius)
+        {
+            var shape = ps.shape;
+            shape.enabled = true;
+            shape.shapeType = ParticleSystemShapeType.Circle;
+            shape.radius = radius;
+            shape.arc = 360f;
+            ps.transform.rotation = Quaternion.Euler(90f, 0f, 0f); // lay the disc flat
+        }
+
+        /// <summary>
         /// A horizontal ring lying on the ground: particles start on the circle and travel
         /// straight outwards along it. This is the shape a blast front is drawn with.
         /// </summary>

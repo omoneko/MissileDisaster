@@ -254,7 +254,8 @@ def stage_cap_legacy(d, t, origin=(0, 0, 0), n=100):
     return p + np.array(origin), np.full(n, size), rgba, False
 
 
-def stage_cap(d, t, origin=(0, 0, 0), n=100):
+def stage_cap_thick(d, t, origin=(0, 0, 0), n=100):
+    """The cap sized off its own width: born at the column head, but a ball rather than a lens."""
     capR, rise, top = d["cap"], d["rise"], d["top"]
     lifetime = max(18.0, rise * 0.8)
     delay = rise * EMERGE
@@ -264,14 +265,62 @@ def stage_cap(d, t, origin=(0, 0, 0), n=100):
     age = t - delay
     u = age / lifetime
     p, v = in_cone(n, capR * emit_f, 62.0)
-    p = p + v * (drift * age)          # a steady drift, covering driftDistance over the lifetime
+    p = p + v * (drift * age)
+    p[:, 1] += top * EMERGE + _climb(age, rise - delay, lifetime, top / rise)
+    p[:, 1] -= 0.5 * 9.81 * 0.015 * age ** 2
+    alpha = ramp([(0.0, 0.6), (0.25, 0.85), (0.7, 0.7), (1.0, 0.0)], u) * 0.72
+    base = np.array([mix(CAP_WARM[:3], CAP_COOL[:3], x) for x in rng.random(n)])
+    rgba = np.concatenate([base, np.full((n, 1), alpha)], axis=1)
+    size = capR * size_f * ramp([(0.0, 0.7), (1.0, growth)], u)
+    return p + np.array(origin), np.full(n, size), rgba, False
+
+
+THICKNESS = 0.30   # CapThicknessFraction - Glasstone: the cap's base at 0.7 of its top
+
+
+def in_disc(n, radius):
+    """A flat filled disc with purely radial, in-plane velocity."""
+    th = rng.random(n) * 2 * math.pi
+    rr = radius * np.sqrt(rng.random(n))
+    radial = np.stack([np.cos(th), np.zeros(n), np.sin(th)], axis=1)
+    return radial * rr[:, None], radial
+
+
+def cap_geometry(d):
+    """The cap's depth, sprite size, emission disc and drift - the C# budget, verbatim."""
+    capR, top = d["cap"], d["top"]
+    lifetime = max(18.0, d["rise"] * 0.8)
+    growth = 1.6
+    thickness = top * THICKNESS
+    sprite_r = thickness * 0.5
+    emit_r = min(capR * 0.35, max(0.0, capR - sprite_r))
+    drift = max(0.0, capR - emit_r - sprite_r)
+    cover = capR / max(sprite_r, 1.0)
+    count = int(min(400, max(100, round(8 * cover * cover))))
+    return dict(lifetime=lifetime, growth=growth, thickness=thickness, sprite_r=sprite_r,
+                emit_r=emit_r, drift=drift, count=count)
+
+
+def stage_cap(d, t, origin=(0, 0, 0), n=None):
+    rise, top = d["rise"], d["top"]
+    g = cap_geometry(d)
+    lifetime, delay = g["lifetime"], rise * EMERGE
+    if t < delay or t > delay + lifetime: return None
+    n = n or g["count"]
+    age = t - delay
+    u = age / lifetime
+    p, v = in_disc(n, g["emit_r"])
+    # a drift of anywhere from nothing to the full distance, so the disc fills instead of
+    # emptying its middle into a ring; strictly horizontal either way
+    speed = rng.random(n) * (g["drift"] / lifetime)
+    p = p + v * (speed * age)[:, None]
     # born at the head of the column, riding the rest of the way up with it
     p[:, 1] += top * EMERGE + _climb(age, rise - delay, lifetime, top / rise)
     p[:, 1] -= 0.5 * 9.81 * 0.015 * age ** 2             # the rim droops
     alpha = ramp([(0.0, 0.6), (0.25, 0.85), (0.7, 0.7), (1.0, 0.0)], u) * 0.72
     base = np.array([mix(CAP_WARM[:3], CAP_COOL[:3], x) for x in rng.random(n)])
     rgba = np.concatenate([base, np.full((n, 1), alpha)], axis=1)
-    size = capR * size_f * ramp([(0.0, 0.7), (1.0, growth)], u)
+    size = g["thickness"] / g["growth"] * ramp([(0.0, 0.7), (1.0, g["growth"])], u)
     return p + np.array(origin), np.full(n, size), rgba, False
 
 

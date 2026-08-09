@@ -194,7 +194,7 @@ def render_cap_fix(kt=150.0, w=620, h=660):
                              fontweight="bold", pad=7)
     for row, label, colour in (
             (0, "BEFORE\na finished canopy hangs\nin clear air above the stem", "#d9a06a"),
-            (1, "AFTER\nit swells out of the column's head\nand rides up with it", "#8fd6a6")):
+            (1, "AFTER\nit swells out of the column's head,\nrides up with it, and is a lens", "#8fd6a6")):
         axes[row, 0].text(-0.12, 0.5, label, transform=axes[row, 0].transAxes, rotation=90,
                           va="center", ha="center", fontsize=12, fontweight="bold", color=colour)
     fig.suptitle("Where the cap is born — 150 kt, one camera, 1 km grid",
@@ -205,6 +205,51 @@ def render_cap_fix(kt=150.0, w=620, h=660):
     return path
 
 
+# -------------------------------------------------------------- the cap's depth
+
+SHAPE_WEAPONS = [("150 kt baseline", 150), ("B83", 1200), ("Ivy Mike", 10400)]
+
+
+def render_cap_shape(w=660, h=620):
+    """Sizing the canopy off its own width against off the cloud top, as Glasstone has it."""
+    fig, axes = plt.subplots(2, len(SHAPE_WEAPONS), figsize=(14.5, 10.4))
+    fig.patch.set_facecolor("#14161a")
+    for col, (name, kt) in enumerate(SHAPE_WEAPONS):
+        d = fx.dimensions(kt)
+        g = fx.cap_geometry(d)
+        t = d["rise"] * 0.55 + g["lifetime"] * 0.8
+        extent = max(d["top"] * 1.25, d["cap"] * 2.4)
+        cam = frame(extent, d["cap"] * 2.5, w, h)
+        others = [fx.stage_ground_dust, fx.stage_stem]
+        old_thick = d["cap"] * (1 - 0.35 - 0.45 * 1.6 * 0.5) + d["cap"] * 0.45 * 1.6
+        for row, (capfn, colour, thick) in enumerate((
+                (fx.stage_cap_thick, "#8c5a3a", old_thick),
+                (fx.stage_cap, "#4a7f5a", g["thickness"]))):
+            ax = axes[row, col]
+            img = scene(cam, [s(d, t) for s in others] + [capfn(d, t)], 2000, extent * 3.0, w, h)
+            ax.imshow(img); ax.set_xticks([]); ax.set_yticks([])
+            for sp in ax.spines.values(): sp.set_color(colour); sp.set_linewidth(1.6)
+            if row == 0:
+                ax.set_title(f"{name} — {kt:,} kt\ncap {km(d['cap']*2)} wide, top {km(d['top'])}",
+                             color="#ffd479", fontsize=12, fontweight="bold", pad=8)
+            ax.set_xlabel(f"cap depth {km(thick)}   ({thick/(0.3*d['top']):.1f}× Glasstone's "
+                          f"{km(0.3*d['top'])})", fontsize=9.5,
+                          color="#d9a06a" if row == 0 else "#8fd6a6")
+    for row, label, colour in (
+            (0, "BEFORE — depth from the cap's own width", "#d9a06a"),
+            (1, "AFTER — depth from the cloud top (0.3 × top)", "#8fd6a6")):
+        axes[row, 0].text(-0.09, 0.5, label, transform=axes[row, 0].transAxes, rotation=90,
+                          va="center", ha="center", fontsize=11.5, fontweight="bold", color=colour)
+    fig.suptitle("How deep the canopy is — Glasstone puts its base at 0.7 of the cloud top",
+                 color="#ffffff", fontsize=18, fontweight="bold", y=0.98)
+    fig.tight_layout(rect=[0.012, 0.01, 1, 0.93])
+    fig.subplots_adjust(hspace=0.16)
+    path = os.path.join(OUT, "cap-shape.png")
+    fig.savefig(path, dpi=110, facecolor="#14161a"); plt.close(fig)
+    return path
+
+
 if __name__ == "__main__":
-    for p in (render_stages(), render_timeline(), render_yields(), render_cap_fix()):
+    for p in (render_stages(), render_timeline(), render_yields(),
+              render_cap_fix(), render_cap_shape()):
         print("wrote", p)
