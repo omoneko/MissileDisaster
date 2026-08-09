@@ -16,11 +16,11 @@ python3 tools/effect-preview/render.py docs/effects     # needs numpy and matplo
 ## `stages.png`
 
 The five overlapping stages of a 150 kt groundburst, each framed on its own scale — the
-fireball is 400 m across and the cap 7 km, so one frame cannot show both.
+fireball is 400 m across and the cap 1.4 km, so one frame cannot show both.
 
 ## `timeline.png`
 
-The same 150 kt detonation from one camera over its whole 22 s, on a 1 km grid.
+The same 150 kt detonation from one camera over its whole 67 s, on a 1 km grid.
 
 ## `yield-ceilings.png`
 
@@ -50,7 +50,7 @@ warms, loses its buoyancy within a kilometre or two, and has nowhere left to go 
 That lid is what spreads the canopy flat — the same one that gives a thunderstorm its anvil.
 
 So the canopy's base is where the cloud stopped rising, and its depth is everything from there
-to the top. `NuclearMushroomFx.CapBase` puts it at half the cloud top, never above the 11 km
+to the top. `NuclearCloudDisplay` puts it at half the cloud top, never above the 11 km
 mid-latitude tropopause. That reproduces what was measured:
 
 | | cloud top | cap base | base ÷ top |
