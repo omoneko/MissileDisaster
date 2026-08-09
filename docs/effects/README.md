@@ -133,7 +133,7 @@ figures alone had not:
 
 ## Playability: what is deliberately not to scale
 
-Two numbers in `NuclearCloudDisplay` are admissions rather than figures, and they are the only
+Three numbers in `NuclearCloudDisplay` are admissions rather than figures, and they are the only
 ones in the model that are:
 
 - **`CloudScale = 0.20`** — the cloud is drawn at a fifth of its real size. A real 150 kt cloud
