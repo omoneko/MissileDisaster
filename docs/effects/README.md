@@ -103,8 +103,9 @@ Sources for the measured figures: [Castle Bravo](https://en.wikipedia.org/wiki/C
 
 The same 150 kt burst at four values of `NuclearCloudDisplay.CloudScale`, from a camera at the
 height and distance the game is actually played at, with a city for a ruler. This is the figure
-to look at when deciding how large clouds should be: at 0.30 and above the canopy runs off the
-top of the screen, at 0.20 the whole mushroom is in frame.
+to look at when deciding how large clouds should be. With `CloudHeightScale` at 0.5 every one of
+the four is in frame, so the choice is about how much of the sky a strike should fill rather
+than about whether it fits.
 
 ## `nineteen-forty-five.png`
 
@@ -139,6 +140,12 @@ ones in the model that are:
   stands 13.2 km, which from a game camera is a column leaving the top of the screen rather than
   a mushroom. It is applied to cap, stem and height together, so every proportion checked
   against the photographs survives it. Raise it for taller clouds; see `cloud-scale.png`.
+- **`CloudHeightScale = 0.50`** — the height alone is halved again on top of that. Even at a
+  fifth of its real size a cloud is a tall thing, because the figures make one taller than it is
+  wide at every yield below a megaton, and height is what runs off the top of a screen. This is
+  the one proportion checked against the photographs that is knowingly broken: the canopy comes
+  out about twice as flat as the real thing, since its depth is measured from the cloud top and
+  the top is what moved. Set it to 1 to have the cloud back in proportion at twice the height.
 - **`FireballScale = 0.50`** — the fireball comes down only half way, so it keeps two and a half
   times its share of a cloud that has been brought down to a fifth. At full size it would be
   nearly as wide as a compressed 50 Mt canopy; in step with the cloud it is a spark. At 0.50 it

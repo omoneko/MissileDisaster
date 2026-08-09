@@ -48,6 +48,7 @@ def hard(v, lo, hi): return max(lo, min(hi, v))
 
 CLOUD_SCALE = 0.20      # NuclearCloudDisplay.CloudScale - playability, not physics
 FIREBALL_SCALE = 0.50   # the fireball comes down less far than the cloud around it
+HEIGHT_SCALE = 0.50     # a further squash on the height alone
 TROPOPAUSE = 11000.0    # real metres, before the scale
 NEW = dict(fb=(25.0, 3000.0, 7000.0), fbs=(0.8, 12.0, 20.0), cap=(200.0, 8000.0, 26000.0),
            top=(800.0, 12000.0, 30000.0), rise=(12.0, 40.0, 60.0))
@@ -69,8 +70,8 @@ def dimensions(kt, ceilings="new"):
         base = min(d["top"] * 0.5, TROPOPAUSE)
         d["fireball"] *= FIREBALL_SCALE
         d["cap"] *= CLOUD_SCALE
-        d["top"] *= CLOUD_SCALE
-        d["base"] = base * CLOUD_SCALE
+        d["top"] *= CLOUD_SCALE * HEIGHT_SCALE
+        d["base"] = base * CLOUD_SCALE * HEIGHT_SCALE
     else:
         d = dict(
             fireball=hard(fireball_radius(kt), *OLD["fb"]),

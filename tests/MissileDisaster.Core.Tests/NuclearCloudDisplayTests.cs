@@ -9,6 +9,7 @@ using Xunit;
 public class NuclearCloudDisplayTests
 {
     private const float S = NuclearCloudDisplay.CloudScale;
+    private const float V = NuclearCloudDisplay.CloudScale * NuclearCloudDisplay.CloudHeightScale;
 
     [Fact]
     public void Every_weapon_in_the_catalogue_is_drawn_larger_than_the_one_below_it()
@@ -95,19 +96,24 @@ public class NuclearCloudDisplayTests
         Assert.Equal(small.CloudTop * 0.5f, small.CapBase, 1);
 
         NuclearCloudDimensions big = NuclearCloudDisplay.For(10400f);
-        Assert.Equal(NuclearCloudDisplay.TropopauseAltitude * S, big.CapBase, 1);
+        Assert.Equal(NuclearCloudDisplay.TropopauseAltitude * V, big.CapBase, 1);
         Assert.InRange(big.CapBase / big.CloudTop, 0.40f, 0.50f);
     }
 
     [Fact]
-    public void A_small_canopy_is_a_ball_and_a_strategic_one_is_a_sheet()
+    public void A_small_canopy_is_rounder_than_a_strategic_one()
     {
         // The whole point of taking the depth from where the cloud stopped rising: a fixed
         // fraction made every canopy exactly twice as wide as it was deep, at every yield.
+        // The absolute figures here carry CloudHeightScale, which flattens both of them by the
+        // same factor - a small canopy is a ball at CloudHeightScale = 1 - so what is pinned is
+        // that a 10 Mt cap is several times the flatter of the two.
         NuclearCloudDimensions small = NuclearCloudDisplay.For(15f);
         NuclearCloudDimensions large = NuclearCloudDisplay.For(10400f);
-        Assert.InRange(small.CapRadius * 2f / small.CapDepth, 0.7f, 1.3f);
-        Assert.True(large.CapRadius * 2f / large.CapDepth > 3f,
+        float smallFlatness = small.CapRadius * 2f / small.CapDepth;
+        float largeFlatness = large.CapRadius * 2f / large.CapDepth;
+        Assert.InRange(smallFlatness * NuclearCloudDisplay.CloudHeightScale, 0.7f, 1.3f);
+        Assert.True(largeFlatness > smallFlatness * 3f,
             "a 10 Mt canopy spreads out along the tropopause");
     }
 
@@ -143,8 +149,8 @@ public class NuclearCloudDisplayTests
                 NuclearCloudDisplay.FireballRadiusCeiling * NuclearCloudDisplay.FireballScale);
             Assert.InRange(d.CapRadius, NuclearCloudDisplay.CapRadiusMin * S,
                 NuclearCloudDisplay.CapRadiusCeiling * S);
-            Assert.InRange(d.CloudTop, NuclearCloudDisplay.CloudTopMin * S,
-                NuclearCloudDisplay.CloudTopCeiling * S);
+            Assert.InRange(d.CloudTop, NuclearCloudDisplay.CloudTopMin * V,
+                NuclearCloudDisplay.CloudTopCeiling * V);
             Assert.InRange(d.RiseSeconds, NuclearCloudDisplay.RiseSecondsMin,
                 NuclearCloudDisplay.RiseSecondsCeiling);
             Assert.InRange(d.FireballSeconds, NuclearCloudDisplay.FireballSecondsMin,

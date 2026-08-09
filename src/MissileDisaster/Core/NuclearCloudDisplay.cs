@@ -70,6 +70,21 @@ namespace MissileDisaster.Core
         /// </summary>
         public const float FireballScale = 0.50f;
 
+        /// <summary>
+        /// A further squash applied to the cloud's height alone, on top of CloudScale.
+        ///
+        /// Even at a fifth of its real size a cloud is a tall thing - the figures make one taller
+        /// than it is wide at every yield below a megaton, because that is what a real one is -
+        /// and height is what runs off the top of a screen. Halving it leaves the canopy as wide
+        /// as it was and brings its top down to where the whole mushroom is comfortably in frame.
+        ///
+        /// This is the one place where a proportion checked against the photographs is knowingly
+        /// broken: the canopy comes out about twice as flat as the real thing, because its depth
+        /// is measured from the cloud top and the top is what moved. Set it to 1 to have the
+        /// cloud back in proportion, at twice the height.
+        /// </summary>
+        public const float CloudHeightScale = 0.5f;
+
         // The tropopause: the lid the canopy spreads out under, in real metres, before the
         // scale. Through the troposphere the air gets colder with height, so a fireball that
         // cools as it expands stays warmer than what surrounds it and keeps climbing; at the
@@ -138,9 +153,10 @@ namespace MissileDisaster.Core
                 FireballRadiusMin, FireballRadiusKnee, FireballRadiusCeiling) * FireballScale;
             d.FireballSeconds = EffectCeiling.Soft(NuclearCloud.FireballSeconds(kt),
                 FireballSecondsMin, FireballSecondsKnee, FireballSecondsCeiling);
+            float vertical = CloudScale * CloudHeightScale;
             d.CapRadius = capRadius * CloudScale;
-            d.CloudTop = cloudTop * CloudScale;
-            d.CapBase = capBase * CloudScale;
+            d.CloudTop = cloudTop * vertical;
+            d.CapBase = capBase * vertical;
             d.CapDepth = d.CloudTop - d.CapBase;
             d.StemRadius = d.CapRadius * NuclearCloud.StemFraction(kt);
             d.RiseSeconds = EffectCeiling.Soft(NuclearCloud.StabiliseSeconds(kt) / RiseCompression,
