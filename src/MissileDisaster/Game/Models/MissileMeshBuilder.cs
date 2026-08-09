@@ -117,7 +117,7 @@ namespace MissileDisaster.Game.Models
 
         /// <summary>
         /// Applies UVs and normals when the OBJ carried them index-aligned with the positions -
-        /// the convention tools/cloud-model/generate.py emits, and the only texture path this
+        /// the convention a purpose-built exporter can emit, and the only texture path this
         /// pipeline has. A Blender export without that alignment simply keeps the old behaviour:
         /// no UVs, normals recalculated.
         /// </summary>

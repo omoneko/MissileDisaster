@@ -27,7 +27,7 @@ namespace MissileDisaster.Core
         /// <summary>
         /// Every vt's u and v flattened into one list. Faces do not carry vt indices through this
         /// parser; UVs are used only when the file has exactly one vt per v, in the same order -
-        /// which is the convention tools/cloud-model/generate.py emits. HasAlignedUVs says whether
+        /// the convention a purpose-built exporter can emit. HasAlignedUVs says whether
         /// this file met it.
         /// </summary>
         public List<float> UVs;

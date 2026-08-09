@@ -1,6 +1,5 @@
 using System;
 using MissileDisaster.Core;
-using MissileDisaster.Game.Models;
 using UnityEngine;
 
 namespace MissileDisaster.Game.Effects
@@ -9,18 +8,17 @@ namespace MissileDisaster.Game.Effects
     /// A nuclear detonation, built to the figures in MissileDisaster.Core.NuclearCloud rather
     /// than to taste. Main thread only.
     ///
-    /// The mushroom itself is a textured mesh - Models/MushroomCloud.obj, procedurally generated
-    /// with the fire baked into its crevices - because that is the verdict of trying to build one out
-    /// of billboard particles: however carefully the column and canopy budgets are solved, a
-    /// crowd of round sprites reads as smoke in the shape of a mushroom, never as the solid,
-    /// cauliflower thing in the photographs. The mesh is grown out of the fireball over the rise,
-    /// the column shooting up first and the cap billowing after it (Core.CloudAnimation), stands
-    /// at full size, and thins away.
+    /// The mushroom is a cloud of soft smoke puffs driven along the flow a real one has - the
+    /// vortex ring - by Core.CloudPuffs, through MushroomCloudPuffsFx placing every puff every
+    /// frame. Free-running particles could not hold the silhouette and a solid mesh read as a
+    /// model growing out of the ground; computed puffs are both at once, a mushroom that is
+    /// visibly made of boiling cloud. It grows out of the fireball with the column climbing
+    /// first and the cap rolling over after it, stands, and thins away (Core.CloudAnimation).
     ///
-    /// Around it, the stages a real detonation has and a static mesh cannot carry:
+    /// Around it, the other stages of the real thing:
     ///
     ///  1. the fireball at the point of burst, swelling and cooling white through orange to a
-    ///     dull red - it covers the mesh's small beginnings
+    ///     dull red - it covers the cloud's small beginnings
     ///  2. the condensation cloud, the white dome that flashes into being behind the shock front
     ///     and is gone within a second or two
     ///  3. the dust the afterwinds tear off the ground and feed into the base of the column
@@ -35,6 +33,10 @@ namespace MissileDisaster.Game.Effects
         private const float CondensationRadiusFactor = 2.6f;
         private const float CondensationLifetime = 1.3f;
 
+        // Big soft billboards get clamped by the renderer's default screen-size cap, which
+        // would shrink the cloud exactly when the camera is close enough to admire it.
+        private const float PuffMaxScreenFraction = 4f;
+
         // Colours, following how a real detonation looks rather than a palette: white hot, then
         // sodium yellow, then orange, then the brown of nitrogen dioxide and lofted earth.
         private static readonly Color FireballCore = new Color(1f, 0.99f, 0.94f, 1f);
@@ -44,12 +46,6 @@ namespace MissileDisaster.Game.Effects
         private static readonly Color Condensation = new Color(0.96f, 0.97f, 1f, 0.42f);
         private static readonly Color DustLight = new Color(0.55f, 0.49f, 0.40f, 0.75f);
         private static readonly Color DustDark = new Color(0.32f, 0.28f, 0.23f, 0.75f);
-
-        // The mesh's tint. Both 1945 photographs - airbursts - show a brilliant white cloud; a
-        // groundburst has ground in it and keeps its dirt. The texture itself is pale, so the
-        // tint only has to nudge it.
-        private static readonly Color CloudTintAir = new Color(1f, 1f, 1f, 1f);
-        private static readonly Color CloudTintGround = new Color(0.90f, 0.85f, 0.78f, 1f);
 
         /// <summary>
         /// Plays the whole detonation. groundZero is the spot on the ground the cloud rises from,
@@ -77,7 +73,7 @@ namespace MissileDisaster.Game.Effects
                 CreateFireball(detonation, d.FireballRadius, d.FireballSeconds);
                 CreateCondensationDome(detonation, d.FireballRadius * CondensationRadiusFactor, d.FireballSeconds);
                 CreateGroundDust(groundZero, d.StemRadius, d.RiseSeconds);
-                CreateCloudMesh(groundZero, d, airburst);
+                CreateCloudPuffs(groundZero, d, airburst);
             }
             catch (Exception e)
             {
@@ -191,103 +187,30 @@ namespace MissileDisaster.Game.Effects
         }
 
         /// <summary>
-        /// The mushroom itself: the sculpted mesh, scaled so its top stands at CloudTop and its
-        /// cap spans CapRadius, grown out of the fireball by MushroomCloudAnimator. Each strike
-        /// gets a random heading, so two clouds never present exactly the same face.
-        /// If the model cannot be loaded at all, a mass of smoke stands in - a nuclear strike
-        /// with no cloud would read as a bug, not a fallback.
+        /// The mushroom itself: a renderer-only ParticleSystem whose puffs MushroomCloudPuffsFx
+        /// places along the vortex-ring flow every frame. Emission stays off - the component
+        /// owns every particle - and the puffs are depth-sorted, because they are large, soft
+        /// and overlapping, which is exactly when sorting artefacts show.
         /// </summary>
-        private static void CreateCloudMesh(Vector3 groundZero, NuclearCloudDimensions d, bool airburst)
+        private static void CreateCloudPuffs(Vector3 groundZero, NuclearCloudDimensions d, bool airburst)
         {
-            GameObject go = MissileModelProvider.CreateInstance(ModConfig.MushroomCloudModelName);
-            if (go == null)
-            {
-                ExplosionFallback.Play(groundZero + Vector3.up * (d.CloudTop * 0.5f), d.CapRadius);
-                return;
-            }
-            go.transform.position = groundZero; // the model's base sits at its own y=0
-            go.transform.rotation = Quaternion.Euler(0f, UnityEngine.Random.value * 360f, 0f);
-            go.transform.localScale = new Vector3(0.001f, 0.001f, 0.001f); // the animator takes over from the first frame
+            var go = ParticleBuilder.NewSystem("NuclearMushroomCloud", groundZero, ParticleAssets.Smoke);
+            var ps = go.GetComponent<ParticleSystem>();
+            var main = ps.main;
+            main.simulationSpace = ParticleSystemSimulationSpace.Local; // puff positions are metres from ground zero
+            main.maxParticles = CloudPuffs.TotalCount;
+            var emission = ps.emission;
+            emission.enabled = false;
 
-            // The converter normalises the model to height 1 with its base at y=0, but the
-            // scales are read off the mesh itself so a re-exported model cannot silently skew.
-            MeshFilter filter = go.GetComponent<MeshFilter>();
-            Bounds bounds = filter != null && filter.sharedMesh != null
-                ? filter.sharedMesh.bounds : new Bounds(Vector3.zero, Vector3.one);
-            float modelHeight = Mathf.Max(bounds.size.y, 0.0001f);
-            float modelHalfWidth = Mathf.Max(Mathf.Max(bounds.extents.x, bounds.extents.z), 0.0001f);
+            var renderer = ps.GetComponent<ParticleSystemRenderer>();
+            renderer.sortMode = ParticleSystemSortMode.Distance;
+            renderer.maxParticleSize = PuffMaxScreenFraction;
 
-            Color tint = airburst ? CloudTintAir : CloudTintGround;
-            MeshRenderer renderer = go.GetComponent<MeshRenderer>();
-            Material[] fadeMats = TryMakeFadeMaterials(renderer, tint);
-            if (fadeMats == null) MakeMatte(renderer, tint);
-
-            var anim = go.AddComponent<MushroomCloudAnimator>();
-            anim.HeightScale = d.CloudTop / modelHeight;
-            anim.WidthScale = d.CapRadius / modelHalfWidth;
-            anim.RiseSeconds = d.RiseSeconds;
-            anim.HoldSeconds = d.HoldSeconds;
-            anim.FadeSeconds = d.FadeSeconds;
-            anim.CapRadius = d.CapRadius;
-            anim.CloudTop = d.CloudTop;
-            anim.FadeMaterials = fadeMats;
-        }
-
-        /// <summary>
-        /// Rebuilds the renderer's materials on a transparency-capable shader, keeping the baked
-        /// texture, so the animator can fade the cloud in and out through the alpha. Null when
-        /// the game has no such shader, in which case the caller keeps the opaque materials and
-        /// the animator covers the teardown with smoke instead.
-        /// </summary>
-        private static Material[] TryMakeFadeMaterials(MeshRenderer renderer, Color tint)
-        {
-            if (renderer == null) return null;
-            Shader shader = RenderAssets.FindFirst(
-                "Legacy Shaders/Transparent/Diffuse", "Transparent/Diffuse");
-            if (shader == null) return null;
-            try
-            {
-                Material[] old = renderer.materials; // instance copies, so the model cache is untouched
-                var mats = new Material[old.Length];
-                for (int i = 0; i < old.Length; i++)
-                {
-                    mats[i] = new Material(shader);
-                    if (old[i] != null && old[i].mainTexture != null)
-                    {
-                        mats[i].mainTexture = old[i].mainTexture;
-                    }
-                    mats[i].color = new Color(tint.r, tint.g, tint.b, 0f); // born invisible; the animator fades it in
-                    RenderAssets.ApplyDepthOcclusion(mats[i]);
-                }
-                renderer.materials = mats;
-                return mats;
-            }
-            catch (Exception e)
-            {
-                ModConfig.LogError("NuclearMushroomFx.TryMakeFadeMaterials error: " + e);
-                return null;
-            }
-        }
-
-        /// <summary>The opaque path: the Standard materials the builder made, taken off the missile's metallic settings and tinted. A cloud is matte.</summary>
-        private static void MakeMatte(MeshRenderer renderer, Color tint)
-        {
-            if (renderer == null) return;
-            try
-            {
-                Material[] mats = renderer.materials; // instance copies
-                for (int i = 0; i < mats.Length; i++)
-                {
-                    if (mats[i] == null) continue;
-                    mats[i].color = tint;
-                    if (mats[i].HasProperty("_Metallic")) mats[i].SetFloat("_Metallic", 0f);
-                    if (mats[i].HasProperty("_Glossiness")) mats[i].SetFloat("_Glossiness", 0.08f);
-                }
-            }
-            catch (Exception e)
-            {
-                ModConfig.LogError("NuclearMushroomFx.MakeMatte error: " + e);
-            }
+            var fx = go.AddComponent<MushroomCloudPuffsFx>();
+            fx.Dims = d;
+            fx.Seed = (int)(UnityEngine.Random.value * 1000000f); // each strike boils its own way
+            fx.Airburst = airburst;
+            ps.Play();
         }
     }
 }

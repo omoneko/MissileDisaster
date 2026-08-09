@@ -29,6 +29,11 @@ namespace UnityEngine
         public static Color Lerp(Color a, Color b, float t) { return a; }
     }
 
+    public struct Color32
+    {
+        public Color32(byte r, byte g, byte b, byte a) { }
+    }
+
     public struct Quaternion
     {
         public static Quaternion Euler(float x, float y, float z) { return new Quaternion(); }
@@ -43,6 +48,7 @@ namespace UnityEngine
         public static float Min(float a, float b) { return a < b ? a : b; }
         public static int RoundToInt(float f) { return (int)Math.Round(f); }
         public static float Sqrt(float f) { return (float)Math.Sqrt(f); }
+        public const float Rad2Deg = 57.29578f;
     }
 
     public struct Keyframe
@@ -150,6 +156,7 @@ namespace UnityEngine
     }
 
     public enum ParticleSystemSimulationSpace { Local, World, Custom }
+    public enum ParticleSystemSortMode { None, Distance, OldestInFront, YoungestInFront }
     public enum ParticleSystemRenderMode { Billboard, Stretch, HorizontalBillboard, VerticalBillboard, Mesh, None }
     public enum ParticleSystemShapeType
     {
@@ -162,10 +169,24 @@ namespace UnityEngine
     {
         public Material material { get; set; }
         public ParticleSystemRenderMode renderMode { get; set; }
+        public ParticleSystemSortMode sortMode { get; set; }
+        public float maxParticleSize { get; set; }
     }
 
     public class ParticleSystem : Component
     {
+        public struct Particle
+        {
+            public Vector3 position { get; set; }
+            public float startSize { get; set; }
+            public float rotation { get; set; }
+            public Color32 startColor { get; set; }
+            public float remainingLifetime { get; set; }
+            public float startLifetime { get; set; }
+        }
+
+        public void SetParticles(Particle[] particles, int size) { }
+
         public struct MinMaxCurve
         {
             public MinMaxCurve(float constant) { }
@@ -261,7 +282,6 @@ namespace MissileDisaster.Game
 {
     public static class ModConfig
     {
-        public const string MushroomCloudModelName = "MushroomCloud";
         public static void Log(string message) { }
         public static void LogError(string message) { }
         public static void LogAlways(string message) { }

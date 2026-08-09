@@ -80,41 +80,4 @@ public class ObjTextureParsingTests
         Assert.Null(mtl["Paint"].TextureFile);
     }
 
-    [Fact]
-    public void The_shipped_cloud_model_meets_the_aligned_convention()
-    {
-        // The real file, as generated: one vt and one vn per v, in order, so the mesh builder
-        // can texture it. If a re-export breaks the convention this is the test that says so.
-        string path = System.IO.Path.Combine(FindModelsDir(), "MushroomCloud.obj");
-        var data = ObjParser.Parse(System.IO.File.ReadAllText(path));
-        Assert.True(data.VertexCount > 500, "the generated sculpt has real detail");
-        Assert.True(data.HasAlignedUVs, "one vt per v, in vertex order");
-        Assert.True(data.HasAlignedNormals, "one vn per v, in vertex order");
-        Assert.Single(data.Submeshes);
-
-        // Normalised: base at y=0, height 1. The game scales it straight to metres.
-        float minY = float.MaxValue, maxY = float.MinValue;
-        for (int i = 0; i < data.VertexCount; i++)
-        {
-            float y = data.Positions[i * 3 + 1];
-            if (y < minY) minY = y;
-            if (y > maxY) maxY = y;
-        }
-        Assert.InRange(minY, -0.001f, 0.001f);
-        Assert.InRange(maxY, 0.999f, 1.001f);
-    }
-
-    private static string FindModelsDir()
-    {
-        // Walks up from the test bin folder to the repo root, which keeps the test independent
-        // of where the runner was started.
-        var dir = new System.IO.DirectoryInfo(System.AppContext.BaseDirectory);
-        while (dir != null)
-        {
-            string candidate = System.IO.Path.Combine(dir.FullName, "src", "MissileDisaster", "Models");
-            if (System.IO.Directory.Exists(candidate)) return candidate;
-            dir = dir.Parent;
-        }
-        throw new System.IO.DirectoryNotFoundException("src/MissileDisaster/Models not found above " + System.AppContext.BaseDirectory);
-    }
 }

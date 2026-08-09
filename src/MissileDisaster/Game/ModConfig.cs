@@ -22,10 +22,6 @@ namespace MissileDisaster.Game
         // Model for the incoming missile, Models/&lt;name&gt;.obj, with +Z as the nose.
         public const string ModelsFolderName = "Models";
         public const string IncomingMissileModelName = "IncomingWarhead";
-        // The mushroom cloud mesh, Models/MushroomCloud.obj: normalised to height 1 with its
-        // base at y=0, textured, procedurally generated (original work, fixed seed) by
-        // tools/cloud-model/generate.py.
-        public const string MushroomCloudModelName = "MushroomCloud";
         public const float IncomingMissileScale = 9f;      // takes the ~2 m model to about 19 m in game
         public const float ObjMetallic = 0.6f;             // the Standard shader's metallic parameter
         public const float ObjGlossiness = 0.5f;           // the Standard shader's smoothness parameter
