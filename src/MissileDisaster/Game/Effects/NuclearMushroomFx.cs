@@ -24,31 +24,22 @@ namespace MissileDisaster.Game.Effects
     /// The one liberty taken is time. A real cloud takes about ten minutes to stabilise, so the
     /// rise is compressed by roughly twenty-five to one and held inside a range that is watchable
     /// without the player having to wait. Every dimension is the real one.
+    ///
+    /// Every size and duration comes from MissileDisaster.Core.NuclearCloudDisplay, which applies
+    /// the engineering ceilings. They are soft: a bigger warhead is always a bigger cloud, right
+    /// up to Tsar Bomba, rather than everything above a megaton coming out the same size.
     /// </summary>
     public static class NuclearMushroomFx
     {
-        // Engineering limits. The playable map is about 17 km across, so a canopy beyond this
-        // already spans it and only costs particle size.
-        private const float CapRadiusMin = 200f;
-        private const float CapRadiusMax = 8000f;
-        private const float CloudTopMin = 800f;
-        private const float CloudTopMax = 12000f;
-        private const float FireballRadiusMin = 25f;
-        private const float FireballRadiusMax = 3000f;
-
-        // Time. The real rise is minutes; this is what it is divided by, and the bounds it is
-        // then held inside so that a small device is not over in a blink nor a large one still
-        // climbing a minute later.
-        private const float RiseCompression = 25f;
-        private const float RiseSecondsMin = 8f;
-        private const float RiseSecondsMax = 26f;
-        private const float FireballSecondsMin = 0.8f;
-        private const float FireballSecondsMax = 12f;
-
         // The condensation dome forms out where the shock has passed, well beyond the fireball,
         // and lasts barely a second.
         private const float CondensationRadiusFactor = 2.6f;
         private const float CondensationLifetime = 1.3f;
+
+        // How far up the column is when the cap starts to swell out of its head, as a fraction
+        // of both the cloud top and the rise time. The two have to be the same number, or the
+        // canopy appears somewhere the column is not.
+        private const float CapEmergeFraction = 0.55f;
 
         // Colours, following how a real detonation looks rather than a palette: white hot, then
         // sodium yellow, then orange, then the brown of nitrogen dioxide and lofted earth.
@@ -72,21 +63,13 @@ namespace MissileDisaster.Game.Effects
         {
             try
             {
-                float kt = kilotons > 0f ? kilotons : NuclearYields.StandardKilotons;
+                NuclearCloudDimensions d = NuclearCloudDisplay.For(kilotons);
 
-                float fireballR = Mathf.Clamp(NuclearCloud.FireballRadius(kt), FireballRadiusMin, FireballRadiusMax);
-                float fireballT = Mathf.Clamp(NuclearCloud.FireballSeconds(kt), FireballSecondsMin, FireballSecondsMax);
-                float capR = Mathf.Clamp(NuclearCloud.CloudRadius(kt), CapRadiusMin, CapRadiusMax);
-                float top = Mathf.Clamp(NuclearCloud.CloudTop(kt), CloudTopMin, CloudTopMax);
-                float stemR = capR * NuclearCloud.StemFraction(kt);
-                float rise = Mathf.Clamp(NuclearCloud.StabiliseSeconds(kt) / RiseCompression,
-                    RiseSecondsMin, RiseSecondsMax);
-
-                CreateFireball(detonation, fireballR, fireballT);
-                CreateCondensationDome(detonation, fireballR * CondensationRadiusFactor, fireballT);
-                CreateGroundDust(groundZero, stemR, rise);
-                CreateStem(groundZero, stemR, top, rise);
-                CreateCap(groundZero + Vector3.up * top, capR, rise);
+                CreateFireball(detonation, d.FireballRadius, d.FireballSeconds);
+                CreateCondensationDome(detonation, d.FireballRadius * CondensationRadiusFactor, d.FireballSeconds);
+                CreateGroundDust(groundZero, d.StemRadius, d.RiseSeconds);
+                CreateStem(groundZero, d.StemRadius, d.CloudTop, d.RiseSeconds);
+                CreateCap(groundZero, d.CapRadius, d.CloudTop, d.RiseSeconds);
             }
             catch (Exception e)
             {
@@ -219,10 +202,18 @@ namespace MissileDisaster.Game.Effects
         /// they add up to capR, the stabilised cloud radius. Letting the drift run free, as an
         /// untuned speed does over an eighteen second lifetime, is what makes a cloud spread to
         /// several times the size the yield says it should be.
+        ///
+        /// It is born at the head of the column, not at the cloud top, and rides the rest of the
+        /// way up at the column's own rate before settling. Emitting it at the top instead - as
+        /// it used to be - hangs a finished canopy in clear air seconds before the stem arrives
+        /// under it, which is the one thing that gives the effect away as particles.
         /// </summary>
-        private static void CreateCap(Vector3 top, float capR, float rise)
+        private static void CreateCap(Vector3 groundZero, float capR, float top, float rise)
         {
-            const float lifetime = 18f;       // it lingers at the top for a long time
+            // It lingers at the top for a long time - and a cloud that took longer to climb has
+            // to linger for longer still, or a strategic cap starts fading while its own stem is
+            // still rising into it.
+            float lifetime = Mathf.Max(18f, rise * 0.8f);
             const float emitFraction = 0.35f; // where the particles start, as a fraction of capR
             const float sizeFraction = 0.45f; // particle diameter at birth, likewise
             const float growth = 1.6f;        // how much larger a particle is by the end of its life
@@ -230,12 +221,21 @@ namespace MissileDisaster.Game.Effects
             if (driftDistance < 0f) driftDistance = 0f;
             float driftSpeed = driftDistance / lifetime;
 
-            var go = ParticleBuilder.NewSystem("NuclearCap", top, ParticleAssets.Smoke);
+            // The head of the column when the cap starts to swell, and the climb left to do.
+            float delay = rise * CapEmergeFraction;
+            float birthHeight = top * CapEmergeFraction;
+
+            var go = ParticleBuilder.NewSystem("NuclearCap", groundZero + Vector3.up * birthHeight,
+                ParticleAssets.Smoke);
             var ps = go.GetComponent<ParticleSystem>();
             var main = ps.main;
-            main.startDelay = rise * 0.55f; // starts to swell about when the stem reaches the top
+            main.startDelay = delay; // it starts to swell once the column is well up
             main.startLifetime = lifetime;
-            main.startSpeed = driftSpeed * 2.5f; // it billows out quickly at first, then is damped
+            // A steady outward drift that covers exactly driftDistance over the lifetime. It is
+            // set here rather than through a speed limit because the climb below already uses
+            // velocityOverLifetime, and the limit module is applied to a particle's whole
+            // velocity - it would brake the climb along with the drift.
+            main.startSpeed = driftSpeed;
             main.startSize = capR * sizeFraction;
             main.startColor = new ParticleSystem.MinMaxGradient(CapWarm, CapCool);
             main.maxParticles = 500;
@@ -243,12 +243,27 @@ namespace MissileDisaster.Game.Effects
 
             ParticleBuilder.Burst(ps, 100);
             ParticleBuilder.ConeUp(ps, capR * emitFraction, 62f);
-            ParticleBuilder.LimitSpeed(ps, driftSpeed, 0.2f);
+            ParticleBuilder.Rise(ps, ClimbThenSettle(rise - delay, lifetime), top / rise);
             ParticleBuilder.Fade(ps,
                 new GradientAlphaKey(0.6f, 0f), new GradientAlphaKey(0.85f, 0.25f),
                 new GradientAlphaKey(0.7f, 0.7f), new GradientAlphaKey(0f, 1f));
             ParticleBuilder.SizeCurve(ps, 0.7f, growth);
-            ParticleBuilder.PlayAndDestroy(go, rise * 0.55f + lifetime + 2f);
+            ParticleBuilder.PlayAndDestroy(go, delay + lifetime + 2f);
+        }
+
+        /// <summary>
+        /// The cap's climb over a particle's life, as a fraction of the stem's rate: full rate
+        /// for the seconds the column has left to run, then eased off to nothing so the canopy
+        /// stops at the cloud top instead of carrying on out of the sky. The flat tangents are
+        /// what keep the eased section from overshooting.
+        /// </summary>
+        private static AnimationCurve ClimbThenSettle(float climbSeconds, float lifetime)
+        {
+            float hold = Mathf.Clamp(climbSeconds / lifetime, 0.02f, 0.9f);
+            float settled = Mathf.Min(hold * 1.15f, 0.99f);
+            return new AnimationCurve(
+                new Keyframe(0f, 1f, 0f, 0f), new Keyframe(hold, 1f, 0f, 0f),
+                new Keyframe(settled, 0f, 0f, 0f), new Keyframe(1f, 0f, 0f, 0f));
         }
     }
 }

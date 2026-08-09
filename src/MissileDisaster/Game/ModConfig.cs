@@ -116,14 +116,24 @@ namespace MissileDisaster.Game
         // heightmap intact, not a balance decision: the real damage radii are expressed through
         // the destruction, fires and contamination, and only the crater - which deforms the
         // terrain - is rounded down.
-        public const float CraterRadiusMax = 500f;
-        public const float CraterDepthMax = 80f;
+        // The limit is soft (see MissileDisaster.Core.EffectCeiling): every yield up to about
+        // 2 Mt digs its real hole, and beyond that the hole keeps widening towards the ceiling
+        // instead of every strategic warhead leaving the same 500 m bowl. Castle Bravo's crater
+        // really was about a kilometre across the radius, so the ceiling is not generous.
+        public const float CraterRadiusKnee = 500f;
+        public const float CraterRadiusMax = 900f;
+        public const float CraterDepthKnee = 80f;
+        public const float CraterDepthMax = 120f;
 
         // Engineering safety ceiling on the destruction and burn radii. A high-yield nuclear
         // weapon's real radii exceed the map, so this is the valve that stops DestroyStuff from
-        // freezing the game on an extreme scan. It is still large enough to cover the whole map,
-        // and it is not a balance decision.
-        public const float MaxEffectRadius = 12000f;
+        // freezing the game on an extreme scan. It is not a balance decision.
+        // The map is 17.3 km square, so its diagonal is 24.4 km: that is the reach a warhead
+        // needs to touch the far corner from the near one, and the ceiling is set there. Nothing
+        // beyond it can do anything, and the scan does not cost what the radius suggests - the
+        // game's grids clamp to the map, so the work is bounded by the map rather than by the
+        // radius asked for.
+        public const float MaxEffectRadius = 24400f;
         // Ceiling on the contamination radius. The ground pollution grid spans about plus or
         // minus 8.6 km, so anything beyond this already covers the map and only wastes scan time.
         public const float MaxContaminationRadius = 8600f;

@@ -37,8 +37,15 @@ radioactive fallout that you can clean up with a dedicated decontamination facil
     — at 150 kt that is a 3.6 km cap under a 13 km column, which happens to match the 3.7 km
     destruction radius within a few per cent
   - Stem half the cap's width at 20 kt, a seventh of it in the megaton range
+  - The cap swells out of the head of the column and rides the rest of the way up with it,
+    rather than appearing finished at the cloud top before the stem gets there
   - Ground dust drawn up by the afterwinds. Only the *time* is compressed (~25×) — a real cloud
     takes ten minutes to stabilise
+  - **The size never stops following the yield.** Nothing in the effect is hard‑clamped: every
+    dimension is exact up to the point a 17 km map can still carry it and then compressed
+    smoothly towards a ceiling it never reaches, so a B83, an Ivy Mike and a Tsar Bomba are
+    three visibly different clouds (9.4 / 22.5 / 26.0 km caps) instead of the same picture.
+    See [docs/effects](docs/effects) for renders of every stage and of the difference
 - **Shock wave** — a blast front races out across the ground following Sedov–Taylor
   (`r ∝ t^0.4`): it leaves at several times the speed of sound and visibly decelerates, reaching
   the destruction radius at an average 540 m/s. Every warhead gets one

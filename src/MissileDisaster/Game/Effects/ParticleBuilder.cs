@@ -149,6 +149,19 @@ namespace MissileDisaster.Game.Effects
             vel.y = new ParticleSystem.MinMaxCurve(metresPerSecond);
         }
 
+        /// <summary>
+        /// A climb that changes over a particle's life, in m/s, for anything that has to rise and
+        /// then stop - a cloud cap carried up by its own column and left there, rather than one
+        /// that keeps going.
+        /// </summary>
+        public static void Rise(ParticleSystem ps, AnimationCurve metresPerSecond, float multiplier)
+        {
+            var vel = ps.velocityOverLifetime;
+            vel.enabled = true;
+            vel.space = ParticleSystemSimulationSpace.World;
+            vel.y = new ParticleSystem.MinMaxCurve(multiplier, metresPerSecond);
+        }
+
         /// <summary>Plays the system and has it clean itself up once the last particle has gone.</summary>
         public static void PlayAndDestroy(GameObject go, float lifetimeSeconds)
         {
