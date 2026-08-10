@@ -163,7 +163,10 @@ namespace MissileDisaster.Core
                 float r0 = dims.FireFieldRadius * (0.3f + 0.7f * p.Rho01);
                 dist = r0 * (1f - FireInwardPull * Smooth(fu));
                 y = (float)Math.Pow(fu, 1.3) * capBase * FireSmokeHeightFraction;
-                point.Size = dims.FireFieldRadius * (0.09f + 0.08f * p.Size01);
+                // Vanilla's smoke swells 0.4 -> 1.0 over its life; fresh smoke is small and
+                // expands as it rises and cools. Same here, per loop.
+                point.Size = dims.FireFieldRadius * (0.09f + 0.08f * p.Size01)
+                    * (0.55f + 0.45f * Smooth(fu));
                 point.Fade = EdgeFade(fu, FireEdgeFade);
                 point.Dust = 1f - 0.3f * fu;
                 // The fires themselves keep glowing where the smoke is freshest, for the whole
@@ -203,7 +206,7 @@ namespace MissileDisaster.Core
                 float radial = 0.25f + 0.75f * p.Rho01;
                 float wobble = 1f + 0.18f * (float)Math.Sin(p.Wobble + u * 9.4f + t * 0.4f);
                 dist = stemR * shape * radial * wobble;
-                point.Size = stemR * (0.7f + 0.5f * p.Size01);
+                point.Size = stemR * (0.7f + 0.5f * p.Size01) * (0.7f + 0.3f * Smooth(u));
                 point.Fade = LoopFade(u);
                 point.Dust = 0.85f - 0.5f * u; // dust at the base, paling as it climbs
                 point.Ember = EmberEnvelope(t, dims.RiseSeconds) * u * 0.6f; // the glow is up near the fireball

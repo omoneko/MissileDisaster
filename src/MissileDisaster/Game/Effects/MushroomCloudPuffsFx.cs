@@ -26,7 +26,9 @@ namespace MissileDisaster.Game.Effects
         // a groundburst is dustier across the board. Ember is the fire showing through early.
         private static readonly Color VapourColor = new Color(0.93f, 0.93f, 0.94f, 1f);
         private static readonly Color DustColorAir = new Color(0.62f, 0.58f, 0.53f, 1f);
-        private static readonly Color DustColorGround = new Color(0.52f, 0.45f, 0.37f, 1f);
+        // The ground dust sits on the game's own aged-smoke brown (the meteor effect ages its
+        // smoke to 0.69, 0.42, 0.38), slightly darkened, so the mod's smoke shares the palette.
+        private static readonly Color DustColorGround = new Color(0.58f, 0.43f, 0.36f, 1f);
         private static readonly Color EmberColor = new Color(1f, 0.45f, 0.12f, 1f);
         // Verified in tools/effect-preview/cloud_preview.py: with the opaque-cored cloud
         // texture these measure 0.997 opacity across the cap's body. The cap is still a touch

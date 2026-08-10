@@ -143,7 +143,7 @@ class Puffs:
         radial = 0.25 + 0.75 * self.rho[m]
         wob = 1 + 0.18 * np.sin(self.wobble[m] + u * 9.4 + t * 0.4)
         dist[m] = stemR * shape * radial * wob
-        size[m] = stemR * (P["col_size0"] + P["col_size1"] * self.size01[m])
+        size[m] = stemR * (P["col_size0"] + P["col_size1"] * self.size01[m]) * (0.7 + 0.3 * smooth(u))
         edge = 0.06
         fade[m] = np.where(u < edge, smooth(u / edge), np.where(u > 1 - edge, smooth((1 - u) / edge), 1.0))
         dust[m] = 0.85 - 0.5 * u
@@ -158,7 +158,7 @@ class Puffs:
         pull = P["fire_pull"]
         dist[f] = r0 * (1.0 - pull * smooth(fu))
         y[f] = fu ** 1.3 * cap_base * 0.7
-        size[f] = d.fire_field * (P["fire_size0"] + P["fire_size1"] * self.size01[f])
+        size[f] = d.fire_field * (P["fire_size0"] + P["fire_size1"] * self.size01[f]) * (0.55 + 0.45 * smooth(fu))
         edge = 0.10
         fade[f] = np.where(fu < edge, smooth(fu / edge),
                            np.where(fu > 1 - edge, smooth((1 - fu) / edge), 1.0))
@@ -203,7 +203,7 @@ def puff_alpha_profile(dd, phase, P):
 
 # ---------------------------------------------------------------- compositing
 
-VAPOUR = np.array([0.93, 0.93, 0.94]); DUST_G = np.array([0.52, 0.45, 0.37])
+VAPOUR = np.array([0.93, 0.93, 0.94]); DUST_G = np.array([0.58, 0.43, 0.36])
 EMBER = np.array([1.0, 0.45, 0.12])
 
 
