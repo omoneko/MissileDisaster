@@ -117,8 +117,14 @@ namespace MissileDisaster.Game
                 });
                 launch.AddButton("Open / reset launch panel to a visible position", () => UI.MissilePanel.ResetPosition());
 
-                UIHelperBase rnd = helper.AddGroup("Random missile strikes");
-                rnd.AddCheckbox("Enable random strikes (occur between natural disasters)",
+                // The label says what it does to the city, not when it happens. A Workshop
+                // report - "your missile mod destroyed my whole new town, i did not know that
+                // random disaster exist" - came from a player who ticked this: the setting has
+                // always shipped off, but "occur between natural disasters" reads as a schedule
+                // detail rather than as a warning that a city can be flattened without warning.
+                UIHelperBase rnd = helper.AddGroup("Random missile strikes (DESTRUCTIVE - off by default)");
+                rnd.AddCheckbox(
+                    "Enable random strikes - missiles WILL hit your city on their own and destroy buildings, like a natural disaster. Leave this off to only launch missiles yourself.",
                     ModSettings.IsRandomEnabled, b => ModSettings.RandomEnabled.value = b ? 1 : 0);
                 // The frequency is a multiplier of the natural disaster rate, 0.25 to 3.0,
                 // stored internally as a percentage from 25 to 300.

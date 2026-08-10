@@ -37,6 +37,7 @@ namespace MissileDisaster.Game.Loading
                 Contamination.ContaminationManager.Reset(); // drop the in-memory ledger; OnLoadData repopulates it on load
                 UI.MissileDisasterButton.DestroyButton();
                 UI.MissilePanel.Destroy();
+                UI.StrikeNotice.Reset(); // the next city gets its own warning
             }
             catch (System.Exception e)
             {

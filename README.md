@@ -76,6 +76,9 @@ radioactive fallout that you can clean up with a dedicated decontamination facil
 - **Fire** for incendiary/thermobaric/nuclear warheads
   - White Phosphorus is a pure incendiary: no crater and almost no blast **at any charge** —
     a bigger charge only spreads the fires further
+- **Random strikes (disaster mode)** — **off by default.** Missiles never fall on their own
+  until you tick it in Options; once on, the first strike in each city chirps to say what hit
+  it and where the switch is
 - **Radioactive fallout** (nuclear ground burst) — persistent soil contamination, expires after 50 in‑game years
 - **Missile defense** — name‑detected interceptor buildings engage incoming missiles with realistic
   single‑shot kill probabilities (PAC‑3 / THAAD / Aegis) and a radar that boosts hit chance

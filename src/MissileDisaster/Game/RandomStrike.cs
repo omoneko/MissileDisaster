@@ -33,6 +33,9 @@ namespace MissileDisaster.Game
                 {
                     FireOne(targeting);
                 }
+
+                // Tell the player, once per city, what just hit them and where the switch is.
+                UI.StrikeNotice.RandomStrikeLaunched();
             }
             catch (System.Exception e)
             {
