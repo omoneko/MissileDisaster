@@ -18,18 +18,21 @@ public class CloudPuffsTests
     }
 
     [Fact]
-    public void Specs_are_deterministic_and_split_into_cap_and_column()
+    public void Specs_are_deterministic_and_split_into_cap_column_and_fire()
     {
-        int caps = 0;
+        int caps = 0, fires = 0;
         for (int i = 0; i < CloudPuffs.TotalCount; i++)
         {
             PuffSpec a = CloudPuffs.Spec(i, 42);
             PuffSpec b = CloudPuffs.Spec(i, 42);
             Assert.Equal(a.Azimuth, b.Azimuth, 5);
             Assert.Equal(a.Theta0, b.Theta0, 5);
+            Assert.False(a.Cap && a.Fire, "a puff is one thing at a time");
             if (a.Cap) caps++;
+            if (a.Fire) fires++;
         }
         Assert.Equal(CloudPuffs.CapCount, caps);
+        Assert.Equal(CloudPuffs.FireCount, fires);
     }
 
     [Fact]
@@ -50,8 +53,10 @@ public class CloudPuffsTests
                 CloudAnimationState anim = CloudAnimation.At(t, d.RiseSeconds, d.HoldSeconds, d.FadeSeconds);
                 PuffPoint p = CloudPuffs.At(s, t, d, anim);
                 float dist = (float)System.Math.Sqrt(p.X * p.X + p.Z * p.Z);
-                Assert.True(dist <= d.CapRadius * anim.WidthFraction * 1.01f + 1f,
-                    $"puff {i} at t={t}: {dist} m out against a cap of {d.CapRadius * anim.WidthFraction}");
+                // The fire smoke lives out in the burn field; everything else inside the cap.
+                float envelope = s.Fire ? d.FireFieldRadius : d.CapRadius * anim.WidthFraction;
+                Assert.True(dist <= envelope * 1.01f + 1f,
+                    $"puff {i} at t={t}: {dist} m out against an envelope of {envelope}");
                 Assert.InRange(p.Y, -1f, d.CloudTop * anim.HeightFraction * 1.01f + 1f);
             }
         }
@@ -143,6 +148,7 @@ public class CloudPuffsTests
         for (int i = 0; i < CloudPuffs.TotalCount; i++)
         {
             PuffSpec s = CloudPuffs.Spec(i, 7);
+            if (s.Fire) continue; // the fires are real places in the city, ablaze from the flash - they do not grow out of the fireball
             PuffPoint pb = CloudPuffs.At(s, 0f, d, born);
             PuffPoint pg = CloudPuffs.At(s, d.RiseSeconds + 2f, d, grown);
             float db = (float)System.Math.Sqrt(pb.X * pb.X + pb.Z * pb.Z);
@@ -152,5 +158,84 @@ public class CloudPuffsTests
         }
         Assert.True(maxBorn < d.CapRadius * 0.2f, "at the flash the cloud is still inside the fireball");
         Assert.True(maxGrown > d.CapRadius * 0.85f, "fully grown, the cap reaches out to its radius");
+    }
+
+    [Fact]
+    public void Fire_smoke_is_born_in_the_burn_field_and_drawn_in_toward_the_updraft()
+    {
+        NuclearCloudDimensions d = Dims();
+        CloudAnimationState anim = FullyGrown(d);
+        PuffSpec s = CloudPuffs.Spec(CloudPuffs.CapCount + CloudPuffs.ColumnCount, 7);
+        Assert.True(s.Fire);
+
+        // Follow one loop from its own start: the puff must begin far out and end close in,
+        // and the pull must be monotonic - gently drawn, never jerked.
+        float loop = d.RiseSeconds * CloudPuffs.FireLoopFactor;
+        float t0 = (1f - s.Climb01) * loop; // where its loop wraps to u=0
+        float last = float.MaxValue; float first = 0f;
+        for (int k = 0; k <= 20; k++)
+        {
+            float u = k / 20f * 0.98f;
+            PuffPoint p = CloudPuffs.At(s, t0 + u * loop, d, anim);
+            float dist = (float)System.Math.Sqrt(p.X * p.X + p.Z * p.Z);
+            if (k == 0) first = dist;
+            Assert.True(dist <= last + 0.5f, "the drift toward the updraft never reverses");
+            last = dist;
+        }
+        Assert.True(last < first * (1f - CloudPuffs.FireInwardPull) * 1.2f,
+            "over a loop the puff gives up most of its birth radius");
+    }
+
+    [Fact]
+    public void The_dissolve_is_staggered_not_uniform()
+    {
+        // Halfway through the fade some puffs must already be gone while others still stand -
+        // the cloud shreds, it does not evaporate in one piece.
+        NuclearCloudDimensions d = Dims();
+        float t = d.RiseSeconds + d.HoldSeconds + d.FadeSeconds * 0.5f;
+        CloudAnimationState anim = CloudAnimation.At(t, d.RiseSeconds, d.HoldSeconds, d.FadeSeconds);
+        int gone = 0, standing = 0;
+        for (int i = 0; i < CloudPuffs.TotalCount; i++)
+        {
+            PuffSpec s = CloudPuffs.Spec(i, 7);
+            if (!s.Cap) continue;
+            float fade = CloudPuffs.At(s, t, d, anim).Fade;
+            if (fade < 0.1f) gone++;
+            if (fade > 0.9f) standing++;
+        }
+        Assert.True(gone > 20, $"some of the cap has shredded away by half fade (gone={gone})");
+        Assert.True(standing > 20, $"and some of it still stands (standing={standing})");
+    }
+
+    [Fact]
+    public void The_fire_smoke_outlasts_the_column()
+    {
+        // The city is still burning when the cloud goes, so its smoke dissolves last.
+        NuclearCloudDimensions d = Dims();
+        float t = d.RiseSeconds + d.HoldSeconds + d.FadeSeconds * 0.45f;
+        CloudAnimationState anim = CloudAnimation.At(t, d.RiseSeconds, d.HoldSeconds, d.FadeSeconds);
+        float colFade = 0f, fireFade = 0f; int cols = 0, fires = 0;
+        for (int i = 0; i < CloudPuffs.TotalCount; i++)
+        {
+            PuffSpec s = CloudPuffs.Spec(i, 7);
+            if (s.Cap) continue;
+            float fade = CloudPuffs.At(s, t, d, anim).Fade;
+            if (s.Fire) { fireFade += fade; fires++; } else { colFade += fade; cols++; }
+        }
+        Assert.True(fireFade / fires > colFade / cols,
+            "midway through the fade the fire smoke is holding on better than the column");
+    }
+
+    [Fact]
+    public void Everything_is_gone_by_the_end_of_the_fade()
+    {
+        NuclearCloudDimensions d = Dims();
+        float t = d.RiseSeconds + d.HoldSeconds + d.FadeSeconds;
+        CloudAnimationState anim = CloudAnimation.At(t, d.RiseSeconds, d.HoldSeconds, d.FadeSeconds);
+        for (int i = 0; i < CloudPuffs.TotalCount; i++)
+        {
+            Assert.True(CloudPuffs.At(CloudPuffs.Spec(i, 7), t, d, anim).Fade < 0.02f,
+                $"puff {i} has dissolved by the end");
+        }
     }
 }

@@ -60,7 +60,8 @@ class Display150kt:
         self.rise = soft(600.0 * (150.0 / 1000.0) ** 0.25 / 45.0, 10.0, 16.0)
         self.rise = max(self.rise, 5.0)
         self.hold = min(max(self.rise * 1.2, 8.0), 16.0)
-        self.fade = 6.0
+        self.fade = min(max(self.rise * 1.7, 12.0), 20.0)
+        self.fire_field = self.cap_radius * 2.5
 
 
 def animation_at(t, rise, hold, fade):
@@ -79,7 +80,7 @@ def animation_at(t, rise, hold, fade):
         alpha = 1.0 if t < fade_start + fade else 0.0
     else:
         f = min((t - fade_start) / fade, 1.0)
-        alpha = 1.0 - f
+        alpha = 1.0  # the thinning is per puff now - see dissolve in Puffs.at
         h *= 1.0 + 0.06 * f
         w *= 1.0 + 0.06 * f
     return h, w, alpha
@@ -91,9 +92,10 @@ class Puffs:
 
     def __init__(self, P):
         self.P = P
-        n = P["cap_count"] + P["col_count"]
+        n = P["cap_count"] + P["col_count"] + P["fire_count"]
         idx = np.arange(n)
         self.cap = idx < P["cap_count"]
+        self.fire = idx >= P["cap_count"] + P["col_count"]
         h = lambda salt: np.array([hash01(i, P["seed"], salt) for i in idx])
         self.azimuth = h(1) * TAU
         self.swirl = (h(2) - 0.5) * 0.08
@@ -104,6 +106,7 @@ class Puffs:
         self.wobble = h(7) * TAU
         self.size01 = h(8)
         self.spin = (h(9) - 0.5) * 24.0
+        self.lag = h(10)
 
     def roll_time(self, t, rise, hold):
         if t <= rise: return t
@@ -130,7 +133,7 @@ class Puffs:
         ember_env = max(1.0 - t / (d.rise * 0.7), 0.0)
         ember[c] = ember_env * (1 - self.rho[c]) * 0.8
 
-        m = ~c
+        m = ~c & ~self.fire
         loop = d.rise * 0.9
         u = np.mod(self.climb[m] + t / loop, 1.0)
         column_top = cap_base + cap_depth * 0.2
@@ -146,8 +149,37 @@ class Puffs:
         dust[m] = 0.85 - 0.5 * u
         ember[m] = ember_env * u * 0.6
 
+        # Fire smoke: born across the burn field, rising slowly, gently drawn in toward the
+        # central updraft, absorbed as it arrives.
+        f = self.fire
+        floop = d.rise * 1.6
+        fu = np.mod(self.climb[f] + t / floop, 1.0)
+        r0 = d.fire_field * (0.3 + 0.7 * self.rho[f])
+        pull = P["fire_pull"]
+        dist[f] = r0 * (1.0 - pull * smooth(fu))
+        y[f] = fu ** 1.3 * cap_base * 0.7
+        size[f] = d.fire_field * (P["fire_size0"] + P["fire_size1"] * self.size01[f])
+        edge = 0.10
+        fade[f] = np.where(fu < edge, smooth(fu / edge),
+                           np.where(fu > 1 - edge, smooth((1 - fu) / edge), 1.0))
+        dust[f] = 1.0 - 0.3 * fu
+        ember[f] = 0.18 * (1.0 - fu) ** 3  # the fires themselves keep glowing at the base
+
+        # Dissolve: the fade is per puff and staggered, so the cloud thins raggedly over many
+        # seconds instead of evaporating all at once. The column dies first - nothing is
+        # feeding it - the cap loosens next, and the fire smoke outlasts them both.
+        fp = np.clip((t - d.rise - d.hold) / d.fade, 0.0, 1.0)
+        if fp > 0.0:
+            lag = np.where(c, 0.10 + 0.50 * self.lag,
+                  np.where(f, 0.35 + 0.50 * self.lag, 0.05 + 0.40 * self.lag))
+            span = np.clip(np.minimum(0.35, 1.0 - lag), 0.05, None)
+            prog = np.clip((fp - lag) / span, 0.0, 1.0)
+            dissolve = 1.0 - smooth(prog)
+            fade = fade * dissolve
+            size = size * (1.0 + 0.30 * (1.0 - dissolve))  # loosening into haze as it thins
+
         x = dist * np.cos(az); z = dist * np.sin(az)
-        a = np.where(c, P["cap_alpha"], P["col_alpha"]) * alpha * fade
+        a = np.where(c, P["cap_alpha"], np.where(f, P["fire_alpha"], P["col_alpha"])) * alpha * fade
         return x, y, z, size, a, ember, dust
 
 
@@ -192,7 +224,7 @@ def backdrop(W, H, metres_w, metres_h, horizon_px):
 
 def render(P, d, t, elev_deg, path):
     W, H = 880, 660
-    metres_w = max(d.cap_radius * 2.6, 900.0)
+    metres_w = max(d.cap_radius * 2.6, d.fire_field * 2.3, 900.0)
     px = W / metres_w
     horizon = int(H * 0.86)
     img = backdrop(W, H, metres_w, metres_w * H / W, horizon)
@@ -250,15 +282,10 @@ def write_png(path, pixels):
 
 
 PROFILES = {
-    # What ships today: the glow texture and the thin alphas. Kept to reproduce the complaint.
-    "current": dict(seed=7, cap_count=340, col_count=160, rho_min=0.25,
-                    cap_size0=0.13, cap_size1=0.11, col_size0=0.5, col_size1=0.42,
-                    cap_alpha=0.72, col_alpha=0.5, texture="current",
-                    tex_core=0.0, tex_edge=1.0, tex_wobble=0.0,
-                    cap_width_scale=1.3, screen_top=2000.0, knee=1400.0),
-    # The fix candidate: an opaque-cored cloud texture, bigger puffs, full alphas.
-    "tuned": dict(seed=7, cap_count=340, col_count=160, rho_min=0.1,
+    # The shipping profile. Keep in lockstep with Core/CloudPuffs + MushroomCloudPuffsFx.
+    "tuned": dict(seed=7, cap_count=340, col_count=160, fire_count=120, rho_min=0.1,
                   cap_size0=0.23, cap_size1=0.16, col_size0=0.7, col_size1=0.5,
+                  fire_size0=0.09, fire_size1=0.08, fire_pull=0.85, fire_alpha=0.8,
                   cap_alpha=0.97, col_alpha=0.88, texture="cloud",
                   tex_core=0.42, tex_edge=0.95, tex_wobble=0.10,
                   cap_width_scale=1.3, screen_top=2000.0, knee=1400.0),
@@ -273,7 +300,9 @@ def main():
         if which and name != which: continue
         d = Display150kt(P["cap_width_scale"], P["screen_top"], P["knee"])
         for label, t in [("forming", d.rise * 0.55), ("standing", d.rise + d.hold * 0.4),
-                         ("fading", d.rise + d.hold + d.fade * 0.4)]:
+                         ("fade30", d.rise + d.hold + d.fade * 0.3),
+                         ("fade60", d.rise + d.hold + d.fade * 0.6),
+                         ("fade85", d.rise + d.hold + d.fade * 0.85)]:
             op = render(P, d, t, 0, os.path.join(out, f"{name}-{label}.png"))
             print(f"{name:8s} {label:9s} t={t:5.1f}s  cap-body opacity = {op:.3f}")
 

@@ -66,7 +66,10 @@ that are taste rather than physics, and they are where to go for "bigger", "smal
 | `RiseCompression` | 45 | real seconds per drawn second. Lower is slower; bounds 5/10/16 s |
 | `HoldFactor` / `HoldSecondsMin/Max` | 1.2 / 8–16 s | how long the cloud stands at full size |
 | `FadeSeconds` | 6 | how long it takes to thin away |
-| `BirthFraction`, `WidthLagPower` in `Core/CloudAnimation` | 0.12 / 1.6 | how small the mesh is born, and how far the cap trails the column |
+| `BirthFraction`, `WidthLagPower` in `Core/CloudAnimation` | 0.12 / 1.6 | how small the cloud is born, and how far the cap trails the column |
+| `FadeFactor` / `FadeSecondsMin/Max` | 1.7 / 12–20 s | the staggered dissolve at the end — deliberately longer than the rise |
+| `FireFieldFactor` | 2.5 | how far out the burning city feeds smoke, against the cap radius |
+| `Dissolve*` in `Core/CloudPuffs` | lags 0.05/0.10/0.35, window 0.35 | the shredding order: column first, cap next, fire smoke last |
 
 What these currently produce:
 

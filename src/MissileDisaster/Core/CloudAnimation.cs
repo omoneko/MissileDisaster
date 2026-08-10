@@ -64,7 +64,9 @@ namespace MissileDisaster.Core
             {
                 float f = (t - fadeStart) / fadeSeconds;
                 if (f > 1f) f = 1f;
-                s.Alpha = 1f - f;
+                // The thinning itself is per puff and staggered - see CloudPuffs - so the cloud
+                // breaks up raggedly over many seconds instead of evaporating in one piece.
+                s.Alpha = 1f;
                 // Dispersal: the cloud loosens and spreads a little as it thins away.
                 s.HeightFraction *= 1f + FadeDrift * f;
                 s.WidthFraction *= 1f + FadeDrift * f;

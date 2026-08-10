@@ -43,7 +43,10 @@ radioactive fallout that you can clean up with a dedicated decontamination facil
     into the cap and recycle, an endless conveyor. Every puff is placed every frame
     (`SetParticles`), so the crowd holds the mushroom silhouette while visibly boiling; the
     boil slows once the cloud stands and all but freezes as it fades. Fire glows through the
-    folds for the first seconds; each strike boils its own way from its own seed
+    folds for the first seconds; each strike boils its own way from its own seed. **Smoke also
+    rises off the burning city across the burn field** and is gently drawn in toward the central
+    updraft. The end is a **staggered dissolve** over 12–20 s — longer than the rise — with the
+    column shredding first, the cap loosening after it, and the fire smoke outlasting both
   - An **airburst's cloud is white**, the way both 1945 photographs show; a groundburst's keeps
     its dirt
   - Ground dust drawn up by the afterwinds

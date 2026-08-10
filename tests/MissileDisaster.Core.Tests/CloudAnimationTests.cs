@@ -66,13 +66,15 @@ public class CloudAnimationTests
     }
 
     [Fact]
-    public void The_fade_thins_it_away_while_it_keeps_spreading()
+    public void The_global_alpha_holds_through_the_fade_and_the_cloud_keeps_spreading()
     {
+        // The thinning is per puff and staggered - CloudPuffs' dissolve - so the timeline's own
+        // alpha must NOT also fade, or the two multiply and the cloud vanishes early and
+        // uniformly, which is exactly the "instant disappearance" the playtest called out.
         var mid = CloudAnimation.At(Rise + Hold + Fade * 0.5f, Rise, Hold, Fade);
-        Assert.InRange(mid.Alpha, 0.45f, 0.55f);
+        Assert.Equal(1f, mid.Alpha, 3);
         Assert.True(mid.WidthFraction > 1f, "the cloud loosens outwards as it disperses");
         var end = CloudAnimation.At(Rise + Hold + Fade, Rise, Hold, Fade);
-        Assert.Equal(0f, end.Alpha, 3);
         Assert.True(end.Finished);
     }
 

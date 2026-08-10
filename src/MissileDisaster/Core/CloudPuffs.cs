@@ -5,16 +5,18 @@ namespace MissileDisaster.Core
     /// <summary>One puff's fixed parameters, dealt deterministically from its index and the strike's seed.</summary>
     public struct PuffSpec
     {
-        public bool Cap;       // circulates in the cap's vortex ring; otherwise climbs the column
+        public bool Cap;       // circulates in the cap's vortex ring
+        public bool Fire;      // smoke off the burning city, drawn in toward the updraft; neither flag means the column
         public float Azimuth;  // radians around the cloud's axis
         public float Swirl;    // slow azimuth drift, radians per second
-        public float Rho01;    // cap: how far out from the ring core, 0..1 of the envelope
+        public float Rho01;    // cap: how far out from the ring core; fire: how far out in the burn field
         public float Theta0;   // cap: starting angle around the ring core
         public float Omega;    // cap: circulation rate, radians per rolled second
-        public float Climb01;  // column: phase offset along the climb loop
+        public float Climb01;  // column and fire: phase offset along the climb loop
         public float Wobble;   // column: radial wobble phase
         public float Size01;   // relative size within its kind
         public float Spin;     // billboard rotation rate, degrees per second, signed
+        public float Lag;      // 0..1, this puff's place in the staggered dissolve at the end
     }
 
     /// <summary>Where one puff is at one moment, in metres from ground zero, and how it is shaded.</summary>
@@ -52,7 +54,8 @@ namespace MissileDisaster.Core
         // not a cloud. The shipped profile measures 0.997 standing and 0.955 while fading.
         public const int CapCount = 340;
         public const int ColumnCount = 160;
-        public const int TotalCount = CapCount + ColumnCount;
+        public const int FireCount = 120;
+        public const int TotalCount = CapCount + ColumnCount + FireCount;
 
         // The cap's torus, as fractions of the drawn cap radius and depth. Outer reach is
         // RingRadius + RingCross = 1.0 exactly, so the envelope honours the figure.
@@ -76,11 +79,36 @@ namespace MissileDisaster.Core
         // The fire stops showing through the folds about here into the rise.
         public const float EmberDiesAtRiseFraction = 0.7f;
 
+        // The fire smoke: born across the burn field, climbing slowly, gently drawn in toward
+        // the central updraft over its loop and absorbed as it arrives. Its loop is longer than
+        // the column's - the drift is supposed to read as gentle - and it dissolves last at the
+        // end, because the city under the cloud is still burning.
+        public const float FireLoopFactor = 1.6f;   // of the rise, per loop
+        public const float FireInwardPull = 0.85f;  // how much of its birth radius a puff gives up
+        public const float FireSmokeHeightFraction = 0.7f; // of the cap base, the height the smoke climbs to
+        public const float FireEdgeFade = 0.1f;     // loop-end fade band, wider than the column's
+
+        // The staggered dissolve: where each kind's thinning starts inside the fade window.
+        // The column dies first - nothing is feeding it - the cap loosens next, and the fire
+        // smoke outlasts them both.
+        public const float DissolveLagColumn = 0.05f;
+        public const float DissolveLagCap = 0.10f;
+        public const float DissolveLagFire = 0.35f;
+        public const float DissolveLagSpreadColumn = 0.40f;
+        public const float DissolveLagSpreadCap = 0.50f;
+        public const float DissolveLagSpreadFire = 0.50f;
+        public const float DissolveLoosening = 0.30f; // how much a puff swells as it thins away
+        // How much of the fade window one puff takes to go, once its turn comes. Shorter than
+        // the window itself, so the early puffs are fully gone while the late ones still stand -
+        // the cloud shreds away piece by piece rather than dimming as one.
+        public const float DissolveWindow = 0.35f;
+
         /// <summary>The fixed parameters of puff i for one strike. Deterministic: the same index and seed always deal the same puff.</summary>
         public static PuffSpec Spec(int index, int seed)
         {
             var s = new PuffSpec();
             s.Cap = index < CapCount;
+            s.Fire = index >= CapCount + ColumnCount;
             s.Azimuth = Hash01(index, seed, 1) * (float)(2.0 * Math.PI);
             s.Swirl = (Hash01(index, seed, 2) - 0.5f) * 0.08f;
             // sqrt biases the puffs outward, where the cauliflower is; the column fills the hole.
@@ -92,6 +120,7 @@ namespace MissileDisaster.Core
             s.Wobble = Hash01(index, seed, 7) * (float)(2.0 * Math.PI);
             s.Size01 = Hash01(index, seed, 8);
             s.Spin = (Hash01(index, seed, 9) - 0.5f) * 24f;
+            s.Lag = Hash01(index, seed, 10);
             return s;
         }
 
@@ -122,7 +151,27 @@ namespace MissileDisaster.Core
             float dist, y;
             var point = new PuffPoint();
 
-            if (p.Cap)
+            if (p.Fire)
+            {
+                // Smoke off the burning city. Born at its own spot in the burn field - fires
+                // are there from the flash, so the field does not grow with the cloud - it
+                // climbs slowly and is gently drawn in toward the central updraft, arriving
+                // spent at the column's base. The pull uses the same smooth ease as everything
+                // else: most of the drift happens mid-loop, none of it as a jerk.
+                float floop = dims.RiseSeconds * FireLoopFactor;
+                float fu = Frac(p.Climb01 + t / floop);
+                float r0 = dims.FireFieldRadius * (0.3f + 0.7f * p.Rho01);
+                dist = r0 * (1f - FireInwardPull * Smooth(fu));
+                y = (float)Math.Pow(fu, 1.3) * capBase * FireSmokeHeightFraction;
+                point.Size = dims.FireFieldRadius * (0.09f + 0.08f * p.Size01);
+                point.Fade = EdgeFade(fu, FireEdgeFade);
+                point.Dust = 1f - 0.3f * fu;
+                // The fires themselves keep glowing where the smoke is freshest, for the whole
+                // life of the effect - unlike the folds of the cap, which cool with the rise.
+                float fresh = 1f - fu;
+                point.Ember = 0.18f * fresh * fresh * fresh;
+            }
+            else if (p.Cap)
             {
                 // The vortex ring: up the inside, out over the top, down the outside, in
                 // underneath. Theta grows with the rolled time, so the boil slows as the cloud
@@ -160,6 +209,30 @@ namespace MissileDisaster.Core
                 point.Ember = EmberEnvelope(t, dims.RiseSeconds) * u * 0.6f; // the glow is up near the fireball
             }
 
+            // The staggered dissolve at the end: each puff thins away on its own cue inside
+            // the fade window, swelling a little as it goes, so the cloud shreds gradually
+            // instead of evaporating in one piece.
+            if (dims.FadeSeconds > 0f)
+            {
+                float fp = (t - dims.RiseSeconds - dims.HoldSeconds) / dims.FadeSeconds;
+                if (fp > 0f)
+                {
+                    if (fp > 1f) fp = 1f;
+                    float lag = p.Fire ? DissolveLagFire + DissolveLagSpreadFire * p.Lag
+                        : p.Cap ? DissolveLagCap + DissolveLagSpreadCap * p.Lag
+                        : DissolveLagColumn + DissolveLagSpreadColumn * p.Lag;
+                    float span = DissolveWindow;
+                    if (span > 1f - lag) span = 1f - lag; // the last puffs still finish by the end
+                    if (span < 0.05f) span = 0.05f;
+                    float prog = (fp - lag) / span;
+                    if (prog < 0f) prog = 0f;
+                    if (prog > 1f) prog = 1f;
+                    float dissolve = 1f - Smooth(prog);
+                    point.Fade *= dissolve;
+                    point.Size *= 1f + DissolveLoosening * (1f - dissolve);
+                }
+            }
+
             point.X = dist * (float)Math.Cos(azimuth);
             point.Y = y;
             point.Z = dist * (float)Math.Sin(azimuth);
@@ -190,7 +263,12 @@ namespace MissileDisaster.Core
         /// <summary>Fades a column puff in over the first and out over the last twentieth of its loop, so recycling never pops.</summary>
         public static float LoopFade(float u)
         {
-            const float edge = 0.06f;
+            return EdgeFade(u, 0.06f);
+        }
+
+        /// <summary>The same in-and-out fade with the band width as a parameter - the fire smoke uses a wider one.</summary>
+        public static float EdgeFade(float u, float edge)
+        {
             if (u < edge) return Smooth(u / edge);
             if (u > 1f - edge) return Smooth((1f - u) / edge);
             return 1f;

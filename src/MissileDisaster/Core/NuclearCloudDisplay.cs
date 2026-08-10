@@ -16,7 +16,8 @@ namespace MissileDisaster.Core
         public float CapDepth;         // CloudTop - CapBase
         public float RiseSeconds;      // how long the cloud takes to form, after time compression
         public float HoldSeconds;      // how long it then stands at full size
-        public float FadeSeconds;      // how long it takes to thin away at the end
+        public float FadeSeconds;      // how long the staggered thinning takes at the end
+        public float FireFieldRadius;  // how far out the burning city feeds smoke into the cloud
     }
 
     /// <summary>
@@ -152,11 +153,21 @@ namespace MissileDisaster.Core
         public const float RiseSecondsKnee = 10f;
         public const float RiseSecondsCeiling = 16f;
 
-        // How long it stands, against how long it rose, and how long the fade takes.
+        // How long it stands, against how long it rose, and how long the fade takes. The fade
+        // is deliberately longer than the rise: a cloud that takes eight seconds to form and
+        // vanishes in a blink reads as a deletion, and a real one takes far longer to shred
+        // than to rise. The thinning is staggered per puff on top of this - see CloudPuffs.
         public const float HoldFactor = 1.2f;
         public const float HoldSecondsMin = 8f;
         public const float HoldSecondsMax = 16f;
-        public const float FadeSeconds = 6f;
+        public const float FadeFactor = 1.7f;
+        public const float FadeSecondsMin = 12f;
+        public const float FadeSecondsMax = 20f;
+
+        // How far out the burning city feeds smoke into the cloud, against the cap. The real
+        // burn radius is kilometres - the whole map at strategic yields - so the drawn field is
+        // tied to the cap the way everything else is.
+        public const float FireFieldFactor = 2.5f;
 
         /// <summary>
         /// The dimensions for a yield in kilotons. Zero or less falls back to the 150 kt
@@ -197,7 +208,11 @@ namespace MissileDisaster.Core
             if (hold < HoldSecondsMin) hold = HoldSecondsMin;
             if (hold > HoldSecondsMax) hold = HoldSecondsMax;
             d.HoldSeconds = hold;
-            d.FadeSeconds = FadeSeconds;
+            float fade = d.RiseSeconds * FadeFactor;
+            if (fade < FadeSecondsMin) fade = FadeSecondsMin;
+            if (fade > FadeSecondsMax) fade = FadeSecondsMax;
+            d.FadeSeconds = fade;
+            d.FireFieldRadius = d.CapRadius * FireFieldFactor;
             return d;
         }
     }

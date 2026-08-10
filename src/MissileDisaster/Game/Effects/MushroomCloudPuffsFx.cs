@@ -33,6 +33,7 @@ namespace MissileDisaster.Game.Effects
         // denser than the column, which reads better with a hint of depth to it.
         private const float CapAlpha = 0.97f;
         private const float ColumnAlpha = 0.88f;
+        private const float FireAlpha = 0.8f;
 
         private ParticleSystem _ps;
         private ParticleSystem.Particle[] _buffer;
@@ -74,7 +75,8 @@ namespace MissileDisaster.Game.Effects
 
                 Color c = Color.Lerp(VapourColor, dust, pt.Dust);
                 c = Color.Lerp(c, EmberColor, pt.Ember);
-                float alpha = (_specs[i].Cap ? CapAlpha : ColumnAlpha) * anim.Alpha * pt.Fade;
+                float baseAlpha = _specs[i].Cap ? CapAlpha : _specs[i].Fire ? FireAlpha : ColumnAlpha;
+                float alpha = baseAlpha * anim.Alpha * pt.Fade;
 
                 _buffer[i].position = new Vector3(pt.X, pt.Y, pt.Z); // local space; the transform sits at ground zero
                 _buffer[i].startSize = pt.Size;

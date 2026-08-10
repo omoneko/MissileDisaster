@@ -201,7 +201,11 @@ public class NuclearCloudDisplayTests
         // and the whole 150 kt shot is under half a minute.
         NuclearCloudDimensions d = NuclearCloudDisplay.For(150f);
         Assert.InRange(d.RiseSeconds, 5f, 12f);
-        Assert.InRange(d.RiseSeconds + d.HoldSeconds + d.FadeSeconds, 15f, 30f);
+        // The dissolve at the end is deliberately the longest phase - vanishing faster than it
+        // formed is what read as a deletion - so the whole shot runs a little over half a
+        // minute now, most of it the cloud shredding away.
+        Assert.InRange(d.RiseSeconds + d.HoldSeconds + d.FadeSeconds, 25f, 40f);
+        Assert.True(d.FadeSeconds > d.RiseSeconds, "it takes longer to shred than it took to rise");
     }
 
     [Fact]
@@ -221,7 +225,8 @@ public class NuclearCloudDisplayTests
         {
             NuclearCloudDimensions d = NuclearCloudDisplay.For(kt);
             Assert.InRange(d.HoldSeconds, NuclearCloudDisplay.HoldSecondsMin, NuclearCloudDisplay.HoldSecondsMax);
-            Assert.Equal(NuclearCloudDisplay.FadeSeconds, d.FadeSeconds, 3);
+            Assert.InRange(d.FadeSeconds, NuclearCloudDisplay.FadeSecondsMin, NuclearCloudDisplay.FadeSecondsMax);
+            Assert.Equal(d.CapRadius * NuclearCloudDisplay.FireFieldFactor, d.FireFieldRadius, 1);
         }
     }
 
