@@ -128,7 +128,7 @@ class Puffs:
         ring, cross = capR * 0.55, capR * 0.45 * self.rho
         dist[c] = np.maximum(ring - cross[c] * np.cos(theta[c]), 0.0)
         y[c] = cap_base + cap_depth * 0.5 + cap_depth * 0.5 * self.rho[c] * np.sin(theta[c])
-        size[c] = capR * (P["cap_size0"] + P["cap_size1"] * self.size01[c])
+        size[c] = capR * (P["cap_size0"] + P["cap_size1"] * self.size01[c] ** P["size_bias"])
         dust[c] = 0.15 + 0.15 * (1 - self.rho[c])
         ember_env = max(1.0 - t / (d.rise * 0.7), 0.0)
         ember[c] = ember_env * (1 - self.rho[c]) * 0.8
@@ -143,7 +143,7 @@ class Puffs:
         radial = 0.25 + 0.75 * self.rho[m]
         wob = 1 + 0.18 * np.sin(self.wobble[m] + u * 9.4 + t * 0.4)
         dist[m] = stemR * shape * radial * wob
-        size[m] = stemR * (P["col_size0"] + P["col_size1"] * self.size01[m]) * (0.7 + 0.3 * smooth(u))
+        size[m] = stemR * (P["col_size0"] + P["col_size1"] * self.size01[m] ** P["size_bias"]) * (0.7 + 0.3 * smooth(u))
         edge = 0.06
         fade[m] = np.where(u < edge, smooth(u / edge), np.where(u > 1 - edge, smooth((1 - u) / edge), 1.0))
         dust[m] = 0.85 - 0.5 * u
@@ -158,7 +158,7 @@ class Puffs:
         pull = P["fire_pull"]
         dist[f] = r0 * (1.0 - pull * smooth(fu))
         y[f] = fu ** 1.3 * cap_base * 0.7
-        size[f] = d.fire_field * (P["fire_size0"] + P["fire_size1"] * self.size01[f]) * (0.55 + 0.45 * smooth(fu))
+        size[f] = d.fire_field * (P["fire_size0"] + P["fire_size1"] * self.size01[f] ** P["size_bias"]) * (0.55 + 0.45 * smooth(fu))
         edge = 0.10
         fade[f] = np.where(fu < edge, smooth(fu / edge),
                            np.where(fu > 1 - edge, smooth((1 - fu) / edge), 1.0))
@@ -172,10 +172,13 @@ class Puffs:
         if fp > 0.0:
             lag = np.where(c, 0.10 + 0.50 * self.lag,
                   np.where(f, 0.35 + 0.50 * self.lag, 0.05 + 0.40 * self.lag))
-            span = np.clip(np.minimum(0.35, 1.0 - lag), 0.05, None)
+            span = np.clip(np.minimum(P["dissolve_window"], 1.0 - lag), 0.05, None)
             prog = np.clip((fp - lag) / span, 0.0, 1.0)
             dissolve = 1.0 - smooth(prog)
-            fade = fade * dissolve
+            # On top of each puff's own dissolve, the whole cloud thins steadily from the
+            # moment the fade begins - so even the puffs whose turn has not come are already
+            # going transparent, and nothing is still solid when its cue finally arrives.
+            fade = fade * dissolve * (1.0 - P["fade_floor"] * fp)
             size = size * (1.0 + 0.30 * (1.0 - dissolve))  # loosening into haze as it thins
 
         x = dist * np.cos(az); z = dist * np.sin(az)
@@ -199,6 +202,48 @@ def puff_alpha_profile(dd, phase, P):
     d2 = dd / np.maximum(wob, 1e-6)
     t = np.clip((d2 - core) / (edge - core), 0.0, 1.0)
     return 1.0 - (t * t * (3 - 2 * t))
+
+
+# ---- ShockWave / ShockWaveFx port: the dust surge rolling outward ----------------
+
+SHOCK_EXPONENT = 0.4
+SHOCK_SPEED = 540.0
+SHOCK_MIN_FRACTION = 0.02
+SURGE = dict(count=360, start_delay=0.06, dur_factor=1.35, size=0.105,
+             size_bias=2.2, growth=3.4, lift=0.02)
+SURGE_LIT = np.array([0.62, 0.55, 0.45]); SURGE_SHADE = np.array([0.42, 0.36, 0.30])
+
+
+def shock_duration(radius):
+    return min(max(radius / SHOCK_SPEED, 0.9), 14.0)
+
+
+def shock_front_radius(radius, u):
+    return radius * max(u, 0.0) ** SHOCK_EXPONENT
+
+
+def surge_at(radius, t, seed=11):
+    """Positions/sizes/alphas of the surge clods at t seconds, as the game draws them."""
+    dur = shock_duration(radius)
+    delay = dur * SURGE["start_delay"]
+    life = dur * SURGE["dur_factor"]
+    u = (t - delay) / life
+    if u <= 0.0 or u >= 1.0:
+        return None
+    n = SURGE["count"]
+    idx = np.arange(n)
+    az = np.array([hash01(i, seed, 1) for i in idx]) * TAU
+    roll = np.array([hash01(i, seed, 8) for i in idx]) ** SURGE["size_bias"]
+    # The clods ride the Sedov curve: radius traced from the start radius outward.
+    start_r = shock_front_radius(radius, SHOCK_MIN_FRACTION)
+    r = start_r + (radius - start_r) * (u ** SHOCK_EXPONENT)
+    biggest = radius * SURGE["size"]
+    size = (biggest * 0.55 + biggest * 0.45 * roll) * (0.8 + (SURGE["growth"] - 0.8) * u)
+    y = 0.5 * 9.81 * SURGE["lift"] * (u * life) ** 2  # negative gravity lifts the wall
+    if u < 0.04: a = u / 0.04
+    elif u < 0.55: a = 1.0
+    else: a = 0.95 * (1.0 - (u - 0.55) / 0.45)
+    return r, az, y, size, np.clip(a, 0, 1) * 0.92, roll
 
 
 # ---------------------------------------------------------------- compositing
@@ -229,6 +274,23 @@ def render(P, d, t, elev_deg, path):
     horizon = int(H * 0.86)
     img = backdrop(W, H, metres_w, metres_w * H / W, horizon)
     cover = np.zeros((H, W))
+
+    # The dust surge first: it is on the ground, behind everything the cloud does.
+    sv = surge_at(P.get("shock_radius", d.cap_radius * 3.2), t)
+    if sv is not None:
+        r, az, sy, ssize, salpha, sroll = sv
+        for i in np.argsort(-np.cos(az)):  # far side first
+            cx = int(W / 2 + r * np.cos(az[i]) * px)
+            cy = int(horizon - sy * px - r * np.sin(az[i]) * px * 0.35)  # slight ground tilt
+            rad = max(int(ssize[i] * 0.5 * px), 2)
+            x0, x1 = max(cx - rad, 0), min(cx + rad + 1, W)
+            y0, y1 = max(cy - rad, 0), min(cy + rad + 1, H)
+            if x0 >= x1 or y0 >= y1: continue
+            gy, gx = np.mgrid[y0:y1, x0:x1]
+            dd = np.sqrt((gx - cx) ** 2 + (gy - cy) ** 2) / rad
+            ta = puff_alpha_profile(dd, np.arctan2(gy - cy, gx - cx), P) * salpha
+            col = SURGE_LIT * (1 - sroll[i]) + SURGE_SHADE * sroll[i]
+            img[y0:y1, x0:x1] = img[y0:y1, x0:x1] * (1 - ta[..., None]) + col * ta[..., None]
 
     anim = animation_at(t, d.rise, d.hold, d.fade)
     puffs = Puffs(P)
@@ -284,8 +346,9 @@ def write_png(path, pixels):
 PROFILES = {
     # The shipping profile. Keep in lockstep with Core/CloudPuffs + MushroomCloudPuffsFx.
     "tuned": dict(seed=7, cap_count=340, col_count=160, fire_count=120, rho_min=0.1,
-                  cap_size0=0.23, cap_size1=0.16, col_size0=0.7, col_size1=0.5,
-                  fire_size0=0.09, fire_size1=0.08, fire_pull=0.85, fire_alpha=0.8,
+                  size_bias=2.2, dissolve_window=0.55, fade_floor=0.85, fireball_scale=0.26,
+                  cap_size0=0.14, cap_size1=0.40, col_size0=0.45, col_size1=0.95,
+                  fire_size0=0.055, fire_size1=0.13, fire_pull=0.85, fire_alpha=0.8,
                   cap_alpha=0.97, col_alpha=0.88, texture="cloud",
                   tex_core=0.42, tex_edge=0.95, tex_wobble=0.10,
                   cap_width_scale=1.3, screen_top=2000.0, knee=1400.0),
@@ -299,7 +362,7 @@ def main():
     for name, P in PROFILES.items():
         if which and name != which: continue
         d = Display150kt(P["cap_width_scale"], P["screen_top"], P["knee"])
-        for label, t in [("forming", d.rise * 0.55), ("standing", d.rise + d.hold * 0.4),
+        for label, t in [("surge1", 1.2), ("surge2", 3.0), ("forming", d.rise * 0.55), ("standing", d.rise + d.hold * 0.4),
                          ("fade30", d.rise + d.hold + d.fade * 0.3),
                          ("fade60", d.rise + d.hold + d.fade * 0.6),
                          ("fade85", d.rise + d.hold + d.fade * 0.85)]:

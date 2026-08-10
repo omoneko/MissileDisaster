@@ -42,7 +42,9 @@ radioactive fallout that you can clean up with a dedicated decontamination facil
     cauliflower — while the column's puffs climb a skirt‑waist‑throat profile from the ground
     into the cap and recycle, an endless conveyor. Every puff is placed every frame
     (`SetParticles`), so the crowd holds the mushroom silhouette while visibly boiling; the
-    boil slows once the cloud stands and all but freezes as it fades. Fire glows through the
+    boil slows once the cloud stands and all but freezes as it fades. Puffs come in a wide
+    range of sizes weighted towards the small end — a few big lobes with many smaller ones
+    packed around them, the way a real cloud is built. Fire glows through the
     folds for the first seconds; each strike boils its own way from its own seed. **Smoke also
     rises off the burning city across the burn field** and is gently drawn in toward the central
     updraft. The end is a **staggered dissolve** over 12–20 s — longer than the rise — with the
@@ -64,7 +66,10 @@ radioactive fallout that you can clean up with a dedicated decontamination facil
     `Core/NuclearCloudDisplay`
 - **Shock wave** — a blast front races out across the ground following Sedov–Taylor
   (`r ∝ t^0.4`): it leaves at several times the speed of sound and visibly decelerates, reaching
-  the destruction radius at an average 540 m/s. Every warhead gets one
+  the destruction radius at an average 540 m/s. Every warhead gets one. Behind it rolls a
+  **concentric wall of dust** — a tsunami of earth the front tears off the ground, starting a
+  beat after the blast passes, piling up and climbing as it spreads, and outlasting the front
+  itself
 - **Distance‑based destruction** — total destruction near ground zero, falling off with distance
 - **Fire** for incendiary/thermobaric/nuclear warheads
   - White Phosphorus is a pure incendiary: no crater and almost no blast **at any charge** —

@@ -21,14 +21,34 @@ namespace MissileDisaster.Game.Effects
     {
         private const int DustParticles = 96;      // enough that the ring reads as continuous
         private const int AirParticles = 72;
+        // The dust surge: the wall of earth the front tears off the ground and rolls outward
+        // ahead of itself, the thing that reads as a tsunami of dirt. It needs far more
+        // particles than the thin rings, because it has to be opaque.
+        // Verified in tools/effect-preview/cloud_preview.py: below about 300 the wall reads as
+        // a string of beads rather than a continuous front.
+        private const int SurgeParticles = 360;
         private const int SpeedCurveKeys = 10;     // resolution the Sedov curve is sampled at
         private const float DustSizeFraction = 0.055f;   // a dust puff against the full radius
         private const float AirSizeFraction = 0.075f;
         private const float GroundClearance = 6f;  // lifts the ring off the terrain so it does not z-fight
 
+        // The surge lags the shock front - the air arrives first, and the ground it lifts
+        // follows a beat behind - and it keeps rolling after the front has spent itself, which
+        // is why it outlives the rings.
+        private const float SurgeStartDelayFraction = 0.06f;
+        private const float SurgeDurationFactor = 1.35f;
+        private const float SurgeSizeFraction = 0.105f;  // one clod of the wall, against the full radius
+        private const float SurgeSizeVariety = 2.2f;     // power bias: many small, a few large
+        private const float SurgeGrowth = 3.4f;          // the wall piles up as it rolls outward
+        private const float SurgeLift = 0.02f;           // gentle rise, so the wall climbs as it spreads
+
         private static readonly Color DustNear = new Color(0.52f, 0.47f, 0.40f, 0.55f); // dry earth
         private static readonly Color DustFar = new Color(0.38f, 0.35f, 0.31f, 0.55f);
         private static readonly Color AirFront = new Color(0.92f, 0.93f, 0.95f, 0.30f); // pale compressed air
+        // The surge is the same earth as the rings but drawn nearly opaque - it is a wall, not
+        // a haze - and lit unevenly, the near face brighter than the shaded folds behind it.
+        private static readonly Color SurgeLit = new Color(0.62f, 0.55f, 0.45f, 0.92f);
+        private static readonly Color SurgeShade = new Color(0.42f, 0.36f, 0.30f, 0.92f);
 
         /// <summary>Sends the front out from groundZero to radius. A radius of zero or less does nothing.</summary>
         public static void Play(Vector3 groundZero, float radius)
@@ -46,6 +66,7 @@ namespace MissileDisaster.Game.Effects
                 CreateRing(origin + Vector3.up * (radius * 0.01f), "ShockWaveAir", ParticleAssets.Smoke,
                     radius, duration * 0.85f, speed, AirParticles, radius * AirSizeFraction,
                     AirFront, AirFront, 1f, 1.8f, 0f);
+                CreateDustSurge(origin, radius, duration, speed);
             }
             catch (Exception e)
             {
@@ -69,6 +90,43 @@ namespace MissileDisaster.Game.Effects
                 keys[i] = new Keyframe(u, ShockWave.FrontSpeed(radius, duration, u));
             }
             return new AnimationCurve(keys);
+        }
+
+        /// <summary>
+        /// The dust surge: a rolling wall of earth chasing the shock front outward, piling up
+        /// and climbing as it goes. It rides the same Sedov speed curve as the rings, so it
+        /// decelerates with the front rather than expanding at a constant rate, but it starts a
+        /// beat later - the blast arrives before the ground it lifts - and rolls on after the
+        /// front has spent itself.
+        /// It is drawn with the opaque-cored cloud material, unlike the thin rings: this is the
+        /// part that has to look like a wall of dirt rather than a haze.
+        /// </summary>
+        private static void CreateDustSurge(Vector3 origin, float radius, float duration, AnimationCurve speed)
+        {
+            float life = duration * SurgeDurationFactor;
+            var go = ParticleBuilder.NewSystem("ShockWaveDustSurge", origin, ParticleAssets.Cloud);
+            var ps = go.GetComponent<ParticleSystem>();
+            var main = ps.main;
+            main.startDelay = duration * SurgeStartDelayFraction;
+            main.startLifetime = life;
+            main.startSpeed = ShockWave.FrontSpeed(radius, duration, ShockWave.MinFraction);
+            // Many small clods and a few large ones, the same size variety the cloud's puffs use.
+            float biggest = radius * SurgeSizeFraction;
+            main.startSize = new ParticleSystem.MinMaxCurve(biggest * 0.55f, biggest);
+            main.startColor = new ParticleSystem.MinMaxGradient(SurgeLit, SurgeShade);
+            main.maxParticles = SurgeParticles * 2;
+
+            ParticleBuilder.Burst(ps, SurgeParticles);
+            ParticleBuilder.GroundRing(ps, ShockWave.StartRadius(radius));
+            ParticleBuilder.SpeedCurve(ps, speed, 1f);
+            ParticleBuilder.Gravity(ps, -SurgeLift); // negative gravity: the wall climbs as it rolls
+            // Opaque almost at once, holding through the run, and only letting go at the very
+            // end - a dust wall does not thin out halfway across the city.
+            ParticleBuilder.Fade(ps,
+                new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.04f),
+                new GradientAlphaKey(0.95f, 0.55f), new GradientAlphaKey(0f, 1f));
+            ParticleBuilder.SizeCurve(ps, 0.8f, SurgeGrowth); // thick from the start, piling up as it rolls
+            ParticleBuilder.PlayAndDestroy(go, duration * SurgeStartDelayFraction + life + 1f);
         }
 
         private static void CreateRing(Vector3 origin, string name, Material mat, float radius,

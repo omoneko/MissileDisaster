@@ -189,22 +189,24 @@ public class CloudPuffsTests
     [Fact]
     public void The_dissolve_is_staggered_not_uniform()
     {
-        // Halfway through the fade some puffs must already be gone while others still stand -
-        // the cloud shreds, it does not evaporate in one piece.
+        // Halfway through the fade the cap must show a real spread of transparencies: every
+        // puff is thinning, but each on its own cue, so some are nearly gone while others are
+        // still substantial. A single uniform alpha across the crowd is the "switched off"
+        // look this replaces; holes punched in something otherwise solid is the other failure.
         NuclearCloudDimensions d = Dims();
         float t = d.RiseSeconds + d.HoldSeconds + d.FadeSeconds * 0.5f;
         CloudAnimationState anim = CloudAnimation.At(t, d.RiseSeconds, d.HoldSeconds, d.FadeSeconds);
-        int gone = 0, standing = 0;
+        float min = float.MaxValue, max = 0f;
         for (int i = 0; i < CloudPuffs.TotalCount; i++)
         {
             PuffSpec s = CloudPuffs.Spec(i, 7);
             if (!s.Cap) continue;
             float fade = CloudPuffs.At(s, t, d, anim).Fade;
-            if (fade < 0.1f) gone++;
-            if (fade > 0.9f) standing++;
+            if (fade < min) min = fade;
+            if (fade > max) max = fade;
         }
-        Assert.True(gone > 20, $"some of the cap has shredded away by half fade (gone={gone})");
-        Assert.True(standing > 20, $"and some of it still stands (standing={standing})");
+        Assert.True(max > 0.3f, $"the cap is still there at half fade (max={max:F2})");
+        Assert.True(min < max * 0.35f, $"and visibly ragged, not one flat alpha ({min:F2}..{max:F2})");
     }
 
     [Fact]
@@ -237,5 +239,57 @@ public class CloudPuffsTests
             Assert.True(CloudPuffs.At(CloudPuffs.Spec(i, 7), t, d, anim).Fade < 0.02f,
                 $"puff {i} has dissolved by the end");
         }
+    }
+
+    [Fact]
+    public void Puffs_come_in_a_range_of_sizes_weighted_small()
+    {
+        // A crowd of one size reads as a bag of identical blobs. What a cloud actually is: a
+        // handful of big lobes with many smaller ones packed around them.
+        NuclearCloudDimensions d = Dims();
+        CloudAnimationState anim = FullyGrown(d);
+        float min = float.MaxValue, max = 0f, sum = 0f; int n = 0;
+        for (int i = 0; i < CloudPuffs.TotalCount; i++)
+        {
+            PuffSpec s = CloudPuffs.Spec(i, 7);
+            if (!s.Cap) continue;
+            float size = CloudPuffs.At(s, d.RiseSeconds + 2f, d, anim).Size;
+            if (size < min) min = size;
+            if (size > max) max = size;
+            sum += size; n++;
+        }
+        Assert.True(max > min * 2.5f, $"the largest puff dwarfs the smallest ({min:F0}..{max:F0} m)");
+        // Weighted small: the mean sits well below the midpoint of the range.
+        Assert.True(sum / n < (min + max) * 0.5f, "most puffs are at the small end");
+    }
+
+    [Fact]
+    public void The_size_roll_is_biased_towards_the_small_end()
+    {
+        Assert.Equal(0f, CloudPuffs.SizeRoll(0f), 3);
+        Assert.Equal(1f, CloudPuffs.SizeRoll(1f), 3);
+        Assert.True(CloudPuffs.SizeRoll(0.5f) < 0.35f, "a middling roll still yields a smallish puff");
+    }
+
+    [Fact]
+    public void The_whole_cloud_goes_transparent_as_it_disperses()
+    {
+        // Not only does each puff take its turn to dissolve - every puff still present is also
+        // steadily more see-through, so the cloud thins as a whole rather than punching holes.
+        NuclearCloudDimensions d = Dims();
+        float early = d.RiseSeconds + d.HoldSeconds + d.FadeSeconds * 0.15f;
+        float late = d.RiseSeconds + d.HoldSeconds + d.FadeSeconds * 0.6f;
+        float sumEarly = 0f, sumLate = 0f;
+        for (int i = 0; i < CloudPuffs.TotalCount; i++)
+        {
+            PuffSpec s = CloudPuffs.Spec(i, 7);
+            if (!s.Cap) continue;
+            sumEarly += CloudPuffs.At(s, early, d,
+                CloudAnimation.At(early, d.RiseSeconds, d.HoldSeconds, d.FadeSeconds)).Fade;
+            sumLate += CloudPuffs.At(s, late, d,
+                CloudAnimation.At(late, d.RiseSeconds, d.HoldSeconds, d.FadeSeconds)).Fade;
+        }
+        Assert.True(sumLate < sumEarly * 0.6f, "the cap is markedly more transparent later in the fade");
+        Assert.True(sumLate > 0f, "but it has not simply been switched off");
     }
 }

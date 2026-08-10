@@ -74,8 +74,12 @@ namespace MissileDisaster.Core
         /// already compressed would be nearly as wide as the cloud itself. Two and a half times
         /// its share puts it at about a third of the canopy's width at every yield, against the
         /// tenth to a seventh it really is.
+        ///
+        /// Raised from 0.16 on the playtest verdict that the fireball wanted to be bigger: the
+        /// flash is the moment of the strike, and it was being upstaged by the cloud that
+        /// follows it.
         /// </summary>
-        public const float FireballScale = 0.16f;
+        public const float FireballScale = 0.26f;
 
         /// <summary>
         /// The ceiling on the drawn cloud height. It began life equal to the airburst ceiling

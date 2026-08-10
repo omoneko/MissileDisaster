@@ -62,14 +62,16 @@ that are taste rather than physics, and they are where to go for "bigger", "smal
 | `CloudScale` | 0.06 | the whole cloud against its real size — **width and height alike**. Raise for a bigger strike, lower for a smaller one. Do not scale height on its own: that is what broke the mushroom shape once already |
 | `CapWidthScale` | 1.3 | the cap's extra sideways spread on top of CloudScale (playtest). The stem deliberately does not follow it |
 | `ScreenTopAltitude` | 2000 | soft bound on the drawn height, knee at 1400. **Decoupled from `ModConfig.MaxBurstAltitude`** (still 1000) since the playtest asked for taller clouds |
-| `FireballScale` | 0.16 | the fireball, which comes down less far than the cloud so it is not lost under it |
 | `RiseCompression` | 45 | real seconds per drawn second. Lower is slower; bounds 5/10/16 s |
 | `HoldFactor` / `HoldSecondsMin/Max` | 1.2 / 8–16 s | how long the cloud stands at full size |
-| `FadeSeconds` | 6 | how long it takes to thin away |
 | `BirthFraction`, `WidthLagPower` in `Core/CloudAnimation` | 0.12 / 1.6 | how small the cloud is born, and how far the cap trails the column |
 | `FadeFactor` / `FadeSecondsMin/Max` | 1.7 / 12–20 s | the staggered dissolve at the end — deliberately longer than the rise |
 | `FireFieldFactor` | 2.5 | how far out the burning city feeds smoke, against the cap radius |
-| `Dissolve*` in `Core/CloudPuffs` | lags 0.05/0.10/0.35, window 0.35 | the shredding order: column first, cap next, fire smoke last |
+| `Dissolve*` in `Core/CloudPuffs` | lags 0.05/0.10/0.35, window 0.55 | the shredding order: column first, cap next, fire smoke last |
+| `DissolveTransparency` | 0.85 | how far the whole cloud goes see-through across the fade, on top of each puff's own dissolve |
+| `SizeBias` in `Core/CloudPuffs` | 2.2 | how strongly puff sizes skew small; 1 makes them uniform |
+| `FireballScale` | 0.26 | the fireball, which comes down less far than the cloud so it is not lost under it; raised from 0.16 on playtest |
+| `Surge*` in `Game/Effects/ShockWaveFx` | 360 clods, 1.35x the front's life | the rolling dust wall behind the shock front |
 
 What these currently produce:
 
@@ -88,10 +90,10 @@ shared with the airburst ceiling; decouple them first if only the cloud should m
 
 | | status |
 |---|---|
-| `Core/**` logic | **251 xUnit tests pass.** `dotnet test tests/MissileDisaster.Core.Tests/` — includes a test that parses the shipped `MushroomCloud.obj` and checks its normalisation |
+| `Core/**` logic | **267 xUnit tests pass.** `dotnet test tests/MissileDisaster.Core.Tests/` |
 | effect code compiles | **passes**, against both the stubs (`tools/compile-check`) and the real game assemblies (`build.ps1`, 0 warnings) |
 | the mesh-cloud Unity members exist in 5.6 | **verified by reflection against the game's own UnityEngine.dll**: `Texture2D.LoadImage`, `MeshRenderer.materials`, `ParticleSystemShapeType.Circle`, both `MinMaxCurve` ctors. The transparent-fade shader is probed at runtime and falls back to a smoke-covered teardown if absent |
-| how it looks in game | **not verified since the mesh rework.** The next playtest is the judge |
+| how it looks in game | **every change since the see-through report is rendered and measured first** in `tools/effect-preview/cloud_preview.py` — it composites the puffs exactly as the game does and prints the cap's opacity. Renders in `docs/effects` |
 
 The particle-era warnings that used to sit here (three unverified members) are resolved — the
 build now compiles against the real assemblies on this machine. Suspects if something still looks

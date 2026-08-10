@@ -98,10 +98,30 @@ namespace MissileDisaster.Core
         public const float DissolveLagSpreadCap = 0.50f;
         public const float DissolveLagSpreadFire = 0.50f;
         public const float DissolveLoosening = 0.30f; // how much a puff swells as it thins away
+        // On top of each puff's own dissolve, the whole cloud goes steadily more transparent
+        // from the moment the fade begins. Without it, a puff whose cue has not come yet is
+        // still fully solid, and the cloud reads as holes opening in something opaque rather
+        // than as the whole thing thinning away.
+        public const float DissolveTransparency = 0.85f;
         // How much of the fade window one puff takes to go, once its turn comes. Shorter than
         // the window itself, so the early puffs are fully gone while the late ones still stand -
         // the cloud shreds away piece by piece rather than dimming as one.
-        public const float DissolveWindow = 0.35f;
+        public const float DissolveWindow = 0.55f;
+
+        /// <summary>
+        /// The power the size roll is raised to before it is spread across a puff kind's size
+        /// range. At 1 the sizes are uniform and the crowd reads as one grade of blob; above 1
+        /// the roll is pushed towards the small end, so most puffs are small and a few are much
+        /// larger - which is what a real cloud is, a handful of big lobes with smaller ones
+        /// packed around them. The ranges themselves were widened to match.
+        /// </summary>
+        public const float SizeBias = 2.2f;
+
+        /// <summary>The size roll, biased small. Verified in tools/effect-preview/cloud_preview.py.</summary>
+        public static float SizeRoll(float size01)
+        {
+            return (float)Math.Pow(size01, SizeBias);
+        }
 
         /// <summary>The fixed parameters of puff i for one strike. Deterministic: the same index and seed always deal the same puff.</summary>
         public static PuffSpec Spec(int index, int seed)
@@ -165,7 +185,7 @@ namespace MissileDisaster.Core
                 y = (float)Math.Pow(fu, 1.3) * capBase * FireSmokeHeightFraction;
                 // Vanilla's smoke swells 0.4 -> 1.0 over its life; fresh smoke is small and
                 // expands as it rises and cools. Same here, per loop.
-                point.Size = dims.FireFieldRadius * (0.09f + 0.08f * p.Size01)
+                point.Size = dims.FireFieldRadius * (0.055f + 0.13f * SizeRoll(p.Size01))
                     * (0.55f + 0.45f * Smooth(fu));
                 point.Fade = EdgeFade(fu, FireEdgeFade);
                 point.Dust = 1f - 0.3f * fu;
@@ -187,7 +207,7 @@ namespace MissileDisaster.Core
                 dist = ringCore - crossR * (float)Math.Cos(theta);
                 if (dist < 0f) dist = 0f;
                 y = centreY + crossY * (float)Math.Sin(theta);
-                point.Size = capR * (0.23f + 0.16f * p.Size01);
+                point.Size = capR * (0.14f + 0.40f * SizeRoll(p.Size01));
                 point.Fade = 1f;
                 point.Dust = 0.15f + 0.15f * (1f - p.Rho01); // the inner cap keeps a little of the column's dust
                 // Early on the fire shows through the folds nearest the core.
@@ -206,7 +226,7 @@ namespace MissileDisaster.Core
                 float radial = 0.25f + 0.75f * p.Rho01;
                 float wobble = 1f + 0.18f * (float)Math.Sin(p.Wobble + u * 9.4f + t * 0.4f);
                 dist = stemR * shape * radial * wobble;
-                point.Size = stemR * (0.7f + 0.5f * p.Size01) * (0.7f + 0.3f * Smooth(u));
+                point.Size = stemR * (0.45f + 0.95f * SizeRoll(p.Size01)) * (0.7f + 0.3f * Smooth(u));
                 point.Fade = LoopFade(u);
                 point.Dust = 0.85f - 0.5f * u; // dust at the base, paling as it climbs
                 point.Ember = EmberEnvelope(t, dims.RiseSeconds) * u * 0.6f; // the glow is up near the fireball
@@ -231,7 +251,7 @@ namespace MissileDisaster.Core
                     if (prog < 0f) prog = 0f;
                     if (prog > 1f) prog = 1f;
                     float dissolve = 1f - Smooth(prog);
-                    point.Fade *= dissolve;
+                    point.Fade *= dissolve * (1f - DissolveTransparency * fp);
                     point.Size *= 1f + DissolveLoosening * (1f - dissolve);
                 }
             }
