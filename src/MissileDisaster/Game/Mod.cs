@@ -3,12 +3,18 @@ using System.Reflection;
 using ColossalFramework;
 using ColossalFramework.Plugins;
 using ICities;
+using MissileDisaster.Core;
 using MissileDisaster.Game.Models;
 
 namespace MissileDisaster.Game
 {
     public class Mod : IUserMod
     {
+        // Where the game actually loaded this DLL from, captured at load. Shown on the options
+        // screen, because when two copies of a mod are installed - a Workshop subscription and a
+        // local build - the only question that matters is which of them is running.
+        private static string _loadedFrom = "(not resolved)";
+
         public string Name => "Missile Disaster";
         public string Description =>
             "Launch missiles with 5 warhead types, adjustable yield, and air or ground burst. " +
@@ -17,6 +23,7 @@ namespace MissileDisaster.Game
 
         public void OnEnabled()
         {
+            LogBuildStamp();
             ModSettings.Ensure();
             // Assembly.GetExecutingAssembly().Location can come back empty the way CS loads
             // mods, which then throws. The mod path is taken from the game's own PluginManager
@@ -29,6 +36,7 @@ namespace MissileDisaster.Game
                     MissileModelProvider.Initialize(info.modPath);
                     Audio.SoundLibrary.Initialize(info.modPath);
                     UI.MissileIcon.SetModDirectory(info.modPath); // so the panel icon can use icon.png
+                    _loadedFrom = info.modPath;
                 }
                 else
                 {
@@ -41,12 +49,53 @@ namespace MissileDisaster.Game
             }
         }
 
+        /// <summary>
+        /// Prints, once at load and whatever the log level, the dimensions this build would draw
+        /// a 150 kt cloud at. It is a fingerprint of the code that is actually running: the
+        /// numbers are computed, not written down, so they cannot go stale the way a version
+        /// string does. If the game is loading an old copy of the DLL - a Workshop subscription
+        /// shadowing a local build, a copy that never got overwritten - this line says so.
+        /// </summary>
+        private static void LogBuildStamp()
+        {
+            try
+            {
+                ModConfig.LogAlways("build check - " + BuildStamp());
+            }
+            catch (Exception e)
+            {
+                ModConfig.LogError("LogBuildStamp error: " + e);
+            }
+        }
+
+        /// <summary>
+        /// The dimensions this build would draw a 150 kt cloud at, as one line. Computed rather
+        /// than written down, so it cannot go stale the way a version string does.
+        /// </summary>
+        private static string BuildStamp()
+        {
+            NuclearCloudDimensions d = NuclearCloudDisplay.For(NuclearYields.StandardKilotons);
+            return string.Format(
+                "150 kt draws: cloud top {0:F0} m, cap {1:F0} m wide, fireball {2:F0} m across, " +
+                "rise {3:F1} s, screen top {4:F0} m",
+                d.CloudTop, d.CapRadius * 2f, d.FireballRadius * 2f, d.RiseSeconds,
+                NuclearCloudDisplay.ScreenTopAltitude);
+        }
+
         /// <summary>The mod's options screen, covering the hotkey and the random strikes. The game finds and calls this itself.</summary>
         public void OnSettingsUI(UIHelperBase helper)
         {
             try
             {
                 ModSettings.Ensure();
+
+                // Which build is running, on screen rather than in a log file. A report that a
+                // change did nothing means one thing if these numbers are the new ones and quite
+                // another if they are not, and hunting for the log to find that out is a poor
+                // use of anybody's evening.
+                UIHelperBase build = helper.AddGroup("Build check");
+                build.AddButton(BuildStamp(), () => { });
+                build.AddButton("Loaded from: " + _loadedFrom, () => { });
 
                 UIHelperBase launch = helper.AddGroup("Launch");
                 launch.AddButton(

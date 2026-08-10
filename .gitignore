@@ -19,5 +19,9 @@ Thumbs.db
 レコーディング*
 画像*.png
 
+# Python bytecode from tools/effect-preview
+__pycache__/
+*.pyc
+
 # Claude Code / superpowers workflow artifacts - not part of the published mod
 .superpowers/

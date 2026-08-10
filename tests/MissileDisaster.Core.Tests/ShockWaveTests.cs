@@ -76,7 +76,21 @@ public class ShockWaveTests
     [Fact]
     public void A_strategic_warhead_does_not_run_on_forever()
     {
-        Assert.Equal(ShockWave.MaximumSeconds, ShockWave.Duration(100000f), 3);
+        Assert.True(ShockWave.Duration(100000f) < ShockWave.CeilingSeconds,
+            "the front is always held under the ceiling");
+    }
+
+    [Fact]
+    public void A_bigger_blast_still_takes_longer_to_cross_the_ground()
+    {
+        // Past the knee the duration is compressed, not clamped: a 50 Mt front crossing 26 km
+        // must take longer than a 1 Mt one crossing 7 km, or the larger weapon is drawn with a
+        // faster wave rather than a longer one.
+        float megaton = ShockWave.Duration(7000f);
+        float tenMegaton = ShockWave.Duration(15300f);
+        float fiftyMegaton = ShockWave.Duration(25800f);
+        Assert.True(megaton < tenMegaton && tenMegaton < fiftyMegaton,
+            "the front lasts longer the further it has to go");
     }
 
     [Fact]

@@ -44,7 +44,7 @@ namespace MissileDisaster.Game.Effects
                     // the fireball where it burst and the cloud rising from the ground, both
                     // built to real figures. The vanilla effect has no size of its own to speak
                     // of and cannot be stretched over the kilometres involved.
-                    NuclearMushroomFx.Play(groundZero, center, spec.YieldKilotons);
+                    NuclearMushroomFx.Play(groundZero, center, spec.YieldKilotons, spec.Airburst);
                     ShockWaveFx.Play(groundZero, spec.DestructionRadius);
                     return;
                 }

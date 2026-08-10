@@ -4,13 +4,16 @@ using System.Globalization;
 
 namespace MissileDisaster.Core
 {
-    /// <summary>A material's colour and transparency, as read from an MTL.</summary>
+    /// <summary>A material's colour, transparency and diffuse texture, as read from an MTL.</summary>
     public class MtlColor
     {
         public float R;
         public float G;
         public float B;
         public float Alpha;
+
+        /// <summary>The map_Kd file name, or null when the material has no texture. A bare name, resolved against the Models folder by the loader.</summary>
+        public string TextureFile;
     }
 
     /// <summary>
@@ -66,7 +69,14 @@ namespace MissileDisaster.Core
 
                     current.Alpha = alpha;
                 }
-                // Everything else (Ka, Ks, Ns, illum, map_*, etc.) is ignored.
+                else if (keyword == "map_Kd")
+                {
+                    // Only the bare form "map_Kd file.png" is understood; the -o/-s option forms
+                    // are not emitted by anything this mod loads.
+                    if (current == null || tokens.Length < 2) continue;
+                    current.TextureFile = tokens[tokens.Length - 1];
+                }
+                // Everything else (Ka, Ks, Ns, illum, the other map_* lines, etc.) is ignored.
             }
 
             return result;

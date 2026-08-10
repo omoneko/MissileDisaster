@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Compiles the mod's particle-effect code against stand-ins for the UnityEngine types it uses,
+    so that it can be type-checked on a machine without Cities: Skylines. The real project
+    (src/MissileDisaster/MissileDisaster.csproj) needs the game's managed DLLs and .NET 3.5, and
+    so can only be built on a machine that owns the game.
+
+      dotnet build tools/compile-check/CompileCheck.csproj
+
+    What this proves: the effect code is well-formed C#, and every call matches the arity and
+    types Unity declares for it.
+
+    What it does NOT prove: that a member exists in Unity 5.6. A stub compiles whatever is
+    written in it - see UnityStubs.cs. It is a syntax and shape check, not an API check, and it
+    is no substitute for building against the game and watching a warhead land.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <OutputType>Library</OutputType>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="UnityStubs.cs" />
+    <Compile Include="..\..\src\MissileDisaster\Core\**\*.cs" LinkBase="Core" />
+    <Compile Include="..\..\src\MissileDisaster\Game\Effects\NuclearMushroomFx.cs" LinkBase="Effects" />
+    <Compile Include="..\..\src\MissileDisaster\Game\Effects\MushroomCloudPuffsFx.cs" LinkBase="Effects" />
+    <Compile Include="..\..\src\MissileDisaster\Game\Effects\ParticleBuilder.cs" LinkBase="Effects" />
+    <Compile Include="..\..\src\MissileDisaster\Game\Effects\SimulationTimed.cs" LinkBase="Effects" />
+    <Compile Include="..\..\src\MissileDisaster\Game\Effects\ShockWaveFx.cs" LinkBase="Effects" />
+  </ItemGroup>
+</Project>

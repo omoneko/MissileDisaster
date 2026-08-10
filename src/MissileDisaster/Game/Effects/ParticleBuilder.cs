@@ -72,6 +72,22 @@ namespace MissileDisaster.Game.Effects
         }
 
         /// <summary>
+        /// A horizontal filled disc: particles start anywhere inside the circle and travel
+        /// straight outwards along it, staying in its plane. This is what a cloud cap spreads
+        /// across - unlike a cone, nothing is sent upwards, so the canopy's depth is left to the
+        /// particle size instead of being set by how far it spreads.
+        /// </summary>
+        public static void FlatDisc(ParticleSystem ps, float radius)
+        {
+            var shape = ps.shape;
+            shape.enabled = true;
+            shape.shapeType = ParticleSystemShapeType.Circle;
+            shape.radius = radius;
+            shape.arc = 360f;
+            ps.transform.rotation = Quaternion.Euler(90f, 0f, 0f); // lay the disc flat
+        }
+
+        /// <summary>
         /// A horizontal ring lying on the ground: particles start on the circle and travel
         /// straight outwards along it. This is the shape a blast front is drawn with.
         /// </summary>
@@ -149,12 +165,32 @@ namespace MissileDisaster.Game.Effects
             vel.y = new ParticleSystem.MinMaxCurve(metresPerSecond);
         }
 
-        /// <summary>Plays the system and has it clean itself up once the last particle has gone.</summary>
+        /// <summary>
+        /// A climb that changes over a particle's life, in m/s, for anything that has to rise and
+        /// then stop - a cloud cap carried up by its own column and left there, rather than one
+        /// that keeps going.
+        /// </summary>
+        public static void Rise(ParticleSystem ps, AnimationCurve metresPerSecond, float multiplier)
+        {
+            var vel = ps.velocityOverLifetime;
+            vel.enabled = true;
+            vel.space = ParticleSystemSimulationSpace.World;
+            vel.y = new ParticleSystem.MinMaxCurve(multiplier, metresPerSecond);
+        }
+
+        /// <summary>
+        /// Plays the system and has it clean itself up once the last particle has gone.
+        /// The lifetime is in simulation seconds and the particles advance at the simulation's
+        /// rate, so the whole effect pauses with the game and speeds up with it - see
+        /// SimulationTimed. Everything the mod spawns goes through here, which is what keeps
+        /// that from having to be remembered at each call site.
+        /// </summary>
         public static void PlayAndDestroy(GameObject go, float lifetimeSeconds)
         {
             var ps = go.GetComponent<ParticleSystem>();
             if (ps != null) ps.Play();
-            Object.Destroy(go, lifetimeSeconds);
+            var timed = go.AddComponent<SimulationTimed>();
+            timed.LifetimeSeconds = lifetimeSeconds;
         }
     }
 }

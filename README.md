@@ -36,12 +36,42 @@ radioactive fallout that you can clean up with a dedicated decontamination facil
     `3.0 km·10^(0.006941L⁴−0.06216L³+0.1526L²+0.1878L)`, `L = log₁₀(W/kt)`
     — at 150 kt that is a 3.6 km cap under a 13 km column, which happens to match the 3.7 km
     destruction radius within a few per cent
-  - Stem half the cap's width at 20 kt, a seventh of it in the megaton range
-  - Ground dust drawn up by the afterwinds. Only the *time* is compressed (~25×) — a real cloud
-    takes ten minutes to stabilise
+  - The mushroom is a **cloud of soft smoke puffs computed along the vortex-ring flow a real
+    one has** (`Core/CloudPuffs`): the cap's puffs circulate around a torus — up the inside,
+    out over the top, down the outside, in underneath, the roll that folds a real cap into
+    cauliflower — while the column's puffs climb a skirt‑waist‑throat profile from the ground
+    into the cap and recycle, an endless conveyor. Every puff is placed every frame
+    (`SetParticles`), so the crowd holds the mushroom silhouette while visibly boiling; the
+    boil slows once the cloud stands and all but freezes as it fades. The cap goes on
+    **spreading sideways for the whole shot** — the updraft is still feeding it — while the
+    column, stopped by the tropopause, does not follow it outwards. Puffs come in a wide
+    range of sizes weighted towards the small end — a few big lobes with many smaller ones
+    packed around them, the way a real cloud is built. Fire glows through the
+    folds for the first seconds; each strike boils its own way from its own seed. **Smoke also
+    rises off the burning city across the burn field** and is gently drawn in toward the central
+    updraft. The end is a **staggered dissolve** over 12–20 s — longer than the rise — with the
+    column shredding first, the cap loosening after it, and the fire smoke outlasting both
+  - An **airburst's cloud is white**, the way both 1945 photographs show; a groundburst's keeps
+    its dirt
+  - Ground dust drawn up by the afterwinds
+  - **The size never stops following the yield.** Nothing is hard‑clamped: every dimension is
+    exact up to the point the map can still carry it and then compressed smoothly towards a
+    ceiling it never reaches, so a B83, an Ivy Mike and a Tsar Bomba are three visibly different
+    clouds instead of the same picture
+  - **What is deliberately not to scale**: the cloud is drawn at 6% of its real size — one
+    number for width and height alike, so the drawn shape is the real shape — with two declared
+    departures from it: the cap alone is spread a further 1.3× sideways, and the drawn height is
+    bounded at 2 km (the airburst ceiling stays at 1 km; the two are decoupled). The fireball
+    comes down less far, so it is not lost under the cloud. Time is compressed hard: the cloud
+    forms in seconds and the whole 150 kt shot is about 24 s, because the playtest verdict on a
+    slower cloud was that it was a wait, not a spectacle. The knobs are named constants in
+    `Core/NuclearCloudDisplay`
 - **Shock wave** — a blast front races out across the ground following Sedov–Taylor
   (`r ∝ t^0.4`): it leaves at several times the speed of sound and visibly decelerates, reaching
-  the destruction radius at an average 540 m/s. Every warhead gets one
+  the destruction radius at an average 540 m/s. Every warhead gets one. Behind it rolls a
+  **concentric wall of dust** — a tsunami of earth the front tears off the ground, starting a
+  beat after the blast passes, piling up and climbing as it spreads, and outlasting the front
+  itself
 - **Distance‑based destruction** — total destruction near ground zero, falling off with distance
 - **Fire** for incendiary/thermobaric/nuclear warheads
   - White Phosphorus is a pure incendiary: no crater and almost no blast **at any charge** —
@@ -49,6 +79,10 @@ radioactive fallout that you can clean up with a dedicated decontamination facil
 - **Radioactive fallout** (nuclear ground burst) — persistent soil contamination, expires after 50 in‑game years
 - **Missile defense** — name‑detected interceptor buildings engage incoming missiles with realistic
   single‑shot kill probabilities (PAC‑3 / THAAD / Aegis) and a radar that boosts hit chance
+- **Runs on the game's clock** — every effect the mod draws advances on simulation time, not
+  the wall clock: pause the game and the cloud, the shock wave, the trails and the sounds all
+  freeze mid-flight; run at triple speed and they run at triple speed, the way the base game's
+  own effects do. Sounds are held silent rather than pitched up, which is also what vanilla does
 - **Explosions & sound** — the fireball is sized from the yield (a 100 kg charge and a 20 t one no
   longer look alike), nuclear mushroom cloud, launch/impact/intercept SFX with 3D falloff
 
@@ -88,10 +122,44 @@ reactor‑meltdown fallout. (Water treatment plants do **not** decontaminate in 
 ## Building from source
 
 - `build.ps1` builds the mod (MSBuild, .NET Framework 3.5 target for Unity 5.6) and deploys the
-  DLL plus `Models/` and `Sounds/` assets to the local Addons folder.
+  DLL plus `Models/` and `Sounds/` assets to the local Addons folder. It needs the game's managed
+  DLLs, so it only runs on a machine that owns Cities: Skylines.
 - Pure logic lives in `src/MissileDisaster/Core` (UnityEngine‑free) and is covered by xUnit tests
-  in `tests/` (`dotnet test`).
+  in `tests/` (`dotnet test`). No game install needed.
+- `tools/compile-check` type-checks the particle-effect code against stand-ins for the Unity
+  types, so a change to the effects can be caught without the game
+  (`dotnet build tools/compile-check/CompileCheck.csproj`). It is a syntax and shape check only —
+  a stub compiles whatever is written in it, so it cannot tell you a member exists in Unity 5.6.
+- `tools/effect-preview` renders the nuclear effect offline; see [docs/effects](docs/effects).
+
+## Handover
+
+[docs/HANDOVER.md](docs/HANDOVER.md) — the state of the nuclear-effect work: the tuning
+constants and what they currently produce, what is verified and what is not, and the open
+question of whether the DLL the game is running is the one that was built.
+
+## Checking which build is running
+
+**Options → Mods → Missile Disaster** has a *Build check* group at the top showing two lines:
+
+```
+150 kt draws: cloud top 781 m, cap 431 m wide, fireball 131 m across, rise 31.1 s, screen top 1000 m
+Loaded from: C:\Users\...\Addons\Mods\MissileDisaster
+```
+
+The numbers are computed by the code that is running, not written down, so they are a
+fingerprint of the build: a cloud top of about **781 m** is a current build, **13245 m** is the
+original one. The path is where the game actually loaded the DLL from, which settles the case
+where a Steam Workshop subscription is shadowing a local build.
+
+The same line goes to the game log at load and at each detonation. The log is written by Unity,
+not by the game's own folder, so it is one of:
+
+```
+%USERPROFILE%\AppData\LocalLow\Colossal Order\Cities_Skylines\Player.log
+<Steam>\steamapps\common\Cities_Skylines\Cities_Data\output_log.txt
+```
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE). All assets are original.

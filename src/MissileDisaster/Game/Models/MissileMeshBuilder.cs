@@ -37,6 +37,7 @@ namespace MissileDisaster.Game.Models
 
                 var builtMesh = new Mesh();
                 builtMesh.vertices = vertices;
+                ApplyAlignedAttributes(builtMesh, obj, vertexCount);
                 builtMesh.subMeshCount = obj.Submeshes.Count;
 
                 var mats = new Material[obj.Submeshes.Count];
@@ -49,7 +50,7 @@ namespace MissileDisaster.Game.Models
                     mats[s] = BuildMaterial(sub != null ? sub.Material : null, mtl, fallbackColor);
                 }
 
-                builtMesh.RecalculateNormals();
+                if (!obj.HasAlignedNormals) builtMesh.RecalculateNormals();
                 builtMesh.RecalculateBounds();
 
                 mesh = builtMesh;
@@ -111,6 +112,35 @@ namespace MissileDisaster.Game.Models
                 ModConfig.LogError("MissileMeshBuilder.TryBuildMergedMesh error: " + e);
                 mesh = null;
                 return false;
+            }
+        }
+
+        /// <summary>
+        /// Applies UVs and normals when the OBJ carried them index-aligned with the positions -
+        /// the convention a purpose-built exporter can emit, and the only texture path this
+        /// pipeline has. A Blender export without that alignment simply keeps the old behaviour:
+        /// no UVs, normals recalculated.
+        /// </summary>
+        private static void ApplyAlignedAttributes(Mesh mesh, ObjData obj, int vertexCount)
+        {
+            if (obj.HasAlignedUVs)
+            {
+                var uv = new Vector2[vertexCount];
+                for (int i = 0; i < vertexCount; i++)
+                {
+                    uv[i] = new Vector2(obj.UVs[i * 2], obj.UVs[i * 2 + 1]);
+                }
+                mesh.uv = uv;
+            }
+            if (obj.HasAlignedNormals)
+            {
+                var normals = new Vector3[vertexCount];
+                for (int i = 0; i < vertexCount; i++)
+                {
+                    normals[i] = new Vector3(
+                        obj.Normals[i * 3], obj.Normals[i * 3 + 1], obj.Normals[i * 3 + 2]);
+                }
+                mesh.normals = normals;
             }
         }
 

@@ -47,7 +47,7 @@ namespace MissileDisaster.Game.Effects
                 if (ps == null) continue;
                 ps.transform.SetParent(null, true); // detached, keeping its world position
                 ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
-                Object.Destroy(ps.gameObject, life + 0.1f);
+                ps.gameObject.AddComponent<SimulationTimed>().LifetimeSeconds = life + 0.1f;
             }
         }
 
@@ -87,6 +87,8 @@ namespace MissileDisaster.Game.Effects
             if (_fireMat != null) renderer.material = _fireMat;
             renderer.renderMode = ParticleSystemRenderMode.Billboard;
             ps.Play();
+            // Speed only, no lifetime: the trail lives as long as what it is attached to.
+            ps.gameObject.AddComponent<SimulationTimed>().LifetimeSeconds = 0f;
         }
 
         private static void CreateSmoke(GameObject parent)

@@ -72,6 +72,8 @@ namespace MissileDisaster.Game.Effects
             renderer.sortingFudge = 0f;
 
             ps.Play();
+            // Speed only, no lifetime: the trail lives as long as what it is attached to.
+            ps.gameObject.AddComponent<SimulationTimed>().LifetimeSeconds = 0f;
         }
 
         private static void CreateSmoke(GameObject missile)

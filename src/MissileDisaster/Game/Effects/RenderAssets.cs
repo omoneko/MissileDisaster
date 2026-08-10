@@ -32,6 +32,49 @@ namespace MissileDisaster.Game.Effects
             return null;
         }
 
+        /// <summary>
+        /// The first loaded shader whose name contains any of substrsLower and none of
+        /// excludeLower. The exclusions matter: a bare substring search for "alphablend" can
+        /// land on a loading-screen shader that ignores vertex colour and depth alike, which is
+        /// far worse than finding nothing.
+        /// The candidates are tried in order, so the most specific substring should come first.
+        /// </summary>
+        public static Shader FindLoadedContaining(string[] excludeLower, params string[] substrsLower)
+        {
+            try
+            {
+                Shader[] all = Resources.FindObjectsOfTypeAll<Shader>();
+                for (int j = 0; j < substrsLower.Length; j++)
+                {
+                    string want = substrsLower[j];
+                    if (string.IsNullOrEmpty(want)) continue;
+                    for (int i = 0; i < all.Length; i++)
+                    {
+                        if (all[i] == null || string.IsNullOrEmpty(all[i].name)) continue;
+                        string lower = all[i].name.ToLowerInvariant();
+                        if (!lower.Contains(want)) continue;
+                        if (Excluded(lower, excludeLower)) continue;
+                        return all[i];
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                ModConfig.LogError("RenderAssets.FindLoadedContaining error: " + e);
+            }
+            return null;
+        }
+
+        private static bool Excluded(string lower, string[] excludeLower)
+        {
+            if (excludeLower == null) return false;
+            for (int k = 0; k < excludeLower.Length; k++)
+            {
+                if (!string.IsNullOrEmpty(excludeLower[k]) && lower.Contains(excludeLower[k])) return true;
+            }
+            return false;
+        }
+
         /// <summary>The first loaded shader whose name contains any of substrsLower, which are lowercase.</summary>
         public static Shader FindLoadedContaining(params string[] substrsLower)
         {

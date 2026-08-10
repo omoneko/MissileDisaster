@@ -69,7 +69,8 @@ namespace MissileDisaster.Game.Effects
             renderer.renderMode = ParticleSystemRenderMode.Billboard;
 
             ps.Play();
-            UnityEngine.Object.Destroy(go, lifetime + 0.5f);
+            // On the game's clock, like every other effect the mod spawns.
+            go.AddComponent<SimulationTimed>().LifetimeSeconds = lifetime + 0.5f;
         }
 
     }

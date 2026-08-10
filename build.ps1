@@ -16,7 +16,7 @@ $modelsSrc = "src\MissileDisaster\Models"
 if (Test-Path $modelsSrc) {
     $modelsDst = Join-Path $modDir "Models"
     New-Item -ItemType Directory -Force -Path $modelsDst | Out-Null
-    Copy-Item (Join-Path $modelsSrc "*") $modelsDst -Include *.obj, *.mtl -Force
+    Copy-Item (Join-Path $modelsSrc "*") $modelsDst -Include *.obj, *.mtl, *.png -Force
     Write-Host "Deployed models: $modelsDst"
 }
 

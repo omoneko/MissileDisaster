@@ -26,7 +26,12 @@ namespace MissileDisaster.Core
         // which is a frame or two. This floor is a playability concession, not physics, and it is
         // the only place the model departs from the figures.
         public const float MinimumSeconds = 0.9f;
-        public const float MaximumSeconds = 14f;
+        // The other end is a soft ceiling rather than a clamp: every strategic yield shared the
+        // old 14 s, so a 50 Mt front - which really takes about 48 s to cross its 26 km - was
+        // drawn crossing the ground three times faster than a 1 Mt one instead of taking longer
+        // over it. Past the knee the duration keeps growing towards the ceiling.
+        public const float MaximumSeconds = 14f;   // the knee: exact below this
+        public const float CeilingSeconds = 26f;   // the front never lasts longer than this
 
         // The front is not tracked all the way in to t=0, where the Sedov speed goes to infinity.
         public const float MinFraction = 0.02f;
@@ -36,8 +41,7 @@ namespace MissileDisaster.Core
         {
             if (radius <= 0f) return 0f;
             float t = radius / AverageFrontSpeed;
-            if (t < MinimumSeconds) return MinimumSeconds;
-            return t > MaximumSeconds ? MaximumSeconds : t;
+            return EffectCeiling.Soft(t, MinimumSeconds, MaximumSeconds, CeilingSeconds);
         }
 
         /// <summary>

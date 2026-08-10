@@ -47,12 +47,13 @@ namespace MissileDisaster.Game
             // move earth at all - an incendiary such as white phosphorus does not.
             bool craters = !spec.Airburst && spec.CraterRadius > 0f;
 
-            // The crater is dug with the game's own MakeCrater, capped so that even a strategic
-            // warhead does not wreck the terrain.
-            float cRadius = spec.CraterRadius > ModConfig.CraterRadiusMax ? ModConfig.CraterRadiusMax : spec.CraterRadius;
+            // The crater is dug with the game's own MakeCrater, held under a soft ceiling so that
+            // even a strategic warhead does not wreck the terrain - while a bigger one still
+            // leaves a bigger hole than a smaller one, which a hard cap did not.
+            float cRadius = EffectCeiling.Soft(spec.CraterRadius, ModConfig.CraterRadiusKnee, ModConfig.CraterRadiusMax);
             if (craters)
             {
-                float cDepth = spec.CraterDepth > ModConfig.CraterDepthMax ? ModConfig.CraterDepthMax : spec.CraterDepth;
+                float cDepth = EffectCeiling.Soft(spec.CraterDepth, ModConfig.CraterDepthKnee, ModConfig.CraterDepthMax);
                 DisasterHelpers.MakeCrater(new Vector2(pos.x, pos.z), cRadius, cDepth, spec.RaiseCraterEdges);
             }
 
@@ -62,8 +63,9 @@ namespace MissileDisaster.Game
             // the larger of destMax and burnMax - passing anything smaller is the known trap
             // where the outer area is never scanned.
             int seed = (int)SimulationManager.instance.m_randomizer.Int32(1000000u);
-            // A high-yield warhead's real radii exceed the map, so they are capped to keep
-            // DestroyStuff from an extreme scan.
+            // A high-yield warhead's real radii exceed the map, so they are held under a ceiling
+            // to keep DestroyStuff from an extreme scan. It is the map's diagonal, so a warhead
+            // that really does reach across the whole map is allowed to.
             float destMax = spec.DestructionRadius > ModConfig.MaxEffectRadius ? ModConfig.MaxEffectRadius : spec.DestructionRadius;
             float burnMax = spec.BurnRadius > ModConfig.MaxEffectRadius ? ModConfig.MaxEffectRadius : spec.BurnRadius;
             float outer = destMax > burnMax ? destMax : burnMax;
