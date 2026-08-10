@@ -25,3 +25,6 @@ __pycache__/
 
 # Claude Code / superpowers workflow artifacts - not part of the published mod
 .superpowers/
+
+# Scratch renders from the effect preview - the kept ones live in docs/effects
+tools/effect-preview/out/
