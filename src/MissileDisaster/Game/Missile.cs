@@ -140,7 +140,10 @@ namespace MissileDisaster.Game
                 if (ps == null) continue;
                 ps.transform.SetParent(null, true); // detach it so destroying the parent cannot take it too, keeping its world position
                 ps.Stop(true, ParticleSystemStopBehavior.StopEmitting); // stop emitting, but keep simulating the particles already out
-                Object.Destroy(ps.gameObject, life + 0.1f);
+                // The detached wake keeps burning out on the game's clock, not the wall clock -
+                // it was attached to a missile that is itself flown on simulation time.
+                ps.gameObject.AddComponent<MissileDisaster.Game.Effects.SimulationTimed>()
+                    .LifetimeSeconds = life + 0.1f;
             }
         }
     }

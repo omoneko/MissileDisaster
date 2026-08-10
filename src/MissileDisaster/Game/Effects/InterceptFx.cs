@@ -67,7 +67,7 @@ namespace MissileDisaster.Game.Effects
                 renderer.renderMode = ParticleSystemRenderMode.Billboard;
 
                 ps.Play();
-                UnityEngine.Object.Destroy(go, ModConfig.InterceptFlashLifetime + 0.3f);
+                go.AddComponent<SimulationTimed>().LifetimeSeconds = ModConfig.InterceptFlashLifetime + 0.3f;
             }
             catch (Exception e)
             {

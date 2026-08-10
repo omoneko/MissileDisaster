@@ -46,6 +46,26 @@ path line settles the case where a Workshop subscription shadows a local build.
 
 Rebuild with Cities: Skylines fully closed — the DLL is locked while it runs.
 
+### The game clock
+
+Every effect runs on simulation time, via `Game/Effects/EffectClock`:
+
+- `EffectClock.Delta` — simulation seconds this frame, 0 while paused. Anything the mod
+  animates itself asks for this instead of `Time.deltaTime`.
+- `EffectClock.Scale` — sim/wall ratio, fed to `ParticleSystem.main.simulationSpeed`, because
+  Unity integrates particles on the wall clock. 0 freezes them mid-flight.
+
+`ParticleBuilder.PlayAndDestroy` attaches `SimulationTimed` to everything the mod spawns, which
+sets that speed and counts the lifetime in simulation seconds — `Object.Destroy(go, seconds)`
+counts wall seconds, so a paused cloud would otherwise be deleted while frozen and be gone on
+unpause. Trails and detached wakes carry it too.
+
+Sound is separate: the game mutes its own audio on pause by passing volume 0 to
+`AudioGroup.UpdatePlayers`, but that only reaches players registered with its `AudioGroup` — a
+plain Unity `AudioSource`, which is what this mod spawns, plays straight over a paused city.
+`Audio/SimulationPausedSound` pauses the source instead. It does **not** pitch up on
+fast-forward; neither does vanilla.
+
 ### The shader trap
 
 Enumerating every `Shader` in the game's assets (UnityPy over `resources.assets` etc.) shows

@@ -178,12 +178,19 @@ namespace MissileDisaster.Game.Effects
             vel.y = new ParticleSystem.MinMaxCurve(multiplier, metresPerSecond);
         }
 
-        /// <summary>Plays the system and has it clean itself up once the last particle has gone.</summary>
+        /// <summary>
+        /// Plays the system and has it clean itself up once the last particle has gone.
+        /// The lifetime is in simulation seconds and the particles advance at the simulation's
+        /// rate, so the whole effect pauses with the game and speeds up with it - see
+        /// SimulationTimed. Everything the mod spawns goes through here, which is what keeps
+        /// that from having to be remembered at each call site.
+        /// </summary>
         public static void PlayAndDestroy(GameObject go, float lifetimeSeconds)
         {
             var ps = go.GetComponent<ParticleSystem>();
             if (ps != null) ps.Play();
-            Object.Destroy(go, lifetimeSeconds);
+            var timed = go.AddComponent<SimulationTimed>();
+            timed.LifetimeSeconds = lifetimeSeconds;
         }
     }
 }

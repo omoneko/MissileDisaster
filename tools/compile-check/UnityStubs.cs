@@ -98,7 +98,11 @@ namespace UnityEngine
         public T GetComponent<T>() where T : Component { return null; }
     }
 
-    public class MonoBehaviour : Component { }
+    public class MonoBehaviour : Component
+    {
+        public T AddComponent<T>() where T : Component { return null; }
+        public T[] GetComponentsInChildren<T>() where T : Component { return null; }
+    }
 
     public static class Time
     {
@@ -210,6 +214,7 @@ namespace UnityEngine
 
         public struct MainModule
         {
+            public float simulationSpeed { get; set; }
             public float duration { get; set; }
             public bool loop { get; set; }
             public bool playOnAwake { get; set; }
@@ -306,6 +311,15 @@ namespace MissileDisaster.Game.Effects
     public static class ExplosionFallback
     {
         public static void Play(UnityEngine.Vector3 center, float radius) { }
+    }
+
+    // EffectClock itself is not in the compile list: it reaches into ColossalFramework's
+    // SimulationManager, which these stubs deliberately do not model. Its shape is what the
+    // effect code depends on, and that is what is stood in for here.
+    public static class EffectClock
+    {
+        public static float Delta { get { return 0f; } }
+        public static float Scale { get { return 1f; } }
     }
 }
 

@@ -31,7 +31,9 @@ namespace MissileDisaster.Game.Audio
                 src.playOnAwake = false;
                 src.Play();
 
-                UnityEngine.Object.Destroy(go, clip.length + 0.5f);
+                // Silent while the game is paused, and only taken down once it has really
+                // finished playing - see SimulationPausedSound.
+                go.AddComponent<SimulationPausedSound>().LifetimeSeconds = clip.length + 0.5f;
             }
             catch (Exception e)
             {

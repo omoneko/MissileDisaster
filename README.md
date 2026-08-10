@@ -79,6 +79,10 @@ radioactive fallout that you can clean up with a dedicated decontamination facil
 - **Radioactive fallout** (nuclear ground burst) — persistent soil contamination, expires after 50 in‑game years
 - **Missile defense** — name‑detected interceptor buildings engage incoming missiles with realistic
   single‑shot kill probabilities (PAC‑3 / THAAD / Aegis) and a radar that boosts hit chance
+- **Runs on the game's clock** — every effect the mod draws advances on simulation time, not
+  the wall clock: pause the game and the cloud, the shock wave, the trails and the sounds all
+  freeze mid-flight; run at triple speed and they run at triple speed, the way the base game's
+  own effects do. Sounds are held silent rather than pitched up, which is also what vanilla does
 - **Explosions & sound** — the fireball is sized from the yield (a 100 kg charge and a 20 t one no
   longer look alike), nuclear mushroom cloud, launch/impact/intercept SFX with 3D falloff
 

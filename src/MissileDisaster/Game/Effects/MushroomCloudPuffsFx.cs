@@ -56,7 +56,9 @@ namespace MissileDisaster.Game.Effects
 
         private void Update()
         {
-            _t += Time.deltaTime;
+            // The game's clock, not the wall clock: the cloud freezes when the game is paused
+            // and boils faster when it is sped up, the way vanilla effects do.
+            _t += EffectClock.Delta;
             if (_ps == null || _specs == null) return;
             Apply();
         }
