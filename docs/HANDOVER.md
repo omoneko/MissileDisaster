@@ -46,6 +46,19 @@ path line settles the case where a Workshop subscription shadows a local build.
 
 Rebuild with Cities: Skylines fully closed — the DLL is locked while it runs.
 
+### The shader trap
+
+Enumerating every `Shader` in the game's assets (UnityPy over `resources.assets` etc.) shows
+**Unity's built-in particle shaders are stripped**: there is no `Particles/Alpha Blended`, no
+`Legacy Shaders/...`. What CS ships is `Custom/Particles/Alpha Blended` (`_TintColor`, ZTest
+LEqual) and `Custom/Particles/Additive (Soft)`.
+
+A substring fallback for "alphablend" can land on **`Custom/Loading/AlphaBlend`** instead — no
+`_TintColor`, so every particle draws **white** whatever colour it was given, and **ZTest
+Always**, so it draws over everything and effects behind it appear through it. Both playtest
+symptoms, one cause. `ParticleAssets` now names the Custom shaders first and excludes "loading"
+from every fallback.
+
 ### One more thing to rule out
 
 The log also shows `[CSWarfront] DisasterImpactBridge: detected MissileDisaster impact beacon.`
@@ -70,17 +83,21 @@ that are taste rather than physics, and they are where to go for "bigger", "smal
 | `Dissolve*` in `Core/CloudPuffs` | lags 0.05/0.10/0.35, window 0.55 | the shredding order: column first, cap next, fire smoke last |
 | `DissolveTransparency` | 0.85 | how far the whole cloud goes see-through across the fade, on top of each puff's own dissolve |
 | `SizeBias` in `Core/CloudPuffs` | 2.2 | how strongly puff sizes skew small; 1 makes them uniform |
-| `FireballScale` | 0.26 | the fireball, which comes down less far than the cloud so it is not lost under it; raised from 0.16 on playtest |
+| `FireballScale` | 0.38 | the fireball, which comes down less far than the cloud so it is not lost under it; raised twice on playtest (0.16 → 0.26 → 0.38) |
+| `CapSpreadAfterRise` in `Core/CloudAnimation` | 0.45 | how much wider the cap goes over the stand and the fade — the updraft keeps feeding it |
 | `Surge*` in `Game/Effects/ShockWaveFx` | 360 clods, 1.35x the front's life | the rolling dust wall behind the shock front |
 
 What these currently produce:
 
 | | cloud top | cap width | fireball | whole shot |
 |---|---|---|---|---|
-| Little Boy 15 kt | 398 m | 240 m | 52 m | 19 s |
-| 150 kt baseline | 795 m | 559 m | 131 m | 24 s |
-| B83 1.2 Mt | 1124 m | 1473 m | 300 m | 33 s |
-| Tsar Bomba 50 Mt | 1599 m | 4054 m | 1284 m | 38 s |
+| Little Boy 15 kt | 398 m | 240 m → 348 m | 123 m | 27 s |
+| 150 kt baseline | 795 m | 559 m → 811 m | 310 m | 32 s |
+| B83 1.2 Mt | 1124 m | 1473 m → 2136 m | 713 m | 41 s |
+| Tsar Bomba 50 Mt | 1599 m | 4054 m → 5878 m | 3050 m | 46 s |
+
+Cap width is given as "at the end of the rise → at the end of the shot": it keeps spreading for
+the whole stand and fade (`CapSpreadAfterRise`).
 
 If the size is still wrong, **`CloudScale` is the lever** — it moves width and height together and
 so cannot break the silhouette. `ScreenTopAltitude` is a guarantee, not a shaping tool, and it is

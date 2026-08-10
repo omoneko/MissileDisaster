@@ -72,6 +72,10 @@ def animation_at(t, rise, hold, fade):
     birth = 0.12
     h = birth + (1.0 - birth) * ease
     w = birth + (1.0 - birth) * ease ** 1.6
+    if t > rise:
+        rest = hold + fade
+        after = min((t - rise) / rest, 1.0) if rest > 0 else 1.0
+        w *= 1.0 + 0.45 * after          # CapSpreadAfterRise
     fade_start = rise + hold
     fade_in = rise * 0.15
     if t < fade_in and fade_in > 0:
@@ -82,7 +86,6 @@ def animation_at(t, rise, hold, fade):
         f = min((t - fade_start) / fade, 1.0)
         alpha = 1.0  # the thinning is per puff now - see dissolve in Puffs.at
         h *= 1.0 + 0.06 * f
-        w *= 1.0 + 0.06 * f
     return h, w, alpha
 
 
@@ -211,7 +214,7 @@ SHOCK_SPEED = 540.0
 SHOCK_MIN_FRACTION = 0.02
 SURGE = dict(count=360, start_delay=0.06, dur_factor=1.35, size=0.105,
              size_bias=2.2, growth=3.4, lift=0.02)
-SURGE_LIT = np.array([0.62, 0.55, 0.45]); SURGE_SHADE = np.array([0.42, 0.36, 0.30])
+SURGE_LIT = np.array([0.60, 0.50, 0.38]); SURGE_SHADE = np.array([0.36, 0.29, 0.22])
 
 
 def shock_duration(radius):

@@ -53,14 +53,31 @@ namespace MissileDisaster.Game.Effects
 
         private static Material BuildMaterial(bool additive, Texture2D texture)
         {
+            // The game's OWN particle shaders come first, and they are what actually exist:
+            // enumerating every Shader in the game's assets shows no "Particles/Alpha Blended"
+            // and no "Legacy Shaders/..." at all - Unity's built-ins are stripped. What CS ships
+            // is Custom/Particles/*, and those are the ones that behave like particle shaders:
+            // _TintColor declared, so the per-particle colour is multiplied in, and ZTest LEqual,
+            // so geometry in front occludes them.
+            //
+            // Getting this wrong is not subtle. The old list fell through to a substring search
+            // for "alphablend", which can match Custom/Loading/AlphaBlend - a loading-screen
+            // shader with no _TintColor (every particle draws white, whatever colour it was
+            // given) and ZTest Always (it draws over everything, so effects behind the cloud
+            // appear through it). That is exactly the "no colour, and the background shows
+            // through" the playtest reported.
             Shader shader = additive
-                ? RenderAssets.FindFirst("Particles/Additive", "Legacy Shaders/Particles/Additive", "Mobile/Particles/Additive")
-                : RenderAssets.FindFirst("Particles/Alpha Blended", "Legacy Shaders/Particles/Alpha Blended");
+                ? RenderAssets.FindFirst("Custom/Particles/Additive (Soft)", "Particles/Additive",
+                    "Legacy Shaders/Particles/Additive", "Mobile/Particles/Additive")
+                : RenderAssets.FindFirst("Custom/Particles/Alpha Blended", "Particles/Alpha Blended",
+                    "Legacy Shaders/Particles/Alpha Blended");
+            // Substring fallbacks, with the loading-screen shaders excluded by name for the
+            // reason above.
             if (shader == null) shader = additive
-                ? RenderAssets.FindLoadedContaining("additive")
-                : RenderAssets.FindLoadedContaining("alpha blend", "alphablend");
-            if (shader == null) shader = RenderAssets.FindFirst("Sprites/Default", "Unlit/Transparent");
-            if (shader == null) shader = RenderAssets.FindLoadedContaining("particle", "sprite", "unlit");
+                ? RenderAssets.FindLoadedContaining(new[] { "loading" }, "particles/additive", "additive")
+                : RenderAssets.FindLoadedContaining(new[] { "loading" }, "particles/alpha blended", "alpha blend", "alphablend");
+            if (shader == null) shader = RenderAssets.FindFirst("Unlit/Transparent", "Sprites/Default");
+            if (shader == null) shader = RenderAssets.FindLoadedContaining(new[] { "loading" }, "particle", "sprite", "unlit");
             if (shader == null) shader = Shader.Find("Standard");
             if (shader == null) return null;
 
@@ -70,6 +87,9 @@ namespace MissileDisaster.Game.Effects
                 mat.mainTexture = texture;
                 if (mat.HasProperty("_MainTex")) mat.SetTexture("_MainTex", texture);
             }
+            // Custom/Particles/Alpha Blended multiplies by _TintColor. Unity's own particle
+            // shaders take it at half grey (the classic 0.5 convention); CS's takes it straight,
+            // so white here means "show the particle's own colour unchanged".
             if (mat.HasProperty("_TintColor")) mat.SetColor("_TintColor", Color.white);
             if (mat.HasProperty("_Color")) mat.SetColor("_Color", Color.white);
             mat.color = Color.white;

@@ -47,8 +47,10 @@ namespace MissileDisaster.Game.Effects
         private static readonly Color AirFront = new Color(0.92f, 0.93f, 0.95f, 0.30f); // pale compressed air
         // The surge is the same earth as the rings but drawn nearly opaque - it is a wall, not
         // a haze - and lit unevenly, the near face brighter than the shaded folds behind it.
-        private static readonly Color SurgeLit = new Color(0.62f, 0.55f, 0.45f, 0.92f);
-        private static readonly Color SurgeShade = new Color(0.42f, 0.36f, 0.30f, 0.92f);
+        // These only reach the screen through the shader's _TintColor path - see ParticleAssets,
+        // where picking a shader without it drew every one of these white.
+        private static readonly Color SurgeLit = new Color(0.60f, 0.50f, 0.38f, 0.92f);
+        private static readonly Color SurgeShade = new Color(0.36f, 0.29f, 0.22f, 0.92f);
 
         /// <summary>Sends the front out from groundZero to radius. A radius of zero or less does nothing.</summary>
         public static void Play(Vector3 groundZero, float radius)

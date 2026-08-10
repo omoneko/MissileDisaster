@@ -35,6 +35,18 @@ namespace MissileDisaster.Core
         /// <summary>How much the cloud keeps swelling through the fade, reading as dispersal rather than deletion.</summary>
         public const float FadeDrift = 0.06f;
 
+        /// <summary>
+        /// How much wider the cap goes over the whole of the stand and the fade, on top of the
+        /// width it reached at the end of the rise.
+        ///
+        /// A cap that stops growing the moment the column tops out is the thing the playtest
+        /// caught: the updraft is still feeding it, so it cannot be finished. A real cap spreads
+        /// along the tropopause for as long as it has anything left to spread - Castle Bravo's
+        /// doubled in the ten minutes after it stabilised. The height does not follow, because
+        /// the lid is what stopped it climbing in the first place.
+        /// </summary>
+        public const float CapSpreadAfterRise = 0.45f;
+
         /// <summary>Where the animation is at t seconds into a cloud with the given phase lengths.</summary>
         public static CloudAnimationState At(float t, float riseSeconds, float holdSeconds, float fadeSeconds)
         {
@@ -49,6 +61,15 @@ namespace MissileDisaster.Core
             float ease = EaseOutCubic(u);
             s.HeightFraction = BirthFraction + (1f - BirthFraction) * ease;
             s.WidthFraction = BirthFraction + (1f - BirthFraction) * (float)Math.Pow(ease, WidthLagPower);
+
+            // Once it has risen, the cap goes on spreading sideways for the rest of the shot.
+            if (t > riseSeconds)
+            {
+                float rest = holdSeconds + fadeSeconds;
+                float after = rest > 0f ? (t - riseSeconds) / rest : 1f;
+                if (after > 1f) after = 1f;
+                s.WidthFraction *= 1f + CapSpreadAfterRise * after;
+            }
 
             // Visibility: quickly in at birth, out over the fade.
             float fadeInSeconds = riseSeconds * FadeInFraction;
@@ -67,9 +88,10 @@ namespace MissileDisaster.Core
                 // The thinning itself is per puff and staggered - see CloudPuffs - so the cloud
                 // breaks up raggedly over many seconds instead of evaporating in one piece.
                 s.Alpha = 1f;
-                // Dispersal: the cloud loosens and spreads a little as it thins away.
+                // Dispersal: the cloud loosens as it thins away. Height only - the width is
+                // already spreading under CapSpreadAfterRise, and doubling it up would run the
+                // cap past the envelope its puffs are placed inside.
                 s.HeightFraction *= 1f + FadeDrift * f;
-                s.WidthFraction *= 1f + FadeDrift * f;
             }
 
             s.Finished = t >= end;

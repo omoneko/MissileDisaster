@@ -42,7 +42,9 @@ radioactive fallout that you can clean up with a dedicated decontamination facil
     cauliflower — while the column's puffs climb a skirt‑waist‑throat profile from the ground
     into the cap and recycle, an endless conveyor. Every puff is placed every frame
     (`SetParticles`), so the crowd holds the mushroom silhouette while visibly boiling; the
-    boil slows once the cloud stands and all but freezes as it fades. Puffs come in a wide
+    boil slows once the cloud stands and all but freezes as it fades. The cap goes on
+    **spreading sideways for the whole shot** — the updraft is still feeding it — while the
+    column, stopped by the tropopause, does not follow it outwards. Puffs come in a wide
     range of sizes weighted towards the small end — a few big lobes with many smaller ones
     packed around them, the way a real cloud is built. Fire glows through the
     folds for the first seconds; each strike boils its own way from its own seed. **Smoke also

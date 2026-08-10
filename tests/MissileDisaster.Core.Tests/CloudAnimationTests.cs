@@ -85,4 +85,32 @@ public class CloudAnimationTests
         Assert.Equal(CloudAnimation.BirthFraction, s.HeightFraction, 3);
         Assert.False(s.Finished);
     }
+
+    [Fact]
+    public void The_cap_keeps_spreading_after_the_column_has_topped_out()
+    {
+        // The updraft does not stop when the cloud stops climbing, so a cap that freezes at the
+        // end of the rise reads as switched off. It goes on spreading for the rest of the shot.
+        var atRise = CloudAnimation.At(Rise, Rise, Hold, Fade);
+        var midHold = CloudAnimation.At(Rise + Hold * 0.5f, Rise, Hold, Fade);
+        var atEnd = CloudAnimation.At(Rise + Hold + Fade * 0.99f, Rise, Hold, Fade);
+        Assert.True(midHold.WidthFraction > atRise.WidthFraction * 1.02f, "still widening while it stands");
+        Assert.True(atEnd.WidthFraction > midHold.WidthFraction, "and still widening as it disperses");
+        Assert.InRange(atEnd.WidthFraction / atRise.WidthFraction,
+            1f + CloudAnimation.CapSpreadAfterRise * 0.9f, 1f + CloudAnimation.CapSpreadAfterRise * 1.1f);
+    }
+
+    [Fact]
+    public void The_height_does_not_follow_the_cap_outwards()
+    {
+        // The tropopause is what stopped the climb; the cap spreads under it rather than
+        // pushing through it. Height may drift slightly as it disperses, but nothing like the
+        // width's spread, or the mushroom turns back into a ball.
+        var atRise = CloudAnimation.At(Rise, Rise, Hold, Fade);
+        var atEnd = CloudAnimation.At(Rise + Hold + Fade * 0.99f, Rise, Hold, Fade);
+        float widthGrowth = atEnd.WidthFraction / atRise.WidthFraction;
+        float heightGrowth = atEnd.HeightFraction / atRise.HeightFraction;
+        Assert.True(heightGrowth < 1.1f, $"the column stays put (x{heightGrowth:F2})");
+        Assert.True(widthGrowth > heightGrowth * 1.25f, "and the cap outgrows it sideways");
+    }
 }

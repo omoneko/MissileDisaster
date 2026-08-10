@@ -91,10 +91,19 @@ public class NuclearCloudDisplayTests
     public void The_fireball_reads_against_the_canopy_at_every_yield()
     {
         // Not so small that it is lost under the cloud, and not so large that it swallows it.
+        // The band's top was 0.55 until the playtest asked twice for a bigger fireball; across
+        // the yields anyone actually launches - 15 kt to 1.2 Mt - it now sits at 0.48-0.55.
+        // Only the extreme end reaches 0.75, and that is the cap's ceiling compressing while
+        // the fireball's does not, which is the documented price of the height guarantee.
         foreach (float kt in new[] { 15f, 150f, 1200f, 10400f, 50000f })
         {
             NuclearCloudDimensions d = NuclearCloudDisplay.For(kt);
-            Assert.InRange(d.FireballRadius / d.CapRadius, 0.15f, 0.55f);
+            Assert.InRange(d.FireballRadius / d.CapRadius, 0.15f, 0.80f);
+        }
+        foreach (float kt in new[] { 15f, 150f, 1200f })
+        {
+            NuclearCloudDimensions d = NuclearCloudDisplay.For(kt);
+            Assert.InRange(d.FireballRadius / d.CapRadius, 0.40f, 0.60f);
         }
     }
 
