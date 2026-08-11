@@ -24,11 +24,11 @@ namespace MissileDisaster.Game.UI
             WarheadType.Conventional, WarheadType.Cluster, WarheadType.WhitePhosphorus,
             WarheadType.Thermobaric, WarheadType.Nuclear,
         };
-        private static readonly string[] WarheadLabels =
-            { "Conventional", "Cluster", "White Phosphorus", "Thermobaric", "Nuclear" };
+        // The labels are fetched through MissileStrings rather than held in a static array: a
+        // static array is built once at class load and would keep whatever language the game
+        // happened to be in at that moment, even after the panel is rebuilt.
 
         private static readonly BurstType[] Bursts = { BurstType.Airburst, BurstType.Groundburst };
-        private static readonly string[] BurstLabels = { "Air Burst", "Ground Burst" };
 
         private static UIPanel _panel;
         private static UIButton[] _warheadButtons;
@@ -142,7 +142,7 @@ namespace MissileDisaster.Game.UI
 
             // The title, which doubles as the drag handle
             UILabel title = _panel.AddUIComponent<UILabel>();
-            title.text = "Missile Launch Control";
+            title.text = MissileStrings.Panel_Title;
             title.textScale = 0.9f;
             title.relativePosition = new Vector3(pad, y);
             var drag = _panel.AddUIComponent<UIDragHandle>();
@@ -156,17 +156,18 @@ namespace MissileDisaster.Game.UI
             // tab opens the panel again.
             UIButton closeBtn = MakeButton("✕", ModConfig.PanelWidth - 26f, 3f, 22f);
             closeBtn.textScale = 0.9f;
-            closeBtn.tooltip = "Close (reopen from the Missile button in the Disasters panel)";
+            closeBtn.tooltip = MissileStrings.Panel_Close;
             closeBtn.eventClick += (c, p) => Hide();
             y += 26f;
 
             // Warhead selection
-            y = AddSectionLabel("Warhead", pad, y);
+            y = AddSectionLabel(MissileStrings.Panel_Warhead, pad, y);
+            string[] warheadLabels = MissileStrings.WarheadLabels();
             _warheadButtons = new UIButton[Warheads.Length];
             for (int i = 0; i < Warheads.Length; i++)
             {
                 WarheadType type = Warheads[i]; // bound to a local for the closure
-                UIButton b = MakeButton(WarheadLabels[i], pad, y, w);
+                UIButton b = MakeButton(warheadLabels[i], pad, y, w);
                 b.eventClick += (c, p) => { MissileTool.CurrentWarhead = type; RefreshHighlight(); };
                 _warheadButtons[i] = b;
                 y += ModConfig.PanelButtonHeight + ModConfig.PanelButtonGap;
@@ -174,7 +175,7 @@ namespace MissileDisaster.Game.UI
 
             // Nuclear yield: pick from the catalogue or type the kilotons in
             y += 4f;
-            y = AddSectionLabel("Nuclear Yield (nuclear only, kt)", pad, y);
+            y = AddSectionLabel(MissileStrings.Panel_NuclearYield, pad, y);
 
             UIDropDown dd = MakeWeaponDropdown(pad, y, w);
             y += ModConfig.PanelButtonHeight + ModConfig.PanelButtonGap;
@@ -184,20 +185,21 @@ namespace MissileDisaster.Game.UI
 
             // Conventional yield, typed in as kilograms of TNT and applied to non-nuclear warheads
             y += 4f;
-            y = AddSectionLabel("Conventional Yield (non-nuclear, kg TNT)", pad, y);
+            y = AddSectionLabel(MissileStrings.Panel_ConventionalYield, pad, y);
             _kgField = MakeKgField(pad, y, w);
             y += 26f + ModConfig.PanelButtonGap;
 
             // Burst height: air or ground
             y += 4f;
-            y = AddSectionLabel("Burst Height", pad, y);
+            y = AddSectionLabel(MissileStrings.Panel_BurstHeight, pad, y);
             _burstButtons = new UIButton[Bursts.Length];
             float halfW = (w - ModConfig.PanelButtonGap) * 0.5f;
+            string[] burstLabels = MissileStrings.BurstLabels();
             for (int i = 0; i < Bursts.Length; i++)
             {
                 BurstType bt = Bursts[i];
                 float bx = pad + i * (halfW + ModConfig.PanelButtonGap);
-                UIButton b = MakeButton(BurstLabels[i], bx, y, halfW);
+                UIButton b = MakeButton(burstLabels[i], bx, y, halfW);
                 b.eventClick += (c, p) => { MissileTool.CurrentBurst = bt; RefreshHighlight(); };
                 _burstButtons[i] = b;
             }
@@ -205,7 +207,7 @@ namespace MissileDisaster.Game.UI
 
             // Start aiming, which opens the tool
             y += 6f;
-            UIButton launch = MakeButton("Start Targeting (click to launch)", pad, y, w);
+            UIButton launch = MakeButton(MissileStrings.Panel_StartTargeting, pad, y, w);
             launch.color = new Color32(255, 190, 120, 255);
             launch.eventClick += (c, p) => StartAiming();
             y += ModConfig.PanelButtonHeight + ModConfig.PanelButtonGap;
@@ -292,7 +294,7 @@ namespace MissileDisaster.Game.UI
 
         private static UITextField MakeKtField(float x, float y, float width)
         {
-            UITextField tf = MakeNumericField(x, y, width, MissileTool.CurrentYieldKilotons, "Enter yield in kt (press Enter)");
+            UITextField tf = MakeNumericField(x, y, width, MissileTool.CurrentYieldKilotons, MissileStrings.Panel_YieldHint);
             tf.eventTextSubmitted += (c, s) => ApplyKtText(s);
             tf.eventLostFocus += (c, p) => { if (_ktField != null) ApplyKtText(_ktField.text); };
             return tf;
@@ -300,7 +302,7 @@ namespace MissileDisaster.Game.UI
 
         private static UITextField MakeKgField(float x, float y, float width)
         {
-            UITextField tf = MakeNumericField(x, y, width, MissileTool.CurrentConventionalKilograms, "Enter charge in kg TNT (press Enter)");
+            UITextField tf = MakeNumericField(x, y, width, MissileTool.CurrentConventionalKilograms, MissileStrings.Panel_ChargeHint);
             tf.eventTextSubmitted += (c, s) => ApplyKgText(s);
             tf.eventLostFocus += (c, p) => { if (_kgField != null) ApplyKgText(_kgField.text); };
             return tf;

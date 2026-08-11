@@ -114,7 +114,8 @@ namespace MissileDisaster.Game.UI
                 button.hoveredBgSprite = "ButtonMenuHovered";
                 button.pressedBgSprite = "ButtonMenuPressed";
             }
-            button.tooltip = "Missile Disaster — open the launch panel";
+            LocaleLoader.EnsureLoaded();
+            button.tooltip = MissileStrings.Button_Tooltip;
             button.eventClick += OnButtonClick;
 
             if (_iconTex == null) _iconTex = MissileIcon.Build(64);
@@ -178,7 +179,8 @@ namespace MissileDisaster.Game.UI
             button.normalBgSprite = "ButtonMenu";
             button.hoveredBgSprite = "ButtonMenuHovered";
             button.pressedBgSprite = "ButtonMenuPressed";
-            button.tooltip = "Missile Disaster — open the launch panel";
+            LocaleLoader.EnsureLoaded();
+            button.tooltip = MissileStrings.Button_Tooltip;
             button.eventClick += OnButtonClick;
 
             if (_iconTex == null) _iconTex = MissileIcon.Build(30);

@@ -1,0 +1,44 @@
+# Missile Disaster UI strings (English template).
+# To translate: copy this file to <language code>.txt using the code the game
+# reports (de/fr/es/zh/ja/...), translate the values, and keep the \n line-break
+# escapes. Missing keys fall back to English, so a partial file is fine.
+# Contributions welcome: https://github.com/omoneko/MissileDisaster
+
+Mod_Description = Launch missiles with 5 warhead types, adjustable yield, and air or ground burst. Radioactive fallout, missile defense (PAC3 / THAAD / Aegis), and an optional random-strike disaster mode. Launch from the missile button in the Disasters panel, or a rebindable hotkey.
+Options_BuildGroup = Build check
+Options_LoadedFrom = Loaded from: {0}
+Options_LaunchGroup = Launch
+Options_LaunchHelp = Open the launch panel with the missile-icon button in the Disasters info-view panel (like the vanilla disaster buttons). Then pick a warhead, click 'Start Targeting', and click the map. Close the panel with the X; reopen from the same button.
+Options_LaunchHotkey = Launch tool hotkey
+Options_ResetPanel = Open / reset launch panel to a visible position
+Options_RandomGroup = Random missile strikes (DESTRUCTIVE - off by default)
+Options_RandomEnable = Enable random strikes - missiles WILL hit your city on their own and destroy buildings, like a natural disaster. Leave this off to only launch missiles yourself.
+Options_RandomFrequency = Strike frequency (x natural disaster rate)
+Options_AttackPattern = Attack pattern
+Pattern_Single = Single
+Pattern_Mirv = MIRV
+Pattern_Random = Random
+Options_RandomWarhead = Warhead
+Warhead_Random = Random
+Warhead_Conventional = Conventional
+Warhead_Cluster = Cluster
+Warhead_WhitePhosphorus = White Phosphorus
+Warhead_Thermobaric = Thermobaric
+Warhead_Nuclear = Nuclear
+Options_PriorityGroup = Priority targeting (random strikes)
+Options_PriorityHelp = Random strikes prefer these buildings. Weights (among tiers that have matches): A 50% / B 25% / C 15% / others 10%. Match is by internal building name, comma-separated, case-insensitive. Tip: add 'Oil' to a tier to target oil industry.
+Options_PriorityA = Tier A keywords (highest)
+Options_PriorityB = Tier B keywords
+Options_PriorityC = Tier C keywords (landmarks/monuments auto-detected too)
+Panel_Title = Missile Launch Control
+Panel_Close = Close (reopen from the Missile button in the Disasters panel)
+Panel_Warhead = Warhead
+Panel_NuclearYield = Nuclear Yield (nuclear only, kt)
+Panel_ConventionalYield = Conventional Yield (non-nuclear, kg TNT)
+Panel_BurstHeight = Burst Height
+Panel_StartTargeting = Start Targeting (click to launch)
+Panel_YieldHint = Enter yield in kt (press Enter)
+Panel_ChargeHint = Enter charge in kg TNT (press Enter)
+Burst_Air = Air Burst
+Burst_Ground = Ground Burst
+Button_Tooltip = Missile Disaster - open the launch panel

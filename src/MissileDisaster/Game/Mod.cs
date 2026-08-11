@@ -15,11 +15,14 @@ namespace MissileDisaster.Game
         // local build - the only question that matters is which of them is running.
         private static string _loadedFrom = "(not resolved)";
 
+        // The mod's name is its Workshop title, so it stays in English; everything else is
+        // localizable. The getter loads the locale because the Content Manager can read this
+        // before the options screen has ever been opened.
         public string Name => "Missile Disaster";
-        public string Description =>
-            "Launch missiles with 5 warhead types, adjustable yield, and air or ground burst. " +
-            "Radioactive fallout, missile defense (PAC3 / THAAD / Aegis), and an optional random-strike " +
-            "disaster mode. Launch from the missile button in the Disasters panel, or a rebindable hotkey.";
+        public string Description
+        {
+            get { LocaleLoader.EnsureLoaded(); return MissileStrings.Mod_Description; }
+        }
 
         public void OnEnabled()
         {
@@ -87,21 +90,19 @@ namespace MissileDisaster.Game
         {
             try
             {
+                LocaleLoader.EnsureLoaded();
                 ModSettings.Ensure();
 
                 // Which build is running, on screen rather than in a log file. A report that a
                 // change did nothing means one thing if these numbers are the new ones and quite
                 // another if they are not, and hunting for the log to find that out is a poor
                 // use of anybody's evening.
-                UIHelperBase build = helper.AddGroup("Build check");
+                UIHelperBase build = helper.AddGroup(MissileStrings.Options_BuildGroup);
                 build.AddButton(BuildStamp(), () => { });
-                build.AddButton("Loaded from: " + _loadedFrom, () => { });
+                build.AddButton(string.Format(MissileStrings.Options_LoadedFrom, _loadedFrom), () => { });
 
-                UIHelperBase launch = helper.AddGroup("Launch");
-                launch.AddButton(
-                    "Open the launch panel with the missile-icon button in the Disasters info-view panel (like the vanilla disaster buttons). " +
-                    "Then pick a warhead, click 'Start Targeting', and click the map. Close the panel with the X; reopen from the same button.",
-                    () => { });
+                UIHelperBase launch = helper.AddGroup(MissileStrings.Options_LaunchGroup);
+                launch.AddButton(MissileStrings.Options_LaunchHelp, () => { });
 
                 string[] keyNames = new string[ModSettings.KeyOptions.Length];
                 int keyIndex = 0;
@@ -110,47 +111,42 @@ namespace MissileDisaster.Game
                     keyNames[i] = ModSettings.KeyOptions[i].ToString();
                     if (ModSettings.KeyOptions[i] == ModSettings.LaunchKeyCode) keyIndex = i;
                 }
-                launch.AddDropdown("Launch tool hotkey", keyNames, keyIndex, i =>
+                launch.AddDropdown(MissileStrings.Options_LaunchHotkey, keyNames, keyIndex, i =>
                 {
                     if (i >= 0 && i < ModSettings.KeyOptions.Length)
                         ModSettings.LaunchKey.value = (int)ModSettings.KeyOptions[i];
                 });
-                launch.AddButton("Open / reset launch panel to a visible position", () => UI.MissilePanel.ResetPosition());
+                launch.AddButton(MissileStrings.Options_ResetPanel, () => UI.MissilePanel.ResetPosition());
 
                 // The label says what it does to the city, not when it happens. A Workshop
                 // report - "your missile mod destroyed my whole new town, i did not know that
                 // random disaster exist" - came from a player who ticked this: the setting has
                 // always shipped off, but "occur between natural disasters" reads as a schedule
                 // detail rather than as a warning that a city can be flattened without warning.
-                UIHelperBase rnd = helper.AddGroup("Random missile strikes (DESTRUCTIVE - off by default)");
-                rnd.AddCheckbox(
-                    "Enable random strikes - missiles WILL hit your city on their own and destroy buildings, like a natural disaster. Leave this off to only launch missiles yourself.",
+                UIHelperBase rnd = helper.AddGroup(MissileStrings.Options_RandomGroup);
+                rnd.AddCheckbox(MissileStrings.Options_RandomEnable,
                     ModSettings.IsRandomEnabled, b => ModSettings.RandomEnabled.value = b ? 1 : 0);
                 // The frequency is a multiplier of the natural disaster rate, 0.25 to 3.0,
                 // stored internally as a percentage from 25 to 300.
-                rnd.AddSlider("Strike frequency (x natural disaster rate)", 0.25f, 3f, 0.25f,
+                rnd.AddSlider(MissileStrings.Options_RandomFrequency, 0.25f, 3f, 0.25f,
                     (float)ModSettings.StrikeFrequency,
                     v => ModSettings.StrikeFrequencyPct.value = (int)Math.Round(v * 100.0));
-                string[] patterns = { "Single", "MIRV", "Random" };
-                rnd.AddDropdown("Attack pattern", patterns, ModSettings.AttackPatternValue,
+                rnd.AddDropdown(MissileStrings.Options_AttackPattern, MissileStrings.PatternLabels(),
+                    ModSettings.AttackPatternValue,
                     i => { if (ModSettings.AttackPattern != null) ModSettings.AttackPattern.value = i; });
-                string[] warheads = { "Random", "Conventional", "Cluster", "White Phosphorus", "Thermobaric", "Nuclear" };
-                rnd.AddDropdown("Warhead", warheads,
+                rnd.AddDropdown(MissileStrings.Options_RandomWarhead, MissileStrings.RandomWarheadLabels(),
                     ModSettings.RandomWarhead != null ? ModSettings.RandomWarhead.value : 0,
                     i => { if (ModSettings.RandomWarhead != null) ModSettings.RandomWarhead.value = i; });
 
                 // Targeting: the keywords for each tier are editable, comma-separated. The
                 // weights are shown but not editable.
-                UIHelperBase prio = helper.AddGroup("Priority targeting (random strikes)");
-                prio.AddButton(
-                    "Random strikes prefer these buildings. Weights (among tiers that have matches): A 50% / B 25% / C 15% / others 10%. " +
-                    "Match is by internal building name, comma-separated, case-insensitive. Tip: add 'Oil' to a tier to target oil industry.",
-                    () => { });
-                prio.AddTextfield("Tier A keywords (highest)", ModSettings.PriorityAText,
+                UIHelperBase prio = helper.AddGroup(MissileStrings.Options_PriorityGroup);
+                prio.AddButton(MissileStrings.Options_PriorityHelp, () => { });
+                prio.AddTextfield(MissileStrings.Options_PriorityA, ModSettings.PriorityAText,
                     s => { if (ModSettings.PriorityKeywordsA != null) ModSettings.PriorityKeywordsA.value = s; });
-                prio.AddTextfield("Tier B keywords", ModSettings.PriorityBText,
+                prio.AddTextfield(MissileStrings.Options_PriorityB, ModSettings.PriorityBText,
                     s => { if (ModSettings.PriorityKeywordsB != null) ModSettings.PriorityKeywordsB.value = s; });
-                prio.AddTextfield("Tier C keywords (landmarks/monuments auto-detected too)", ModSettings.PriorityCText,
+                prio.AddTextfield(MissileStrings.Options_PriorityC, ModSettings.PriorityCText,
                     s => { if (ModSettings.PriorityKeywordsC != null) ModSettings.PriorityKeywordsC.value = s; });
             }
             catch (Exception e)

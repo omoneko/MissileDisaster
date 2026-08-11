@@ -1,0 +1,49 @@
+# Missile Disaster UI strings (Japanese).
+# Generated from en.txt; keys must match the field names in MissileStrings.cs.
+# Missing keys fall back to English, so this file may be partial.
+
+Mod_Description = 5種類の弾頭・威力調整・空中/地上爆発でミサイルを発射できます。放射性降下物、ミサイル防衛 (PAC3 / THAAD / イージス)、および任意のランダム着弾モードを備えています。災害パネルのミサイルボタン、または変更可能なホットキーから発射します。
+
+Options_BuildGroup = ビルド確認
+Options_LoadedFrom = 読み込み元: {0}
+
+Options_LaunchGroup = 発射
+Options_LaunchHelp = 災害インフォビューのパネルにあるミサイルアイコンのボタンから発射パネルを開きます (バニラの災害ボタンと同じ場所です)。弾頭を選び、[Start Targeting] を押してからマップをクリックしてください。パネルは X で閉じ、同じボタンで開き直せます。
+Options_LaunchHotkey = 発射ツールのホットキー
+Options_ResetPanel = 発射パネルを開く / 見える位置に戻す
+
+Options_RandomGroup = ミサイルのランダム着弾 (破壊的 - 既定はオフ)
+Options_RandomEnable = ランダム着弾を有効にする - 自然災害と同じように、ミサイルが勝手に街に着弾して建物を破壊します。自分で発射するだけにしたい場合はオフのままにしてください。
+Options_RandomFrequency = 着弾頻度 (自然災害の発生率に対する倍率)
+Options_AttackPattern = 攻撃パターン
+Pattern_Single = 単発
+Pattern_Mirv = MIRV (多弾頭)
+Pattern_Random = ランダム
+Options_RandomWarhead = 弾頭
+
+Warhead_Random = ランダム
+Warhead_Conventional = 通常弾頭
+Warhead_Cluster = クラスター弾
+Warhead_WhitePhosphorus = 白リン弾
+Warhead_Thermobaric = サーモバリック弾
+Warhead_Nuclear = 核弾頭
+
+Options_PriorityGroup = 優先目標 (ランダム着弾)
+Options_PriorityHelp = ランダム着弾はここに挙げた建物を優先します。重み (一致のあるティア間で): A 50% / B 25% / C 15% / その他 10%。判定は内部の建物名に対する部分一致で、カンマ区切り・大文字小文字は区別しません。ヒント: いずれかのティアに Oil を加えると石油産業を狙えます。
+Options_PriorityA = ティアA キーワード (最優先)
+Options_PriorityB = ティアB キーワード
+Options_PriorityC = ティアC キーワード (ランドマーク・モニュメントは自動判定されます)
+
+Panel_Title = ミサイル発射管制
+Panel_Close = 閉じる (災害パネルのミサイルボタンから開き直せます)
+Panel_Warhead = 弾頭
+Panel_NuclearYield = 核出力 (核弾頭のみ、kt)
+Panel_ConventionalYield = 通常火薬量 (非核、kg TNT)
+Panel_BurstHeight = 爆発高度
+Panel_StartTargeting = 目標指定を開始 (クリックで発射)
+Panel_YieldHint = 出力を kt で入力 (Enterで確定)
+Panel_ChargeHint = 火薬量を kg TNT で入力 (Enterで確定)
+Burst_Air = 空中爆発
+Burst_Ground = 地上爆発
+
+Button_Tooltip = Missile Disaster - 発射パネルを開く
