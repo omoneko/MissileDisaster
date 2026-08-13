@@ -63,17 +63,47 @@ namespace MissileDisaster.Game.Effects
                 Vector3 origin = groundZero + Vector3.up * GroundClearance;
                 AnimationCurve speed = BuildSpeedCurve(radius, duration);
 
+                // Particle counts follow the size. A ring only has to look continuous, and the
+                // arc each particle covers grows with the radius - so a small blast needs far
+                // fewer of them, and spending 96 on a 1.5 t warhead bought nothing but frames.
+                float scale = CountScale(radius);
+
                 CreateRing(origin, "ShockWaveDust", ParticleAssets.Smoke, radius, duration, speed,
-                    DustParticles, radius * DustSizeFraction, DustNear, DustFar, 0.7f, 2.6f, -0.01f);
+                    Count(DustParticles, scale), radius * DustSizeFraction, DustNear, DustFar, 0.7f, 2.6f, -0.01f);
                 CreateRing(origin + Vector3.up * (radius * 0.01f), "ShockWaveAir", ParticleAssets.Smoke,
-                    radius, duration * 0.85f, speed, AirParticles, radius * AirSizeFraction,
+                    radius, duration * 0.85f, speed, Count(AirParticles, scale), radius * AirSizeFraction,
                     AirFront, AirFront, 1f, 1.8f, 0f);
-                CreateDustSurge(origin, radius, duration, speed);
+
+                // The rolling wall of earth belongs to a large explosion. Behind a bomb it reads
+                // as a dust storm arriving from nowhere, so below the threshold the rings run
+                // alone - which is also what makes a small blast finish quickly, since the surge
+                // is the longest-lived part of the effect.
+                if (radius >= ShockWave.DustSurgeMinRadius) CreateDustSurge(origin, radius, duration, speed);
             }
             catch (Exception e)
             {
                 ModConfig.LogError("ShockWaveFx.Play error: " + e);
             }
+        }
+
+        /// <summary>
+        /// How much of the full particle budget a front of this radius needs, 0.25 to 1. A ring
+        /// reads as continuous when the gaps between its particles are small against its
+        /// circumference, and that circumference grows with the radius - so the small end can be
+        /// drawn with a quarter of the particles and look identical.
+        /// </summary>
+        private static float CountScale(float radius)
+        {
+            const float full = 1500f;   // at and above this the full budget is spent
+            float k = radius / full;
+            if (k < 0.25f) return 0.25f;
+            return k > 1f ? 1f : k;
+        }
+
+        private static int Count(int full, float scale)
+        {
+            int n = Mathf.RoundToInt(full * scale);
+            return n < 8 ? 8 : n;
         }
 
         /// <summary>

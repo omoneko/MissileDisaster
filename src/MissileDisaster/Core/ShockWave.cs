@@ -25,7 +25,19 @@ namespace MissileDisaster.Core
         // A 1 t charge's front crosses its 72 m of destruction in about a tenth of a second,
         // which is a frame or two. This floor is a playability concession, not physics, and it is
         // the only place the model departs from the figures.
-        public const float MinimumSeconds = 0.9f;
+        // Held at 0.35 s rather than the 0.9 s it used to be: at 0.9 s every conventional warhead
+        // hit the floor and so every one of them took the same time to spread, which is exactly
+        // the "it does not scale with the explosion" that was reported. 0.35 s is still about
+        // twenty frames - long enough to read - and small charges now finish visibly sooner than
+        // large ones.
+        public const float MinimumSeconds = 0.35f;
+
+        /// <summary>
+        /// Below this radius the blast is a bomb going off, not a front sweeping a city: the
+        /// rolling wall of earth that chases the rings is a large-explosion phenomenon and reads
+        /// as absurd behind a 1.5 t warhead. ShockWaveFx draws the rings alone below it.
+        /// </summary>
+        public const float DustSurgeMinRadius = 250f;
         // The other end is a soft ceiling rather than a clamp: every strategic yield shared the
         // old 14 s, so a 50 Mt front - which really takes about 48 s to cross its 26 km - was
         // drawn crossing the ground three times faster than a 1 Mt one instead of taking longer

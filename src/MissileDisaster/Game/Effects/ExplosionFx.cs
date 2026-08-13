@@ -72,7 +72,8 @@ namespace MissileDisaster.Game.Effects
                         ExplosionFallback.Play(
                             new Vector3(center.x + offs[i].X, center.y, center.z + offs[i].Z), fireball);
                     }
-                    // One flash for the pattern rather than fourteen stacked on top of each other.
+                    // One flash for the pattern rather than fourteen stacked on top of each other,
+                    // and no mushroom: scattered bomblets throw up a haze, not a column.
                     DetonationFlashFx.PlayConventional(center, Mathf.Max(fireball, spec.SpreadRadius * 0.25f));
                     return;
                 }
@@ -80,6 +81,9 @@ namespace MissileDisaster.Game.Effects
                 // A single detonation, conventional or thermobaric.
                 ExplosionFallback.Play(center, fireball);
                 DetonationFlashFx.PlayConventional(center, fireball);
+                // The column of dirt and smoke it lifts. It rises from the ground however high
+                // the warhead burst, the same way the nuclear cloud does.
+                SmallMushroomFx.Play(groundZero, fireball);
             }
             catch (Exception e)
             {

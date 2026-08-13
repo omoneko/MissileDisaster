@@ -81,6 +81,47 @@ public class ShockWaveTests
     }
 
     [Fact]
+    public void Conventional_warheads_no_longer_all_take_the_same_time()
+    {
+        // The reported problem: every conventional blast spread at the same rate whatever its
+        // size, because they all sat on the duration floor. The floor still exists - a front that
+        // crosses in two frames cannot be seen - but it now sits below the range these warheads
+        // occupy, so a bigger charge visibly takes longer.
+        float small = ShockWave.Duration(82f);     // 1.5 t conventional
+        float medium = ShockWave.Duration(206f);   // 1.5 t thermobaric
+        float large = ShockWave.Duration(388f);    // 20 t thermobaric
+
+        Assert.True(small < medium, "82 m and 206 m fronts take the same time");
+        Assert.True(medium < large, "206 m and 388 m fronts take the same time");
+    }
+
+    [Fact]
+    public void The_floor_still_holds_the_very_smallest_open_long_enough_to_see()
+    {
+        // Roughly twenty frames. Below that the ring is gone before the eye finds it.
+        Assert.Equal(ShockWave.MinimumSeconds, ShockWave.Duration(1f), 3);
+        Assert.InRange(ShockWave.MinimumSeconds, 0.25f, 0.6f);
+    }
+
+    [Fact]
+    public void The_dust_surge_threshold_sits_above_every_conventional_warhead()
+    {
+        // The rolling wall of earth is a large-explosion phenomenon. It must not appear behind a
+        // bomb, and it must still appear for a nuclear burst.
+        foreach (WarheadType type in new[]
+                 { WarheadType.Conventional, WarheadType.Cluster, WarheadType.WhitePhosphorus })
+        {
+            var spec = WarheadSpec.For(type).Scaled(ConventionalYields.Multiplier(2000));
+            Assert.True(ExplosionScale.BlastRadius(spec) < ShockWave.DustSurgeMinRadius,
+                type + " at 2 t would raise a dust surge");
+        }
+
+        var nuke = WarheadSpec.For(WarheadType.Nuclear);
+        Assert.True(nuke.DestructionRadius > ShockWave.DustSurgeMinRadius,
+            "a nuclear burst must still raise the dust surge");
+    }
+
+    [Fact]
     public void A_bigger_blast_still_takes_longer_to_cross_the_ground()
     {
         // Past the knee the duration is compressed, not clamped: a 50 Mt front crossing 26 km

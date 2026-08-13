@@ -54,6 +54,11 @@ namespace MissileDisaster.Game.Effects
         private const float ConventionalIntensityMin = 3f;
         private const float ConventionalIntensityMax = 25f;
 
+        // How far past the fireball the visible glow reaches. A nuclear flash is seen from the
+        // next county, so its glow dwarfs the fireball that made it; a bomb's barely leaves it.
+        private const float NuclearGlowFactor = 6f;
+        private const float ConventionalGlowFactor = 1.8f;
+
         // White with the faintest warmth. A nuclear flash is near-white; tinting it orange makes
         // it read as an ordinary explosion.
         private static readonly Color FlashColor = new Color(1f, 0.97f, 0.90f, 1f);
@@ -99,6 +104,13 @@ namespace MissileDisaster.Game.Effects
 
                 var flash = go.AddComponent<FlashBehaviour>();
                 flash.PeakIntensity = peakIntensity;
+
+                // A Light lights surfaces. It puts nothing in the air, so from a camera looking at
+                // the sky the flash simply is not there - which is what "it does not spread into
+                // the sky" means. This is the glow itself: an additive ball at the burst that
+                // swells and fades, drawn against the sky rather than on the ground.
+                GlowFx.Play(burstPoint, fireballRadius, RiseSeconds + HoldSeconds + FadeSeconds,
+                    directionalIntensity > 0f ? NuclearGlowFactor : ConventionalGlowFactor);
 
                 if (directionalIntensity > 0f)
                 {
