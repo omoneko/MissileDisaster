@@ -54,19 +54,94 @@ public class ExplosionScaleTests
     public void A_zero_charge_never_returns_a_negative_radius()
     {
         var dud = WarheadSpec.For(WarheadType.Conventional).Scaled(0f);
-        Assert.Equal(0f, ExplosionScale.VisualRadius(dud), 3);
+        Assert.Equal(0f, ExplosionScale.FireballRadius(dud), 3);
+        Assert.Equal(0f, ExplosionScale.BlastRadius(dud), 3);
         Assert.Equal(ExplosionScale.SpawnRadiusMin, ExplosionScale.SpawnRadius(dud), 3);
     }
 
     [Fact]
-    public void The_visual_radius_takes_the_widest_effect()
+    public void The_blast_radius_takes_the_widest_effect()
     {
         // Conventional destroys further than half of what it burns, so the destruction leads.
         var conv = WarheadSpec.For(WarheadType.Conventional);
-        Assert.Equal(conv.DestructionRadius, ExplosionScale.VisualRadius(conv), 3);
+        Assert.Equal(conv.DestructionRadius, ExplosionScale.BlastRadius(conv), 3);
         // White phosphorus barely destroys anything, so its fires lead instead.
         var wp = WarheadSpec.For(WarheadType.WhitePhosphorus);
-        Assert.Equal(wp.BurnRadius * 0.5f, ExplosionScale.VisualRadius(wp), 3);
+        Assert.Equal(wp.BurnRadius * 0.5f, ExplosionScale.BlastRadius(wp), 3);
+    }
+
+    [Fact]
+    public void A_smaller_fireball_keeps_its_density_rather_than_thinning_out()
+    {
+        // Shrinking the fireball must not leave a sparse puff. Below the budget-limited range the
+        // magnitude sits at its ceiling, so the emission falls with the area and the particles
+        // per square metre stay put - the explosion gets smaller, not thinner.
+        float smallR = ExplosionScale.SpawnRadius(Conventional(1500));
+        float largeR = ExplosionScale.SpawnRadius(Conventional(20000));
+
+        float smallDensity = ExplosionScale.Magnitude(smallR, ExplosionScale.SingleParticlesPerSecond);
+        float largeDensity = ExplosionScale.Magnitude(largeR, ExplosionScale.SingleParticlesPerSecond);
+
+        Assert.True(smallR < largeR);
+        Assert.Equal(largeDensity, smallDensity, 3);
+        Assert.Equal(ExplosionScale.MagnitudeMax, smallDensity, 3);
+    }
+
+    [Fact]
+    public void The_fireball_is_far_smaller_than_the_area_the_warhead_damages()
+    {
+        // The reported bug: the fireball was drawn at the destruction radius, so a 1.5 t bomb
+        // threw one 82 m across. It must read as the charge going off, not as the damage.
+        foreach (WarheadType type in new[]
+                 { WarheadType.Conventional, WarheadType.Cluster, WarheadType.Thermobaric })
+        {
+            var spec = WarheadSpec.For(type);
+            Assert.True(ExplosionScale.FireballRadius(spec) < ExplosionScale.BlastRadius(spec),
+                type + ": the fireball is not smaller than the blast");
+        }
+    }
+
+    [Fact]
+    public void A_1500_kg_conventional_fireball_is_about_17_m()
+    {
+        // The figure the fix is calibrated on: 1.5 * cbrt(1500 kg) is about 17 m, against the
+        // 41 m the old destruction-driven formula produced.
+        var spec = WarheadSpec.For(WarheadType.Conventional)
+            .Scaled(ConventionalYields.Multiplier(1500));
+
+        float fireball = ExplosionScale.SpawnRadius(spec);
+        Assert.InRange(fireball, 15f, 20f);
+
+        // And that it really is the large reduction that was asked for: a particle cloud reads
+        // by area, so compare areas against what the destruction radius would have given.
+        float oldSpawn = ExplosionScale.BlastRadius(spec) * 0.5f;   // the old fraction
+        float areaRatio = (fireball * fireball) / (oldSpawn * oldSpawn);
+        Assert.InRange(areaRatio, 0.10f, 0.25f);
+    }
+
+    [Fact]
+    public void Every_warhead_that_uses_the_particle_effect_has_a_fireball()
+    {
+        // Nuclear is the one exception: NuclearMushroomFx builds its fireball from the yield, and
+        // ExplosionFx returns before reading the spec's figure.
+        foreach (WarheadType type in new[]
+                 { WarheadType.Conventional, WarheadType.Cluster,
+                   WarheadType.WhitePhosphorus, WarheadType.Thermobaric })
+        {
+            Assert.True(WarheadSpec.For(type).FireballRadius > 0f, type + " has no fireball radius");
+        }
+    }
+
+    [Fact]
+    public void The_fireball_grows_with_the_charge_even_for_an_incendiary()
+    {
+        // An incendiary keeps its blast fixed however large the charge, but the charge still
+        // burns - so the fireball has to grow where the destruction radius does not.
+        var small = WarheadSpec.For(WarheadType.WhitePhosphorus).Scaled(ConventionalYields.Multiplier(500));
+        var large = WarheadSpec.For(WarheadType.WhitePhosphorus).Scaled(ConventionalYields.Multiplier(4000));
+
+        Assert.Equal(small.DestructionRadius, large.DestructionRadius, 3);
+        Assert.True(large.FireballRadius > small.FireballRadius * 1.5f);
     }
 
     // ---- the magnitude, which the base game's IL says is a density and not a size ----
@@ -88,8 +163,13 @@ public class ExplosionScaleTests
     [Fact]
     public void A_larger_explosion_asks_for_a_lower_density()
     {
-        float small = ExplosionScale.SpawnRadius(Conventional(100));
-        float large = ExplosionScale.SpawnRadius(Conventional(50000));
+        // Compared well above 63 m of spawn radius, which is where the solved magnitude drops
+        // below MagnitudeMax. Below that the clamp holds both sides at the ceiling and there is
+        // no ordering to assert - the emission is then area-limited rather than budget-limited,
+        // which is the right behaviour for a small fireball and is covered by the test below.
+        float small = ExplosionScale.SpawnRadius(Conventional(100000));
+        float large = ExplosionScale.SpawnRadius(Conventional(1000000));
+        Assert.True(small > 63f && large > small, "the sizes must be in the unclamped range");
         Assert.True(ExplosionScale.Magnitude(large, ExplosionScale.SingleParticlesPerSecond) <
                     ExplosionScale.Magnitude(small, ExplosionScale.SingleParticlesPerSecond),
             "spreading the same budget over more ground means fewer particles per square metre");

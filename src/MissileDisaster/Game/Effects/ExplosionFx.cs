@@ -34,9 +34,11 @@ namespace MissileDisaster.Game.Effects
             try
             {
                 EffectInfo effect = ResolveMeteorEffect();
-                // The size of the fireball follows the yield: the spec's radii have already been
-                // scaled by the charge, and ExplosionScale turns them into the effect scale.
-                float radius = ExplosionScale.VisualRadius(spec);
+                // Two different sizes, deliberately. The fireball is what the charge looks like;
+                // the blast front is what it damages. They used to be the same number, which made
+                // every conventional fireball as wide as its destruction radius.
+                float fireball = ExplosionScale.FireballRadius(spec);
+                float blast = ExplosionScale.BlastRadius(spec);
 
                 if (spec.Type == WarheadType.Nuclear)
                 {
@@ -44,7 +46,11 @@ namespace MissileDisaster.Game.Effects
                     // the fireball where it burst and the cloud rising from the ground, both
                     // built to real figures. The vanilla effect has no size of its own to speak
                     // of and cannot be stretched over the kilometres involved.
+                    // Because it skips the vanilla effect it also skips that effect's LightEffect,
+                    // so the flash it would have carried is played here instead.
                     NuclearMushroomFx.Play(groundZero, center, spec.YieldKilotons, spec.Airburst);
+                    DetonationFlashFx.Play(center, Mathf.RoundToInt(spec.YieldKilotons),
+                        NuclearCloudDisplay.For(spec.YieldKilotons).FireballRadius);
                     ShockWaveFx.Play(groundZero, spec.DestructionRadius);
                     return;
                 }
@@ -52,29 +58,30 @@ namespace MissileDisaster.Game.Effects
                 // The blast front, out across the ground, whatever the warhead. A scattering
                 // warhead gets one from the middle of the pattern rather than one per bomblet.
                 ShockWaveFx.Play(groundZero, spec.SubmunitionCount > 1
-                    ? Mathf.Max(spec.SpreadRadius, radius) : radius);
+                    ? Mathf.Max(spec.SpreadRadius, blast) : blast);
 
                 if (effect == null)
                 {
-                    ExplosionFallback.Play(center, radius);
+                    ExplosionFallback.Play(center, fireball);
                     return;
                 }
 
                 if (spec.SubmunitionCount > 1)
                 {
-                    // Scattering warhead: a smaller effect at each submunition point.
+                    // Scattering warhead: a smaller effect at each submunition point. The
+                    // fireball figure is already per submunition, not for the whole load.
                     Offset2[] offs = SubmunitionScatter.Offsets(spec.SubmunitionCount, spec.SpreadRadius);
                     for (int i = 0; i < offs.Length; i++)
                     {
                         Dispatch(effect, new Vector3(center.x + offs[i].X, center.y, center.z + offs[i].Z),
-                            radius, ExplosionScale.SubmunitionParticlesPerSecond);
+                            fireball, ExplosionScale.SubmunitionParticlesPerSecond);
                     }
                     return;
                 }
 
                 // A single detonation, conventional or thermobaric: one explosion at the
                 // detonation point, sized to the yield.
-                Dispatch(effect, center, radius, ExplosionScale.SingleParticlesPerSecond);
+                Dispatch(effect, center, fireball, ExplosionScale.SingleParticlesPerSecond);
             }
             catch (Exception e)
             {

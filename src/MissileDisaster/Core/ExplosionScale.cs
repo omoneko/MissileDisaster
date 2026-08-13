@@ -31,9 +31,11 @@ namespace MissileDisaster.Core
         public const float EmitAreaFloor = 100f;   // max(100, PI*r*r)
         public const float DensityPerMagnitude = 0.01f;
 
-        // The spawn disc against what the warhead does. Half the visual radius reads as a
-        // fireball filling the heart of the blast rather than the whole damaged area.
-        public const float SpawnRadiusFraction = 0.5f;
+        // The spawn disc against the fireball. It is 1:1 because FireballRadius already IS the
+        // fireball: this used to be 0.5 against the destruction radius, which is a gameplay
+        // figure sized to bring city blocks down, and the result was a 1.5 t bomb throwing a
+        // fireball 80 m across. Halving that number was never the fix - it was the wrong number.
+        public const float SpawnRadiusFraction = 1f;
         public const float SpawnRadiusMin = 8f;
         // Ceiling on the disc. The count goes with its area, so this is what keeps a strategic
         // warhead from asking for hundreds of thousands of particles a second.
@@ -52,12 +54,28 @@ namespace MissileDisaster.Core
         public const float MagnitudeMax = 8f;
 
         /// <summary>
-        /// The radius the visible explosion should read as, in metres: the widest of what the
-        /// warhead destroys, half of what it sets alight, and half the width of the crater it
-        /// digs. Taking the widest is what lets an incendiary - whose destruction radius is fixed
-        /// however large the charge - still grow its fireball with the yield through the fires.
+        /// How wide the fireball should read, in metres: the warhead's own FireballRadius, which
+        /// is what the explosion looks like rather than what it damages.
+        /// <para>
+        /// This used to be the widest of the destruction, burn and crater radii - that is, the
+        /// visual was as large as the damage. A 1.5 t conventional warhead came out with a
+        /// particle disc 82 m across against a real fireball nearer 34 m, roughly six times the
+        /// area, which is what a subscriber reported. The damage figures are untouched; only what
+        /// is drawn moved.
+        /// </para>
         /// </summary>
-        public static float VisualRadius(WarheadSpec spec)
+        public static float FireballRadius(WarheadSpec spec)
+        {
+            return spec.FireballRadius < 0f ? 0f : spec.FireballRadius;
+        }
+
+        /// <summary>
+        /// How far the blast front sweeps, in metres: the widest of what the warhead destroys,
+        /// half of what it sets alight, and one and a half times the crater. The shock wave
+        /// follows this - it is the one effect that genuinely should span the damaged area, and
+        /// it is deliberately left at the figure the fireball used to be drawn at.
+        /// </summary>
+        public static float BlastRadius(WarheadSpec spec)
         {
             float r = spec.DestructionRadius;
             float burn = spec.BurnRadius * 0.5f;
@@ -68,15 +86,15 @@ namespace MissileDisaster.Core
         }
 
         /// <summary>The radius of the disc the effect's particles are spawned over - the one argument that makes the explosion physically larger.</summary>
-        public static float SpawnRadius(float visualRadius)
+        public static float SpawnRadius(float fireballRadius)
         {
-            return Clamp(visualRadius * SpawnRadiusFraction, SpawnRadiusMin, SpawnRadiusMax);
+            return Clamp(fireballRadius * SpawnRadiusFraction, SpawnRadiusMin, SpawnRadiusMax);
         }
 
         /// <summary>Convenience: the spawn radius for a whole warhead.</summary>
         public static float SpawnRadius(WarheadSpec spec)
         {
-            return SpawnRadius(VisualRadius(spec));
+            return SpawnRadius(FireballRadius(spec));
         }
 
         /// <summary>

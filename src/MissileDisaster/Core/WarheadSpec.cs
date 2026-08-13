@@ -28,6 +28,13 @@ namespace MissileDisaster.Core
         public float SpreadRadius;
         public bool RaiseCraterEdges;
         public float BurnRadius;          // fires and thermal radiation; for nuclear this is third-degree burns, wider than the destruction
+        // The radius of the visible fireball, in metres - what the explosion looks like, not what
+        // it damages. It is deliberately its own number: the destruction radius is a gameplay
+        // figure sized so that city blocks come down, and driving the visual off it made a 1.5 t
+        // bomb throw a fireball 80 m across. A real fireball goes as the cube root of the charge,
+        // which is the same law every other radius here follows, so a constant per warhead type
+        // scaled by the yield multiplier is exactly right.
+        public float FireballRadius;
         public bool Contaminates;
         public float ContaminationRadius; // fallout; greater than zero for nuclear warheads only
         public float BurstAltitude;       // height above the target the warhead detonates at when fused for an airburst, in metres
@@ -90,6 +97,9 @@ namespace MissileDisaster.Core
             s.BurnRadius *= multiplier;
             s.ContaminationRadius *= multiplier;
             s.BurstAltitude *= multiplier;
+            // Scaled even for an incendiary, whose blast is fixed: the fireball is the charge
+            // going off, so it grows with the charge whatever the blast does.
+            s.FireballRadius *= multiplier;
             return s;
         }
 
@@ -108,6 +118,8 @@ namespace MissileDisaster.Core
                         SubmunitionCount = 10, SpreadRadius = 260f,
                         RaiseCraterEdges = false, BurnRadius = 12f, Contaminates = false,
                         BurstAltitude = 150f,
+                        // Per submunition: a tenth of the charge each, so 1.5*cbrt(100 kg).
+                        FireballRadius = 7f,
                     };
                 case WarheadType.WhitePhosphorus:
                     // White phosphorus, an incendiary. The filler burns rather than detonating,
@@ -122,6 +134,9 @@ namespace MissileDisaster.Core
                         SubmunitionCount = 14, SpreadRadius = 220f,
                         RaiseCraterEdges = false, BurnRadius = 70f, Contaminates = false,
                         BurstAltitude = 125f, Incendiary = true,
+                        // It burns rather than detonating, so the bright cloud is wider than the
+                        // 6 m blast but nothing like a detonation of the same mass.
+                        FireballRadius = 10f,
                     };
                 case WarheadType.Thermobaric:
                     // Thermobaric, equivalent to a large fuel-air explosive: the overpressure
@@ -134,6 +149,9 @@ namespace MissileDisaster.Core
                         SubmunitionCount = 1, SpreadRadius = 0f,
                         RaiseCraterEdges = true, BurnRadius = 220f, Contaminates = false,
                         BurstAltitude = 30f,
+                        // A fuel-air cloud burns through a far greater volume than high explosive
+                        // of the same mass: roughly 2.7 times the HE fireball radius.
+                        FireballRadius = 40f,
                     };
                 case WarheadType.Nuclear:
                     // Nuclear, at the 150 kt baseline, using real groundburst radii: 3.7 km at
@@ -147,6 +165,9 @@ namespace MissileDisaster.Core
                         RaiseCraterEdges = true, BurnRadius = 5850f,
                         Contaminates = true, ContaminationRadius = 5300f,
                         BurstAltitude = 900f, // half the optimum height of burst for 150 kt, so the fireball stays in shot
+                        // Never read: NuclearMushroomFx builds the nuclear fireball from the
+                        // yield itself, and ExplosionFx returns before touching this.
+                        FireballRadius = 0f,
                     };
                 default: // Conventional: a large HE warhead of about 1 t
                     return new WarheadSpec
@@ -156,6 +177,8 @@ namespace MissileDisaster.Core
                         SubmunitionCount = 1, SpreadRadius = 0f,
                         RaiseCraterEdges = false, BurnRadius = 40f, Contaminates = false,
                         BurstAltitude = 40f,
+                        // 1.5*cbrt(1000 kg), the usual approximation for an HE fireball.
+                        FireballRadius = 15f,
                     };
             }
         }
