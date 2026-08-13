@@ -88,6 +88,47 @@ namespace MissileDisaster.Game
             float burnMin = core;
             if (burnMin > burnMax * 0.5f) burnMin = burnMax * 0.5f; // hold the inner edge back so the burn band cannot invert
             DisasterHelpers.DestroyStuff(seed, null, pos, outer, outer, removeRadius, destMin, destMax, burnMin, burnMax);
+
+            SplashWater(pos, spec);
+        }
+
+        /// <summary>
+        /// Presses the water surface down under the burst, if it went off over or beside water.
+        /// The game's water simulation takes it from there: the cavity rebounds and the wave
+        /// radiates outward on its own, which is both the real behaviour and far better than
+        /// anything hand-rolled would be.
+        /// <para>
+        /// DisasterHelpers.SplashWater is the same call the vanilla meteor and earthquake make,
+        /// so it is contracted to the simulation thread exactly like MakeCrater and DestroyStuff
+        /// above - which is where this already is.
+        /// </para>
+        /// </summary>
+        private static void SplashWater(Vector3 pos, WarheadSpec spec)
+        {
+            try
+            {
+                // The fireball is what couples the energy into the water, so it sizes the splash.
+                // Nuclear builds its fireball from the yield rather than carrying a figure on the
+                // spec - see WarheadSpec.FireballRadius.
+                float fireball = spec.Type == WarheadType.Nuclear
+                    ? NuclearCloudDisplay.For(spec.YieldKilotons).FireballRadius
+                    : spec.FireballRadius;
+                if (!WaterSplash.Displaces(fireball)) return;
+
+                var flat = new Vector2(pos.x, pos.z);
+                if (!TerrainManager.instance.HasWater(flat)) return;
+
+                float radius = WaterSplash.Radius(fireball);
+                float depth = WaterSplash.Depth(fireball);
+                DisasterHelpers.SplashWater(flat, radius, depth);
+                ModConfig.Log("Water displaced at " + flat + ": radius " + radius.ToString("0")
+                    + " m, pressed down " + depth.ToString("0.0") + " m");
+            }
+            catch (System.Exception e)
+            {
+                // The water is decoration; losing it must never cost the impact its damage.
+                ModConfig.LogError("ImpactResolver.SplashWater error: " + e);
+            }
         }
     }
 }
