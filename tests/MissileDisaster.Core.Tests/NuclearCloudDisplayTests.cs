@@ -154,17 +154,37 @@ public class NuclearCloudDisplayTests
     [Fact]
     public void The_cloud_keeps_the_proportions_the_figures_give_it()
     {
-        // Width and height come down by one number, so the drawn shape is the real shape -
-        // except for the cap's declared lateral spread, which is divided back out here.
-        // Scaling width and height separately by accident is what turned the effect into a
-        // pancake on a lump; the spread is the deliberate, bounded version of the same thing.
+        // Width and height come down by one number, CloudScale, so the drawn shape is the real
+        // shape once the two declared departures are divided back out: the cap's lateral spread
+        // and the column's extra height. Scaling them separately *by accident* is what turned
+        // the effect into a pancake on a lump; these two are the deliberate, bounded version,
+        // and dividing them out is what keeps this test able to catch the accident.
         foreach (float kt in new[] { 15f, 22f, 150f })
         {
             NuclearCloudDimensions d = NuclearCloudDisplay.For(kt);
-            float drawn = d.CapRadius / NuclearCloudDisplay.CapWidthScale * 2f / d.CloudTop;
+            float drawnWidth = d.CapRadius / NuclearCloudDisplay.CapWidthScale * 2f;
+            float drawnHeight = d.CloudTop / NuclearCloudDisplay.CloudHeightScale;
+            float drawn = drawnWidth / drawnHeight;
             float real = NuclearCloud.CloudRadius(kt) * 2f / NuclearCloud.CloudTop(kt);
             Assert.InRange(drawn / real, 0.9f, 1.15f);
         }
+    }
+
+    [Fact]
+    public void The_column_is_drawn_taller_than_the_figures_give_it()
+    {
+        // A deliberate departure, asked for on playtest: the largest yields read as squat
+        // because a game is watched from low angles the photographs were not taken at. It is
+        // the height alone - widening the cloud with it would undo the point.
+        NuclearCloudDimensions d = NuclearCloudDisplay.For(150f);
+        float honestHeight = NuclearCloud.CloudTop(150f) * NuclearCloudDisplay.CloudScale;
+
+        Assert.True(d.CloudTop > honestHeight * 1.5f,
+            "the column is not visibly taller than the honest figure");
+        // Up to the multiplier, never past it: the soft ceiling may take a little back at the
+        // top of the range, but nothing may hand out more height than was asked for.
+        Assert.InRange(d.CloudTop / honestHeight,
+            NuclearCloudDisplay.CloudHeightScale * 0.9f, NuclearCloudDisplay.CloudHeightScale);
     }
 
     [Fact]

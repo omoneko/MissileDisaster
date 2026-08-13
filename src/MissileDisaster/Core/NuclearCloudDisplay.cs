@@ -65,6 +65,24 @@ namespace MissileDisaster.Core
         public const float CloudScale = 0.06f;
 
         /// <summary>
+        /// Extra height, on top of CloudScale, applied to the column alone.
+        ///
+        /// <para>
+        /// A playtest asked for twice the height because the large yields read as squat, and
+        /// raising the drawn ceiling did almost nothing - at 150 kt the cloud is drawn 795 m
+        /// tall against a ceiling of 2000 m, so the ceiling was never what held it down.
+        /// CloudScale was, and lowering or raising that takes the width with it, which is
+        /// exactly what must not happen here: the complaint is the proportion, not the size.
+        /// </para>
+        ///
+        /// So the height gets its own multiplier. The clouds come out taller than the figures
+        /// strictly give them - a deliberate departure, in the same spirit as FireballScale
+        /// being nearly three times CloudScale, and for the same reason: a game is watched from
+        /// low angles that the photographs were not taken at.
+        /// </summary>
+        public const float CloudHeightScale = 2f;
+
+        /// <summary>
         /// The fireball gets its own, larger scale - nearly three times the cloud's.
         ///
         /// It is the smallest part of the effect and the only part judged against the buildings
@@ -90,7 +108,10 @@ namespace MissileDisaster.Core
         /// a mushroom naturally - so it is now double, and deliberately decoupled from the
         /// burst ceiling, which has its own flight-path reasons to stay where it is.
         /// </summary>
-        public const float ScreenTopAltitude = 2000f;
+        /// Doubled again after a second playtest: at 2000 m the largest yields still read as
+        /// squat, because the cap's width goes on growing past the knee while the height is
+        /// compressed, so the very clouds that should tower were the flattest on screen.
+        public const float ScreenTopAltitude = 4000f;
 
         /// <summary>
         /// Where the soft ceiling on the drawn height starts to bite. It sits high enough that
@@ -100,7 +121,9 @@ namespace MissileDisaster.Core
         /// the very largest clouds do come out wider than their share; that is the price of the
         /// guarantee, and it is paid only by weapons nobody has ever built but Tsar Bomba.
         /// </summary>
-        public const float CloudTopDrawnKnee = 1400f;
+        /// Doubled with ScreenTopAltitude, so everything that was drawn in proportion still is
+        /// and the compression starts twice as high - which is where the extra height goes.
+        public const float CloudTopDrawnKnee = 2800f;
 
         /// <summary>
         /// How much further the cap spreads sideways than the true proportion, on top of
@@ -200,7 +223,7 @@ namespace MissileDisaster.Core
             d.FireballSeconds = EffectCeiling.Soft(NuclearCloud.FireballSeconds(kt),
                 FireballSecondsMin, FireballSecondsKnee, FireballSecondsCeiling);
             d.CapRadius = capRadius * CloudScale * CapWidthScale;
-            d.CloudTop = EffectCeiling.Soft(cloudTop * CloudScale,
+            d.CloudTop = EffectCeiling.Soft(cloudTop * CloudScale * CloudHeightScale,
                 CloudTopDrawnKnee, ScreenTopAltitude);
             d.CapBase = d.CloudTop * baseFraction;
             d.CapDepth = d.CloudTop - d.CapBase;

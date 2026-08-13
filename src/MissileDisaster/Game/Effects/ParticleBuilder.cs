@@ -35,6 +35,43 @@ namespace MissileDisaster.Game.Effects
             emission.SetBursts(new[] { new ParticleSystem.Burst(0f, (short)count) });
         }
 
+        /// <summary>
+        /// The same number of particles, released in even steps across a span of seconds rather
+        /// than all at once.
+        /// <para>
+        /// A rising column needs this and a single burst cannot give it: released together, every
+        /// particle climbs at the same speed and they stay a clump all the way up, arriving at
+        /// the top as a ball. There is never a stem - only a cap. Staggering the release is what
+        /// puts the early particles high and the late ones low at the same moment, which is the
+        /// column.
+        /// </para>
+        /// </summary>
+        public static void BurstsOver(ParticleSystem ps, int count, float seconds, int steps)
+        {
+            if (steps < 1) steps = 1;
+            if (seconds < 0f) seconds = 0f;
+
+            var main = ps.main;
+            main.loop = false;                                   // or the bursts repeat every cycle
+            if (main.duration < seconds) main.duration = seconds + 0.01f;
+
+            var emission = ps.emission;
+            emission.enabled = true;
+            emission.rateOverTime = 0f;
+
+            var bursts = new ParticleSystem.Burst[steps];
+            int placed = 0;
+            for (int i = 0; i < steps; i++)
+            {
+                // The remainder goes to the last step rather than being lost to integer division.
+                int n = i == steps - 1 ? count - placed : count / steps;
+                if (n < 1) n = 1;
+                placed += n;
+                bursts[i] = new ParticleSystem.Burst(seconds * i / steps, (short)n);
+            }
+            emission.SetBursts(bursts);
+        }
+
         /// <summary>A steady stream, for anything that has to keep feeding while it lasts.</summary>
         public static void Stream(ParticleSystem ps, float perSecond)
         {

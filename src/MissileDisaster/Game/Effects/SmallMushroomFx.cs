@@ -20,14 +20,20 @@ namespace MissileDisaster.Game.Effects
     /// </summary>
     public static class SmallMushroomFx
     {
-        // Against the fireball radius.
-        private const float ColumnRadiusFraction = 0.55f;  // the stem's thickness
+        // Against the fireball radius. The stem is deliberately narrow against the cap - that
+        // contrast is the whole silhouette of a mushroom.
+        private const float ColumnRadiusFraction = 0.35f;  // the stem's thickness
         private const float CapRadiusFactor = 1.9f;        // the cap is wider than the fireball
         private const float HeightFactor = 5.5f;           // how high the column reaches
-        private const float PuffSizeFraction = 0.85f;      // one puff of the column
+        private const float PuffSizeFraction = 0.55f;      // one puff of the column
 
-        private const int ColumnParticles = 26;
+        private const int ColumnParticles = 30;
         private const int CapParticles = 34;
+
+        // The column is released over this long, in steps, rather than all at once - see
+        // ParticleBuilder.BurstsOver for why a single burst has no stem at all.
+        private const float ColumnEmitSeconds = 1.1f;
+        private const int ColumnEmitSteps = 8;
 
         // Seconds. Short on purpose: this is a moment, not an event.
         private const float ColumnLife = 3.2f;
@@ -73,7 +79,7 @@ namespace MissileDisaster.Game.Effects
             main.startColor = new ParticleSystem.MinMaxGradient(StemLit, StemShade);
             main.maxParticles = ColumnParticles * 2;
 
-            ParticleBuilder.Burst(ps, ColumnParticles);
+            ParticleBuilder.BurstsOver(ps, ColumnParticles, ColumnEmitSeconds, ColumnEmitSteps);
             ParticleBuilder.ConeUp(ps, fireballRadius * ColumnRadiusFraction, 8f);
             // Fast off the ground and easing off as it climbs, so the column stretches rather
             // than travelling as a block.
@@ -85,7 +91,9 @@ namespace MissileDisaster.Game.Effects
                 new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.08f),
                 new GradientAlphaKey(0.85f, 0.5f), new GradientAlphaKey(0f, 1f));
             ParticleBuilder.SizeCurve(ps, 0.7f, 2.2f);   // the column swells as it rises and cools
-            ParticleBuilder.PlayAndDestroy(go, ColumnLife + 1f);
+            // The last puff leaves at ColumnEmitSeconds and then lives its full life, so the
+            // object has to outlast both or the top of the column is deleted mid-climb.
+            ParticleBuilder.PlayAndDestroy(go, ColumnEmitSeconds + ColumnLife + 1f);
         }
 
         /// <summary>The cap: a puff that spreads outward at the top once the column has arrived.</summary>
