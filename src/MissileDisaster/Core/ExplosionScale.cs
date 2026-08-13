@@ -27,6 +27,18 @@ namespace MissileDisaster.Core
     /// </summary>
     public static class ExplosionScale
     {
+        // ---------------------------------------------------------------------------------------
+        // NOT CURRENTLY USED BY THE MOD. Everything from here down to Magnitude() describes how to
+        // dispatch a vanilla effect, and the mod stopped doing that: the size of an individual
+        // particle lives in the effect prefab, a shared game asset, so neither argument below can
+        // make a vanilla explosion smaller - only sparser or wider. Non-nuclear warheads are drawn
+        // by ExplosionFallback instead, where the flame size is a parameter.
+        //
+        // It is kept because it is the only written record of what DispatchEffect's magnitude
+        // actually means, read out of the IL and confirmed by the tests below. Anyone who reaches
+        // for DispatchEffect in this codebase should read it first and not have to rediscover it.
+        // ---------------------------------------------------------------------------------------
+
         // The two constants the emitted count is built from, straight out of the IL above.
         public const float EmitAreaFloor = 100f;   // max(100, PI*r*r)
         public const float DensityPerMagnitude = 0.01f;

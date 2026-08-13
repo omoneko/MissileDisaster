@@ -4,17 +4,34 @@ using UnityEngine;
 namespace MissileDisaster.Game.Effects
 {
     /// <summary>
-    /// This mod's own explosion fireball - an additive burst of flame plus black smoke - for
-    /// when the meteor impact effect is unavailable. It scales with the destruction radius.
+    /// This mod's own explosion fireball - an additive burst of flame plus black smoke.
+    ///
+    /// <para>
+    /// It is no longer only a fallback. Every non-nuclear warhead draws its fireball here now,
+    /// because the vanilla meteor impact effect cannot be made smaller: DispatchEffect takes a
+    /// SpawnArea radius and a magnitude, and the magnitude is a particle *density*, so the only
+    /// thing either argument changes is how widely and how thickly the particles are scattered.
+    /// The size of each particle lives in the effect prefab, which is a shared game asset - a
+    /// meteor-sized flame stays meteor-sized however small the disc is. Shrinking the disc for a
+    /// 1.5 t warhead therefore produced fewer huge flames rather than a smaller explosion, which
+    /// is exactly what a subscriber reported.
+    /// </para>
+    ///
+    /// Here the flame size is a parameter, so the fireball is whatever size it should be.
     /// Main thread only.
     /// </summary>
     public static class ExplosionFallback
     {
-        public static void Play(Vector3 center, float radius)
+        /// <summary>
+        /// Draws a fireball of the given radius, in metres. A particle grows to about 1.6x its
+        /// start size and is scattered over a sphere 0.3x wide, so a start size near the radius
+        /// puts the visible edge of the ball about where it was asked for.
+        /// </summary>
+        public static void Play(Vector3 center, float fireballRadius)
         {
             try
             {
-                float size = Mathf.Clamp(radius * 0.25f, 10f, 750f);
+                float size = Mathf.Clamp(fireballRadius, 4f, 750f);
                 CreateBurst(center, "ExplosionFire", ParticleAssets.Fire, size, 0.8f, 60,
                     new Color(1f, 0.8f, 0.35f, 1f), new Color(1f, 0.4f, 0.08f, 1f), 1f, 1.6f);
                 CreateBurst(center, "ExplosionSmoke", ParticleAssets.Smoke, size * 1.2f, 2.4f, 40,

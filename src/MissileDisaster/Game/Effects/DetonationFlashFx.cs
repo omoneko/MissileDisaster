@@ -26,51 +26,121 @@ namespace MissileDisaster.Game.Effects
         private const float HoldSeconds = 0.10f;   // at full brightness
         private const float FadeSeconds = 0.70f;   // back to nothing
 
-        // The light reaches far beyond the fireball itself, which is what makes it read as a
-        // flash lighting the city rather than as a glowing ball.
+        // The point light reaches far beyond the fireball itself, which is what makes the ground
+        // near the burst read as scorched by it rather than as merely lit.
         private const float RangePerFireballRadius = 14f;
         private const float RangeMax = 8000f;      // beyond this Unity gains nothing and the cost grows
 
-        // Unity intensity. Vanilla LightEffects sit near 1-3; a nuclear flash should be plainly
-        // brighter than anything else on screen without turning the frame white for a second.
-        private const float IntensityMin = 6f;
-        private const float IntensityMax = 22f;
-        private const float IntensityPerKilotonRoot = 3.2f;   // times cbrt(kt), then clamped
+        // A point light cannot turn night into day across a city: its range is finite and it
+        // falls off with distance, so districts on the far side stay dark however bright it is.
+        // A directional light does exactly that - it lights every surface in the scene equally,
+        // wherever the camera is - so the flash is both: a local blaze and a brief wash of
+        // daylight over the whole map. Destroying the object restores the night with it, which
+        // is why this is a light rather than a change to RenderSettings.
+        private const float DirectionalMin = 2.5f;
+        private const float DirectionalMax = 9f;
+        private const float DirectionalPerKilotonRoot = 1.4f;
+
+        // Unity intensity for the point light. Vanilla LightEffects sit near 1-3; a nuclear
+        // detonation should be in a different league.
+        private const float IntensityMin = 20f;
+        private const float IntensityMax = 90f;
+        private const float IntensityPerKilotonRoot = 14f;    // times cbrt(kt), then clamped
+
+        // A conventional warhead flashes too - it has to, now that the mod draws its own fireball
+        // instead of the vanilla effect that used to carry a LightEffect - but it lights its
+        // surroundings, not the county. No directional component at all.
+        private const float ConventionalIntensityPerMetre = 0.5f;
+        private const float ConventionalIntensityMin = 3f;
+        private const float ConventionalIntensityMax = 25f;
 
         // White with the faintest warmth. A nuclear flash is near-white; tinting it orange makes
         // it read as an ordinary explosion.
         private static readonly Color FlashColor = new Color(1f, 0.97f, 0.90f, 1f);
 
         /// <summary>
-        /// Plays the flash at the point of burst. yieldKilotons sizes it; fireballRadius is the
-        /// radius the fireball itself is being drawn at, which the light's reach is built from.
-        /// A failure here never stops the detonation resolving.
+        /// The flash of a nuclear detonation: a blaze at the burst plus a brief wash of daylight
+        /// over the whole map. A failure here never stops the detonation resolving.
         /// </summary>
-        public static void Play(Vector3 burstPoint, int yieldKilotons, float fireballRadius)
+        public static void PlayNuclear(Vector3 burstPoint, int yieldKilotons, float fireballRadius)
+        {
+            Spawn("MissileDisaster_NuclearFlash", burstPoint, fireballRadius,
+                PeakIntensity(yieldKilotons), DirectionalIntensity(yieldKilotons),
+                yieldKilotons + " kt");
+        }
+
+        /// <summary>
+        /// The flash of a conventional detonation: bright where it went off and nowhere else.
+        /// Needed because the mod draws its own fireball now rather than dispatching the vanilla
+        /// meteor effect, which used to carry a LightEffect of its own.
+        /// </summary>
+        public static void PlayConventional(Vector3 burstPoint, float fireballRadius)
+        {
+            float peak = Mathf.Clamp(fireballRadius * ConventionalIntensityPerMetre,
+                ConventionalIntensityMin, ConventionalIntensityMax);
+            Spawn("MissileDisaster_Flash", burstPoint, fireballRadius, peak, 0f,
+                fireballRadius.ToString("0") + " m fireball");
+        }
+
+        private static void Spawn(string name, Vector3 burstPoint, float fireballRadius,
+            float peakIntensity, float directionalIntensity, string what)
         {
             try
             {
-                var go = new GameObject("MissileDisaster_NuclearFlash");
+                var go = new GameObject(name);
                 go.transform.position = burstPoint;
 
                 Light light = go.AddComponent<Light>();
                 light.type = LightType.Point;
                 light.color = FlashColor;
-                light.range = Mathf.Min(fireballRadius * RangePerFireballRadius, RangeMax);
+                light.range = Mathf.Min(Mathf.Max(fireballRadius, 1f) * RangePerFireballRadius, RangeMax);
                 light.intensity = 0f;   // the behaviour raises it; a full-brightness first frame would pop
                 light.shadows = LightShadows.None;   // a shadow pass at this range costs far more than it adds
 
                 var flash = go.AddComponent<FlashBehaviour>();
-                flash.PeakIntensity = PeakIntensity(yieldKilotons);
+                flash.PeakIntensity = peakIntensity;
 
-                ModConfig.Log("DetonationFlashFx: flash at " + burstPoint + " (" + yieldKilotons
-                    + " kt, range " + light.range.ToString("0") + " m, peak "
-                    + flash.PeakIntensity.ToString("0.0") + ")");
+                if (directionalIntensity > 0f)
+                {
+                    // Its own object, pointing straight down, so the whole map is lit rather
+                    // than a sphere around the burst. Parented so it dies with the flash.
+                    var sunGo = new GameObject(name + "_Daylight");
+                    sunGo.transform.parent = go.transform;
+                    sunGo.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+                    Light sun = sunGo.AddComponent<Light>();
+                    sun.type = LightType.Directional;
+                    sun.color = FlashColor;
+                    sun.intensity = 0f;
+                    sun.shadows = LightShadows.None;
+                    flash.Daylight = sun;
+                    flash.PeakDaylight = directionalIntensity;
+                }
+
+                ModConfig.Log("DetonationFlashFx: flash at " + burstPoint + " (" + what
+                    + ", range " + light.range.ToString("0") + " m, peak "
+                    + peakIntensity.ToString("0.0")
+                    + (directionalIntensity > 0f
+                        ? ", daylight " + directionalIntensity.ToString("0.0") : "") + ")");
             }
             catch (System.Exception e)
             {
-                ModConfig.LogError("DetonationFlashFx.Play error: " + e);
+                ModConfig.LogError("DetonationFlashFx.Spawn error: " + e);
             }
+        }
+
+        /// <summary>
+        /// How much daylight the flash washes over the map, from the yield. Unity's own sun sits
+        /// near 1, so even the smallest of these is brighter than noon - which is the point:
+        /// at night the city should read as lit by day for an instant.
+        /// </summary>
+        public static float DirectionalIntensity(int yieldKilotons)
+        {
+            if (yieldKilotons <= 0) return DirectionalMin;
+            float root = (float)System.Math.Pow(yieldKilotons, 1.0 / 3.0);
+            float i = DirectionalPerKilotonRoot * root;
+            if (i < DirectionalMin) return DirectionalMin;
+            if (i > DirectionalMax) return DirectionalMax;
+            return i;
         }
 
         /// <summary>
@@ -96,6 +166,8 @@ namespace MissileDisaster.Game.Effects
         private class FlashBehaviour : MonoBehaviour
         {
             public float PeakIntensity;
+            public Light Daylight;       // optional; the map-wide wash
+            public float PeakDaylight;
 
             private Light _light;
             private float _age;
@@ -110,25 +182,27 @@ namespace MissileDisaster.Game.Effects
                 if (_light == null) { Destroy(gameObject); return; }
 
                 _age += EffectClock.Delta;
+                float k = Envelope(_age);
+                if (k < 0f) { Destroy(gameObject); return; }
 
-                if (_age < RiseSeconds)
-                {
-                    _light.intensity = PeakIntensity * (_age / RiseSeconds);
-                    return;
-                }
-                if (_age < RiseSeconds + HoldSeconds)
-                {
-                    _light.intensity = PeakIntensity;
-                    return;
-                }
+                _light.intensity = PeakIntensity * k;
+                if (Daylight != null) Daylight.intensity = PeakDaylight * k;
+            }
 
-                float fade = (_age - RiseSeconds - HoldSeconds) / FadeSeconds;
-                if (fade >= 1f) { Destroy(gameObject); return; }
+            /// <summary>
+            /// 0..1 over rise and hold, then squared decay; negative once it is finished.
+            /// Squared because a linear fade reads as a dimmer being turned down, where a flash
+            /// drops away fast and then lingers faintly.
+            /// </summary>
+            private static float Envelope(float age)
+            {
+                if (age < RiseSeconds) return age / RiseSeconds;
+                if (age < RiseSeconds + HoldSeconds) return 1f;
 
-                // Squared, so it drops away fast and then lingers faintly, the way an
-                // afterglow does - a linear fade reads as a dimmer being turned down.
+                float fade = (age - RiseSeconds - HoldSeconds) / FadeSeconds;
+                if (fade >= 1f) return -1f;
                 float k = 1f - fade;
-                _light.intensity = PeakIntensity * k * k;
+                return k * k;
             }
         }
     }
