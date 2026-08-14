@@ -64,6 +64,17 @@ namespace MissileDisaster.Game
         public static string Warhead_Thermobaric = "Thermobaric";
         public static string Warhead_Nuclear = "Nuclear";
 
+        // --- Black rain ------------------------------------------------------------------------
+        public static string Options_BlackRainGroup = "Black rain";
+        public static string Options_BlackRain = "Black rain after a nuclear detonation";
+        public static string Options_BlackRainHelp =
+            "Soot and fallout scavenged out of the rising column by the water the fireball " +
+            "condensed, falling dirty enough to mark what it lands on. It rains for a few " +
+            "minutes and leaves the ground stained around the strike for a while afterwards. " +
+            "The stain is only a mark; the fallout that actually poisons the ground is the " +
+            "contamination the warhead already leaves, and an airburst - which leaves no " +
+            "fallout - leaves no stain either.";
+
         // --- Priority targeting --------------------------------------------------------------------
         public static string Options_PriorityGroup = "Priority targeting (random strikes)";
         public static string Options_PriorityHelp =

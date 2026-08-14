@@ -38,6 +38,8 @@ namespace MissileDisaster.Game.Loading
                 UI.MissileDisasterButton.DestroyButton();
                 UI.MissilePanel.Destroy();
                 UI.StrikeNotice.Reset(); // the next city gets its own warning
+            BlackRainController.Reset(); // one city's rain must not follow into the next
+            BlackRainQueue.Reset();
             }
             catch (System.Exception e)
             {

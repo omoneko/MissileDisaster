@@ -140,6 +140,12 @@ namespace MissileDisaster.Game
 
                 // Targeting: the keywords for each tier are editable, comma-separated. The
                 // weights are shown but not editable.
+                UIHelperBase br = helper.AddGroup(MissileStrings.Options_BlackRainGroup);
+                br.AddCheckbox(MissileStrings.Options_BlackRain,
+                    ModSettings.BlackRain != null && ModSettings.BlackRain.value != 0,
+                    b => { if (ModSettings.BlackRain != null) ModSettings.BlackRain.value = b ? 1 : 0; });
+                br.AddButton(MissileStrings.Options_BlackRainHelp, () => { });
+
                 UIHelperBase prio = helper.AddGroup(MissileStrings.Options_PriorityGroup);
                 prio.AddButton(MissileStrings.Options_PriorityHelp, () => { });
                 prio.AddTextfield(MissileStrings.Options_PriorityA, ModSettings.PriorityAText,

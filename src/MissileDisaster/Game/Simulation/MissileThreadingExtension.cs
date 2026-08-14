@@ -52,6 +52,11 @@ namespace MissileDisaster.Game.Simulation
                 {
                     MissileManager.UpdateVisual(simulationTimeDelta);
                 }
+
+                // Ground stains asked for by the simulation thread. Drawing is Unity work, so it
+                // has to happen here even while paused - a stain queued and never drawn would be
+                // lost, not deferred.
+                BlackRainQueue.DrainAndDraw();
             }
             catch (System.Exception e)
             {
@@ -70,6 +75,11 @@ namespace MissileDisaster.Game.Simulation
                 // against the game's natural decay, spaced out internally. Nothing is
                 // decontaminated here.
                 MissileDisaster.Game.Contamination.ContaminationManager.Maintain(nowTicks);
+
+                // Hold the weather at rain while the black rain lasts. It has to be written every
+                // tick: the weather simulation rewrites m_targetRain from its own cycle each
+                // step, so setting it once does nothing.
+                BlackRainController.Update(SimulationManager.instance.m_simulationTimeDelta);
 
                 // The random strike scheduler, following the vanilla disaster frequency.
                 AdvanceRandomStrikes(nowTicks);

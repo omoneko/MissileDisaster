@@ -90,6 +90,47 @@ namespace MissileDisaster.Game
             DisasterHelpers.DestroyStuff(seed, null, pos, outer, outer, removeRadius, destMin, destMax, burnMin, burnMax);
 
             SplashWater(pos, spec);
+            StartBlackRain(pos, spec);
+        }
+
+        /// <summary>
+        /// Brings the black rain down after a nuclear detonation: soot and fallout scavenged out
+        /// of the column by the water the fireball condensed, falling dirty enough to mark what
+        /// it lands on.
+        /// <para>
+        /// The game does none of this by itself - its weather simulation never reads pollution -
+        /// so rain a player sees after a strike is the ordinary cycle and a coincidence. This is
+        /// the deliberate version. The ground stain is cosmetic; the fallout that actually does
+        /// something is the ground pollution applied above.
+        /// </para>
+        /// Simulation thread, like the rest of this class.
+        /// </summary>
+        private static void StartBlackRain(Vector3 pos, WarheadSpec spec)
+        {
+            try
+            {
+                if (spec.Type != WarheadType.Nuclear) return;
+                if (ModSettings.BlackRain == null || ModSettings.BlackRain.value == 0) return;
+                if (!BlackRain.Falls(spec.YieldKilotons)) return;
+
+                float rainSeconds = BlackRain.RainSeconds(spec.YieldKilotons);
+                BlackRainController.Begin(rainSeconds);
+
+                // The stain rides the fallout down, so it is sized from that. An airburst leaves
+                // no fallout and therefore no stain - which is the real behaviour, and the reason
+                // airbursts were used on cities.
+                float stainRadius = BlackRain.StainRadius(spec.ContaminationRadius);
+                if (stainRadius <= 0f) return;
+
+                // Drawing is main-thread work, so it is handed over rather than done here.
+                Vector3 groundZero = pos;
+                float stainSeconds = BlackRain.StainSeconds(rainSeconds);
+                BlackRainQueue.Enqueue(groundZero, stainRadius, stainSeconds);
+            }
+            catch (System.Exception e)
+            {
+                ModConfig.LogError("ImpactResolver.StartBlackRain error: " + e);
+            }
         }
 
         /// <summary>

@@ -26,6 +26,7 @@ namespace MissileDisaster.Game
         public static SavedInt StrikeFrequencyPct;    // strike frequency as a percentage of the natural disaster rate; 25 to 300, with 100 meaning 1.0
         public static SavedInt AttackPattern;         // impact pattern: 0 single, 1 MIRV, 2 random
         public static SavedInt RandomWarhead;         // 0 picks at random; 1 to 5 fix it to conventional, cluster, white phosphorus, thermobaric or nuclear
+        public static SavedInt BlackRain;             // the black rain that follows a nuclear detonation, 0 or 1
 
         // Keywords for each targeting tier, comma-separated, matched as substrings against the
         // building's internal info.name. Tier A outranks B, which outranks C.
@@ -57,6 +58,9 @@ namespace MissileDisaster.Game
                 StrikeFrequencyPct = new SavedInt("strikeFrequencyPct", FileName, 100, true);
                 AttackPattern = new SavedInt("attackPattern", FileName, 0, true);
                 RandomWarhead = new SavedInt("randomWarhead", FileName, 0, true);
+                // On by default: it only follows a nuclear detonation, which the player either
+                // launched or switched random strikes on for, and it costs nothing but weather.
+                BlackRain = new SavedInt("blackRain", FileName, 1, true);
                 PriorityKeywordsA = new SavedString("priorityKeywordsA", FileName, DefaultKeywordsA, true);
                 PriorityKeywordsB = new SavedString("priorityKeywordsB", FileName, DefaultKeywordsB, true);
                 PriorityKeywordsC = new SavedString("priorityKeywordsC", FileName, DefaultKeywordsC, true);
