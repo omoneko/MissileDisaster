@@ -32,46 +32,73 @@ public class BlackRainTests
     }
 
     [Fact]
-    public void An_airburst_leaves_no_stain()
+    public void An_airburst_stains_too_because_it_is_the_fires_that_blacken_the_rain()
     {
-        // The stain rides the fallout down, and an airburst leaves none - which is the real
-        // behaviour, and the reason airbursts were used over cities.
+        // Hiroshima was an airburst at 600 m and its black rain is the case this is modelled on.
+        // Tying the stain to fallout, which an airburst does not leave, gave exactly the wrong
+        // answer for the one detonation everybody has heard of.
         var airburst = WarheadSpec.For(WarheadType.Nuclear).WithBurst(BurstType.Airburst);
+
         Assert.Equal(0f, airburst.ContaminationRadius, 3);
-        Assert.Equal(0f, BlackRain.StainRadius(airburst.ContaminationRadius), 3);
+        Assert.True(airburst.BurnRadius > 0f, "an airburst still sets the city alight");
+        Assert.True(BlackRain.StainRadius(airburst.BurnRadius) > 0f);
     }
 
     [Fact]
-    public void A_groundburst_stains_exactly_the_ground_it_contaminated()
+    public void The_stain_covers_the_ground_the_fires_reached()
     {
-        // The stain is the rain that brought the fallout down, so it lands where the fallout
-        // did. It used to reach 1.35x further, which put the mark outside the contamination it
-        // was there to explain.
-        // Up to the baseline. Past about 200 kt the fallout itself runs past the ceiling below -
-        // a 1 Mt groundburst contaminates a 9.9 km radius, which is wider than the map - and
-        // there the stain stops matching it on purpose.
+        // The soot comes off the burning city, so the mark is the size of the fire field.
         foreach (int kt in new[] { 15, 150 })
         {
             var ground = WarheadSpec.For(WarheadType.Nuclear)
                 .WithBurst(BurstType.Groundburst)
                 .Scaled(NuclearYields.Multiplier(kt));
 
-            Assert.True(ground.ContaminationRadius < BlackRain.StainRadiusMax,
+            Assert.True(ground.BurnRadius < BlackRain.StainRadiusMax,
                 kt + " kt already exceeds the ceiling; pick a smaller yield for this test");
-            Assert.Equal(ground.ContaminationRadius,
-                BlackRain.StainRadius(ground.ContaminationRadius), 1);
+            Assert.Equal(ground.BurnRadius, BlackRain.StainRadius(ground.BurnRadius), 1);
         }
     }
 
     [Fact]
-    public void An_absurd_fallout_radius_is_still_held_under_a_ceiling()
+    public void A_detonation_that_starts_no_fires_leaves_no_mark()
     {
-        // Nothing in the catalogue reaches it - the ceiling is a guard against a hand-typed
-        // yield asking to grey out the entire map, not a limit anyone meets.
-        var ground = WarheadSpec.For(WarheadType.Nuclear).WithBurst(BurstType.Groundburst);
-        Assert.True(ground.ContaminationRadius < BlackRain.StainRadiusMax,
-            "the baseline now hits the ceiling - the stain no longer matches the contamination");
+        // No fires, no soot, no black rain - which is why a test shot in a desert produced
+        // fallout and white coral ash but nothing anyone called black rain.
+        Assert.Equal(0f, BlackRain.StainRadius(0f), 3);
+    }
+
+    [Fact]
+    public void An_absurd_fire_radius_is_still_held_under_a_ceiling()
+    {
+        // A guard against a hand-typed yield asking to grey out the entire map.
         Assert.Equal(BlackRain.StainRadiusMax, BlackRain.StainRadius(1e6f), 3);
+    }
+
+    [Fact]
+    public void The_stain_is_carried_downwind_rather_than_ringing_the_burst()
+    {
+        // The Hiroshima rain fell to the north and west of the hypocentre. A disc centred on the
+        // burst is the one shape it certainly was not.
+        float cx, cz;
+        BlackRain.Centre(0f, 0f, 1000f, 0f, 1f, out cx, out cz);
+
+        Assert.Equal(0f, cx, 3);
+        Assert.True(cz > 0f, "the stain did not move downwind at all");
+        Assert.Equal(1000f * BlackRain.DownwindOffsetFraction, cz, 3);
+
+        // And it follows the wind rather than a fixed compass direction.
+        BlackRain.Centre(0f, 0f, 1000f, -1f, 0f, out cx, out cz);
+        Assert.Equal(-1000f * BlackRain.DownwindOffsetFraction, cx, 3);
+        Assert.Equal(0f, cz, 3);
+    }
+
+    [Fact]
+    public void The_stain_is_longer_downwind_than_it_is_wide()
+    {
+        Assert.True(BlackRain.DownwindStretch > BlackRain.CrosswindSquash,
+            "the ellipse is not elongated along the wind");
+        Assert.True(BlackRain.CrosswindSquash < 1f, "it must also narrow across the wind");
     }
 
     [Fact]

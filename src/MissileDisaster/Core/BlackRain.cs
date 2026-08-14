@@ -28,17 +28,31 @@ namespace MissileDisaster.Core
         public const float RainSecondsMax = 240f;
 
         /// <summary>
-        /// The stain covers the contaminated ground, one to one: it is the rain that brought the
-        /// fallout down, so it lands where the fallout did.
+        /// The stain is sized from the FIRES, not from the fallout.
         /// <para>
-        /// It used to spread 1.35x wider, on the argument that rain drifts on the wind. That is
-        /// true and it looked wrong - the mark reached past the contamination it was supposed to
-        /// be explaining, so the two read as unrelated.
+        /// What makes the rain black is soot, and the soot comes from the city burning: the
+        /// third of the three clouds behind it is the one the fires' updraught carries to about
+        /// 800 m. Sizing it from the fallout was the wrong quantity - and it also, wrongly, gave
+        /// an airburst no stain at all, when Hiroshima was an airburst at 600 m and the black
+        /// rain there is the case everything else here is modelled on.
         /// </para>
         /// </summary>
-        public const float StainRadiusPerFallout = 1f;
+        public const float StainRadiusPerBurn = 1f;
         public const float StainRadiusMin = 80f;
         public const float StainRadiusMax = 6000f;
+
+        /// <summary>
+        /// How far downwind the stain's centre is pushed, against its radius, and how much it is
+        /// stretched along the wind and squeezed across it.
+        /// <para>
+        /// The Hiroshima rain did not fall in a circle around the hypocentre: it fell to the
+        /// north and west, because the column was carried on the wind before it came down. A
+        /// disc centred on the burst is the one shape it certainly was not.
+        /// </para>
+        /// </summary>
+        public const float DownwindOffsetFraction = 0.45f;
+        public const float DownwindStretch = 1.5f;
+        public const float CrosswindSquash = 0.72f;
 
         /// <summary>
         /// The mark outlasts the shower that left it, but only just. It is soot on wet ground,
@@ -81,11 +95,26 @@ namespace MissileDisaster.Core
             return Clamp(RainSecondsPerKilotonRoot * root, RainSecondsMin, RainSecondsMax);
         }
 
-        /// <summary>How far the stain reaches, in metres, from the fallout radius it rode down on.</summary>
-        public static float StainRadius(float falloutRadius)
+        /// <summary>
+        /// How far the stain reaches, in metres, from the radius of the fires whose soot made it
+        /// black. No fires, no soot, no black rain - which is why a nuclear test in a desert
+        /// produced fallout and white coral ash but nothing anyone called black rain.
+        /// </summary>
+        public static float StainRadius(float burnRadius)
         {
-            if (falloutRadius <= 0f) return 0f;
-            return Clamp(falloutRadius * StainRadiusPerFallout, StainRadiusMin, StainRadiusMax);
+            if (burnRadius <= 0f) return 0f;
+            return Clamp(burnRadius * StainRadiusPerBurn, StainRadiusMin, StainRadiusMax);
+        }
+
+        /// <summary>
+        /// Where the stain's centre sits, given the burst point and the direction the wind is
+        /// blowing towards. Downwind by DownwindOffsetFraction of the radius.
+        /// </summary>
+        public static void Centre(float burstX, float burstZ, float radius,
+            float windX, float windZ, out float centreX, out float centreZ)
+        {
+            centreX = burstX + windX * radius * DownwindOffsetFraction;
+            centreZ = burstZ + windZ * radius * DownwindOffsetFraction;
         }
 
         /// <summary>How long the ground stays marked, in simulation seconds.</summary>

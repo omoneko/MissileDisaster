@@ -68,12 +68,11 @@ namespace MissileDisaster.Game
         public static string Options_BlackRainGroup = "Black rain";
         public static string Options_BlackRain = "Black rain after a nuclear detonation";
         public static string Options_BlackRainHelp =
-            "Soot and fallout scavenged out of the rising column by the water the fireball " +
-            "condensed, falling dirty enough to mark what it lands on. It rains for a few " +
-            "minutes and leaves the ground stained around the strike for a while afterwards. " +
-            "The stain is only a mark; the fallout that actually poisons the ground is the " +
-            "contamination the warhead already leaves, and an airburst - which leaves no " +
-            "fallout - leaves no stain either.";
+            "Soot lifted by the burning city, scavenged out of the column by the water the " +
+            "fireball condensed and falling dirty enough to mark what it lands on. It comes " +
+            "down about half the time, drifts downwind of the strike rather than ringing it, " +
+            "and lifts again shortly after the rain stops. The mark is only a mark: the fallout " +
+            "that actually poisons the ground is the contamination the warhead already leaves.";
 
         // --- Priority targeting --------------------------------------------------------------------
         public static string Options_PriorityGroup = "Priority targeting (random strikes)";

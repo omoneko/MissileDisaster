@@ -1,3 +1,4 @@
+using ColossalFramework;
 using MissileDisaster.Core;
 using UnityEngine;
 
@@ -124,20 +125,50 @@ namespace MissileDisaster.Game
                 float rainSeconds = BlackRain.RainSeconds(spec.YieldKilotons);
                 BlackRainController.Begin(rainSeconds);
 
-                // The stain rides the fallout down, so it is sized from that. An airburst leaves
-                // no fallout and therefore no stain - which is the real behaviour, and the reason
-                // airbursts were used on cities.
-                float stainRadius = BlackRain.StainRadius(spec.ContaminationRadius);
+                // Sized from the FIRES, not the fallout: the soot that makes the rain black comes
+                // off the burning city. That is also why an airburst gets one - Hiroshima was an
+                // airburst at 600 m, and its black rain is the case this is modelled on.
+                float stainRadius = BlackRain.StainRadius(spec.BurnRadius);
                 if (stainRadius <= 0f) return;
 
+                // Downwind, because the column is carried before it comes down. The Hiroshima
+                // rain fell to the north and west of the hypocentre, not in a ring around it.
+                float windX, windZ;
+                WindDirection(out windX, out windZ);
+                float cx, cz;
+                BlackRain.Centre(pos.x, pos.z, stainRadius, windX, windZ, out cx, out cz);
+
                 // Drawing is main-thread work, so it is handed over rather than done here.
-                Vector3 groundZero = pos;
                 float stainSeconds = BlackRain.StainSeconds(rainSeconds);
-                BlackRainQueue.Enqueue(groundZero, stainRadius, stainSeconds);
+                BlackRainQueue.Enqueue(new Vector3(cx, pos.y, cz), stainRadius, stainSeconds,
+                    windX, windZ);
             }
             catch (System.Exception e)
             {
                 ModConfig.LogError("ImpactResolver.StartBlackRain error: " + e);
+            }
+        }
+
+        /// <summary>
+        /// The unit vector the wind is blowing towards. WeatherManager.m_windDirection is an
+        /// angle in degrees; a missing manager or a still day falls back to north, so the stain
+        /// is offset consistently rather than jumping back to a centred disc.
+        /// </summary>
+        private static void WindDirection(out float x, out float z)
+        {
+            x = 0f;
+            z = 1f;
+            try
+            {
+                WeatherManager wm = Singleton<WeatherManager>.instance;
+                if (wm == null) return;
+                float radians = wm.m_windDirection * Mathf.Deg2Rad;
+                x = Mathf.Sin(radians);
+                z = Mathf.Cos(radians);
+            }
+            catch (System.Exception e)
+            {
+                ModConfig.LogError("ImpactResolver.WindDirection error: " + e);
             }
         }
 

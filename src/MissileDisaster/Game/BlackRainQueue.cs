@@ -20,17 +20,24 @@ namespace MissileDisaster.Game
             public Vector3 GroundZero;
             public float Radius;
             public float Seconds;
+            public float WindX;
+            public float WindZ;
         }
 
         private static readonly List<Stain> _queue = new List<Stain>();
         private static readonly object _lock = new object();
 
         /// <summary>Simulation thread. Asks for a stain to be drawn on the next main-thread frame.</summary>
-        public static void Enqueue(Vector3 groundZero, float radius, float seconds)
+        public static void Enqueue(Vector3 groundZero, float radius, float seconds,
+            float windX, float windZ)
         {
             lock (_lock)
             {
-                _queue.Add(new Stain { GroundZero = groundZero, Radius = radius, Seconds = seconds });
+                _queue.Add(new Stain
+                {
+                    GroundZero = groundZero, Radius = radius, Seconds = seconds,
+                    WindX = windX, WindZ = windZ,
+                });
             }
         }
 
@@ -50,7 +57,8 @@ namespace MissileDisaster.Game
 
             for (int i = 0; i < pending.Count; i++)
             {
-                Effects.BlackRainFx.Play(pending[i].GroundZero, pending[i].Radius, pending[i].Seconds);
+                Effects.BlackRainFx.Play(pending[i].GroundZero, pending[i].Radius,
+                    pending[i].Seconds, pending[i].WindX, pending[i].WindZ);
             }
         }
 
