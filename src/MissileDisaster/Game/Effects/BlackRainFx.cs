@@ -46,15 +46,23 @@ namespace MissileDisaster.Game.Effects
         /// - stays the same however many there are. Only the per-particle CPU work grows, and
         /// four thousand billboards is not much of that.
         private const float PatchMetres = 60f;
-        private const int MaxPatches = 4000;
+        private const int MaxPatches = 6000;
         private const int MinPatches = 60;
 
         /// <summary>
-        /// How many times over the patches cover the ground. Above 1 they overlap, which is what
-        /// turns a scatter of discs into a continuous wash - and what lets each one be drawn
-        /// faint, so the overlaps build the colour up instead of one sprite carrying it.
+        /// How many times over the patches cover the ground. Well above 1: the survivors describe
+        /// rain that fell like dissolved ink, and what it left behind was general filth with
+        /// splatter in it - not a pattern. Discs that merely touch read as a pattern, so they are
+        /// stacked several deep and each is drawn faint enough that no single one is findable.
         /// </summary>
-        private const float Coverage = 1.6f;
+        private const float Coverage = 2.4f;
+
+        /// <summary>
+        /// How far a patch is jittered off its lattice point, against its own size. The points
+        /// come off an even spiral, and an even spiral is exactly what the eye reads as leopard
+        /// print - real splatter clumps and leaves bare ground, so the regularity is broken here.
+        /// </summary>
+        private const float Jitter = 0.85f;
 
         private const float GroundClearance = 1.2f;   // off the terrain, so it does not z-fight
 
@@ -63,12 +71,14 @@ namespace MissileDisaster.Game.Effects
         private const float SoakFraction = 0.1f;
         private const float HoldFraction = 0.45f;
 
-        // Wet soot: nearly black, never quite. Pure black reads as a hole in the terrain.
-        // The alpha is low because the patches overlap Coverage times over - it is the stack that
-        // makes the colour, not the individual sprite, and that is what stops the wash looking
-        // like a set of discs laid on the map.
-        private static readonly Color StainDark = new Color(0.11f, 0.10f, 0.09f, 0.30f);
-        private static readonly Color StainLight = new Color(0.24f, 0.23f, 0.21f, 0.24f);
+        // Wet soot: nearly black, never quite - pure black reads as a hole in the terrain.
+        // The alpha is very low because the patches stack Coverage deep; it is the stack that
+        // makes the colour, not any one sprite. That is the whole difference between a wash and
+        // a set of discs laid on the map.
+        private static readonly Color StainDark = new Color(0.10f, 0.09f, 0.08f, 1f);
+        private static readonly Color StainLight = new Color(0.22f, 0.20f, 0.18f, 1f);
+        private const float AlphaMin = 0.07f;
+        private const float AlphaMax = 0.16f;
 
         /// <summary>
         /// Stains the ground across radius around groundZero, following the terrain. A radius or
@@ -88,10 +98,11 @@ namespace MissileDisaster.Game.Effects
                     ? 2f * radius * Mathf.Sqrt(Coverage / patches)
                     : PatchMetres;
 
-                // The cloud material, not the soft-glow smoke: smoke is nearly transparent
-                // everywhere but its centre, which is right for a wisp in the air and is exactly
-                // what made this read as haze lying over the map rather than as wet ground.
-                var go = ParticleBuilder.NewSystem("BlackRainStain", groundZero, ParticleAssets.Cloud);
+                // The soft-glow smoke material, not the opaque-cored cloud. The cloud texture has
+                // a hard core, and a hard-edged disc is findable however small it is - which is
+                // what turned the wash into leopard print. Soft edges are what let neighbouring
+                // patches blend into one another instead of tiling.
+                var go = ParticleBuilder.NewSystem("BlackRainStain", groundZero, ParticleAssets.Smoke);
                 var ps = go.GetComponent<ParticleSystem>();
 
                 var main = ps.main;
@@ -144,7 +155,6 @@ namespace MissileDisaster.Game.Effects
 
             var p = new ParticleSystem.EmitParams();
             p.startLifetime = seconds;
-            p.startSize = size;
             p.velocity = Vector3.zero;
 
             for (int i = 0; i < patches; i++)
@@ -153,17 +163,32 @@ namespace MissileDisaster.Game.Effects
                 float r = radius * Mathf.Sqrt(t);
                 float a = i * goldenAngle;
 
-                var pos = new Vector3(centre.x + Mathf.Cos(a) * r, 0f, centre.z + Mathf.Sin(a) * r);
+                // Off the lattice, by up to Jitter of a patch in each direction. Two different
+                // irrational strides so x and z do not move together and re-form a pattern.
+                float jx = (Frac(i * 0.7548777f) - 0.5f) * 2f * Jitter * size;
+                float jz = (Frac(i * 0.5698402f) - 0.5f) * 2f * Jitter * size;
+
+                var pos = new Vector3(centre.x + Mathf.Cos(a) * r + jx, 0f,
+                                      centre.z + Mathf.Sin(a) * r + jz);
                 pos.y = terrain != null
                     ? terrain.SampleRawHeightSmoothWithWater(pos, false, 0f) + GroundClearance
                     : centre.y + GroundClearance;
 
-                // Size and rotation vary per patch so the wash does not read as a tiled grid.
-                // The size band is narrow: with this many patches the variety only has to break
-                // the pattern, and a wide band brings back the blobs it is meant to avoid.
+                // Colour is set per particle rather than left to the module. With Emit() the
+                // module's start colour is not reliably what reaches the shader's _TintColor, and
+                // an untinted particle draws white - which is what put pale blobs through the
+                // stain. Setting it here removes the question, and lets each patch carry its own
+                // weight so the wash varies the way filth does.
+                float mix = Frac(i * 0.6180339f);
+                Color c = Color.Lerp(StainDark, StainLight, mix);
+                c.a = AlphaMin + (AlphaMax - AlphaMin) * Frac(i * 0.3819660f);
+
                 p.position = pos;
-                p.startSize = size * (0.85f + 0.3f * Frac(i * 0.6180339f));
-                p.rotation = 360f * Frac(i * 0.7548777f);
+                p.startColor = c;
+                // A wide size band on purpose: splatter is not one drop size, and varied sizes
+                // stacked several deep stop any one disc being findable.
+                p.startSize = size * (0.55f + 1.1f * Frac(i * 0.4142135f));
+                p.rotation = 360f * Frac(i * 0.2360679f);
                 ps.Emit(p, 1);
             }
         }
