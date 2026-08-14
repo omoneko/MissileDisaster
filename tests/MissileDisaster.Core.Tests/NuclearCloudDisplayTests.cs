@@ -53,7 +53,7 @@ public class NuclearCloudDisplayTests
         foreach (float kt in new[] { 15f, 22f, 150f, 300f, 475f })
         {
             NuclearCloudDimensions d = NuclearCloudDisplay.For(kt);
-            Assert.Equal(NuclearCloud.CloudRadius(kt) * S * NuclearCloudDisplay.CapWidthScale,
+            Assert.Equal(NuclearCloud.CloudRadius(kt) * S * NuclearCloudDisplay.CapWidthFactor(kt),
                 d.CapRadius, 1);
         }
     }
@@ -162,7 +162,7 @@ public class NuclearCloudDisplayTests
         foreach (float kt in new[] { 15f, 22f, 150f })
         {
             NuclearCloudDimensions d = NuclearCloudDisplay.For(kt);
-            float drawnWidth = d.CapRadius / NuclearCloudDisplay.CapWidthScale * 2f;
+            float drawnWidth = d.CapRadius / NuclearCloudDisplay.CapWidthFactor(kt) * 2f;
             float drawnHeight = d.CloudTop / NuclearCloudDisplay.CloudHeightScale;
             float drawn = drawnWidth / drawnHeight;
             float real = NuclearCloud.CloudRadius(kt) * 2f / NuclearCloud.CloudTop(kt);
@@ -269,7 +269,7 @@ public class NuclearCloudDisplayTests
                 NuclearCloudDisplay.FireballRadiusMin * NuclearCloudDisplay.FireballScale,
                 NuclearCloudDisplay.FireballRadiusCeiling * NuclearCloudDisplay.FireballScale);
             Assert.InRange(d.CapRadius, NuclearCloudDisplay.CapRadiusMin * S,
-                NuclearCloudDisplay.CapRadiusCeiling * S * NuclearCloudDisplay.CapWidthScale);
+                NuclearCloudDisplay.CapRadiusCeiling * S * NuclearCloudDisplay.CapWidthFactor(kt));
             Assert.InRange(d.CloudTop, 1f, NuclearCloudDisplay.ScreenTopAltitude);
             Assert.InRange(d.RiseSeconds, NuclearCloudDisplay.RiseSecondsMin,
                 NuclearCloudDisplay.RiseSecondsCeiling);
@@ -287,7 +287,8 @@ public class NuclearCloudDisplayTests
         {
             NuclearCloudDimensions d = NuclearCloudDisplay.For(kt);
             Assert.InRange(d.StemRadius / d.CapRadius,
-                0.099f / NuclearCloudDisplay.CapWidthScale, 0.501f / NuclearCloudDisplay.CapWidthScale);
+                0.099f / NuclearCloudDisplay.CapWidthFactor(kt),
+                0.501f / NuclearCloudDisplay.CapWidthFactor(kt));
         }
     }
 

@@ -111,7 +111,15 @@ namespace MissileDisaster.Game
             {
                 if (spec.Type != WarheadType.Nuclear) return;
                 if (ModSettings.BlackRain == null || ModSettings.BlackRain.value == 0) return;
-                if (!BlackRain.Falls(spec.YieldKilotons)) return;
+                // A coin toss, on the simulation thread's own randomizer so that reloading the
+                // save and replaying the strike gives the same weather.
+                int roll = (int)SimulationManager.instance.m_randomizer.Int32(100u);
+                if (!BlackRain.FallsThisTime(spec.YieldKilotons, roll))
+                {
+                    ModConfig.Log("No black rain this time (roll " + roll + " of "
+                        + BlackRain.ChancePercent + ").");
+                    return;
+                }
 
                 float rainSeconds = BlackRain.RainSeconds(spec.YieldKilotons);
                 BlackRainController.Begin(rainSeconds);

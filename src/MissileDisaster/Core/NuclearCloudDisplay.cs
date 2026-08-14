@@ -1,3 +1,4 @@
+using System;
 namespace MissileDisaster.Core
 {
     /// <summary>
@@ -134,6 +135,42 @@ namespace MissileDisaster.Core
         /// </summary>
         public const float CapWidthScale = 1.3f;
 
+        /// <summary>
+        /// Extra width for the cap at low yields, on top of CapWidthScale.
+        ///
+        /// <para>
+        /// The figures are right and the small clouds still read wrong: at 15 kt the canopy is
+        /// only 120 m of radius against a column drawn 795 m tall, so the mushroom comes out as
+        /// a thin spike with a knob on it. The proportion is honest - a small cloud really is
+        /// narrow for its height - but it is not what a 15 kt shot looks like in the photographs
+        /// people remember, because those were taken from far enough away to foreshorten it.
+        /// </para>
+        ///
+        /// So the boost is full at and below LowYieldKilotons and gone by LowYieldFadesByKilotons,
+        /// interpolated on log10 between them - the same scale every other yield law here uses.
+        /// The large yields, which already read correctly, are untouched.
+        /// </summary>
+        public const float LowYieldCapWidthBoost = 1.25f;
+        public const float LowYieldKilotons = 30f;
+        public const float LowYieldFadesByKilotons = 200f;
+
+        /// <summary>
+        /// The cap's total width multiplier at this yield: CapWidthScale, plus the low-yield
+        /// boost where it applies.
+        /// </summary>
+        public static float CapWidthFactor(float kilotons)
+        {
+            if (kilotons <= 0f) return CapWidthScale * LowYieldCapWidthBoost;
+            if (kilotons <= LowYieldKilotons) return CapWidthScale * LowYieldCapWidthBoost;
+            if (kilotons >= LowYieldFadesByKilotons) return CapWidthScale;
+
+            double from = Math.Log10(LowYieldKilotons);
+            double to = Math.Log10(LowYieldFadesByKilotons);
+            float t = (float)((Math.Log10(kilotons) - from) / (to - from));
+            float boost = LowYieldCapWidthBoost + (1f - LowYieldCapWidthBoost) * t;
+            return CapWidthScale * boost;
+        }
+
         // The tropopause: the lid the canopy spreads out under, in real metres, before the
         // scale. Through the troposphere the air gets colder with height, so a fireball that
         // cools as it expands stays warmer than what surrounds it and keeps climbing; at the
@@ -222,7 +259,7 @@ namespace MissileDisaster.Core
                 FireballRadiusMin, FireballRadiusKnee, FireballRadiusCeiling) * FireballScale;
             d.FireballSeconds = EffectCeiling.Soft(NuclearCloud.FireballSeconds(kt),
                 FireballSecondsMin, FireballSecondsKnee, FireballSecondsCeiling);
-            d.CapRadius = capRadius * CloudScale * CapWidthScale;
+            d.CapRadius = capRadius * CloudScale * CapWidthFactor(kt);
             d.CloudTop = EffectCeiling.Soft(cloudTop * CloudScale * CloudHeightScale,
                 CloudTopDrawnKnee, ScreenTopAltitude);
             d.CapBase = d.CloudTop * baseFraction;

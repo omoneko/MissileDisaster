@@ -28,23 +28,49 @@ namespace MissileDisaster.Core
         public const float RainSecondsMax = 240f;
 
         /// <summary>
-        /// The stain spreads wider than the fallout that carries it: rain drifts on the wind and
-        /// lands beyond where the column stood.
+        /// The stain covers the contaminated ground, one to one: it is the rain that brought the
+        /// fallout down, so it lands where the fallout did.
+        /// <para>
+        /// It used to spread 1.35x wider, on the argument that rain drifts on the wind. That is
+        /// true and it looked wrong - the mark reached past the contamination it was supposed to
+        /// be explaining, so the two read as unrelated.
+        /// </para>
         /// </summary>
-        public const float StainRadiusPerFallout = 1.35f;
+        public const float StainRadiusPerFallout = 1f;
         public const float StainRadiusMin = 80f;
-        public const float StainRadiusMax = 4000f;
+        public const float StainRadiusMax = 6000f;
 
-        /// <summary>The mark outlasts the shower that left it, but not by a great deal.</summary>
-        public const float StainSecondsFactor = 2.5f;
+        /// <summary>
+        /// The mark outlasts the shower that left it, but only just. It is soot on wet ground,
+        /// not a scar: the rain that laid it down washes it away almost as fast.
+        /// </summary>
+        public const float StainSecondsFactor = 0.6f;
 
         /// <summary>Below this yield there is not enough column to scavenge anything worth seeing.</summary>
         public const float MinimumKilotons = 0.5f;
 
-        /// <summary>Whether a detonation of this size brings black rain down at all.</summary>
+        /// <summary>
+        /// The chance, in percent, that a detonation large enough for it actually brings the rain
+        /// down. It needs moisture in the air to scavenge, and it did not follow every historical
+        /// shot - making it certain turned a striking detail into scenery, so it is a coin toss.
+        /// </summary>
+        public const int ChancePercent = 50;
+
+        /// <summary>Whether a detonation of this size could bring black rain down at all.</summary>
         public static bool Falls(float kilotons)
         {
             return kilotons >= MinimumKilotons;
+        }
+
+        /// <summary>
+        /// Whether this particular detonation brings it down. roll is 0-99, and the caller owns
+        /// the randomness - the simulation thread's own randomizer, so a replay of the same save
+        /// makes the same weather.
+        /// </summary>
+        public static bool FallsThisTime(float kilotons, int roll)
+        {
+            if (!Falls(kilotons)) return false;
+            return roll >= 0 && roll < ChancePercent;
         }
 
         /// <summary>How long it rains, in simulation seconds.</summary>

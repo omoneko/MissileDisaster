@@ -42,41 +42,68 @@ public class BlackRainTests
     }
 
     [Fact]
-    public void A_groundburst_stains_wider_than_its_fallout()
+    public void A_groundburst_stains_exactly_the_ground_it_contaminated()
     {
-        // Rain drifts on the wind and lands beyond where the column stood. Checked at 15 kt:
-        // the 150 kt baseline's fallout is 5.3 km, past the ceiling below, and a stain 8 km
-        // across is already most of the map - so the largest yields are the one case where the
-        // mark is narrower than the fallout, by deliberate choice rather than by accident.
-        var ground = WarheadSpec.For(WarheadType.Nuclear)
-            .WithBurst(BurstType.Groundburst)
-            .Scaled(NuclearYields.Multiplier(15));
-        float stain = BlackRain.StainRadius(ground.ContaminationRadius);
+        // The stain is the rain that brought the fallout down, so it lands where the fallout
+        // did. It used to reach 1.35x further, which put the mark outside the contamination it
+        // was there to explain.
+        // Up to the baseline. Past about 200 kt the fallout itself runs past the ceiling below -
+        // a 1 Mt groundburst contaminates a 9.9 km radius, which is wider than the map - and
+        // there the stain stops matching it on purpose.
+        foreach (int kt in new[] { 15, 150 })
+        {
+            var ground = WarheadSpec.For(WarheadType.Nuclear)
+                .WithBurst(BurstType.Groundburst)
+                .Scaled(NuclearYields.Multiplier(kt));
 
-        Assert.True(stain < BlackRain.StainRadiusMax, "the ceiling must not bite at 15 kt");
-        Assert.True(stain > ground.ContaminationRadius,
-            "the stain is no wider than the fallout that carried it");
-        Assert.InRange(stain, BlackRain.StainRadiusMin, BlackRain.StainRadiusMax);
+            Assert.True(ground.ContaminationRadius < BlackRain.StainRadiusMax,
+                kt + " kt already exceeds the ceiling; pick a smaller yield for this test");
+            Assert.Equal(ground.ContaminationRadius,
+                BlackRain.StainRadius(ground.ContaminationRadius), 1);
+        }
     }
 
     [Fact]
-    public void The_biggest_yields_are_held_under_the_stain_ceiling()
+    public void An_absurd_fallout_radius_is_still_held_under_a_ceiling()
     {
-        // 8 km across is already half the playable map; past that the mark stops reading as a
-        // mark. The ceiling is what stops a strategic warhead greying out the whole city.
+        // Nothing in the catalogue reaches it - the ceiling is a guard against a hand-typed
+        // yield asking to grey out the entire map, not a limit anyone meets.
         var ground = WarheadSpec.For(WarheadType.Nuclear).WithBurst(BurstType.Groundburst);
-        Assert.True(ground.ContaminationRadius > BlackRain.StainRadiusMax,
-            "the baseline no longer reaches the ceiling - this test proves nothing");
-        Assert.Equal(BlackRain.StainRadiusMax,
-            BlackRain.StainRadius(ground.ContaminationRadius), 3);
+        Assert.True(ground.ContaminationRadius < BlackRain.StainRadiusMax,
+            "the baseline now hits the ceiling - the stain no longer matches the contamination");
+        Assert.Equal(BlackRain.StainRadiusMax, BlackRain.StainRadius(1e6f), 3);
     }
 
     [Fact]
-    public void The_stain_outlasts_the_shower_that_left_it()
+    public void The_stain_lifts_before_the_rain_stops()
     {
+        // Soot on wet ground, not a scar: the shower that laid it down washes it off again.
         float rain = BlackRain.RainSeconds(150f);
-        Assert.True(BlackRain.StainSeconds(rain) > rain);
+        Assert.True(BlackRain.StainSeconds(rain) < rain,
+            "the mark outlasts the rain that is supposed to be washing it away");
         Assert.Equal(rain * BlackRain.StainSecondsFactor, BlackRain.StainSeconds(rain), 3);
+    }
+
+    [Fact]
+    public void It_only_rains_about_half_the_time()
+    {
+        // A coin toss rather than a certainty: making it follow every strike turned a striking
+        // detail into scenery.
+        int fell = 0;
+        for (int roll = 0; roll < 100; roll++)
+        {
+            if (BlackRain.FallsThisTime(150f, roll)) fell++;
+        }
+        Assert.Equal(BlackRain.ChancePercent, fell);
+    }
+
+    [Fact]
+    public void A_yield_too_small_never_rains_whatever_the_roll()
+    {
+        for (int roll = 0; roll < 100; roll++)
+        {
+            Assert.False(BlackRain.FallsThisTime(0.1f, roll));
+        }
     }
 
     [Fact]

@@ -37,6 +37,15 @@ namespace MissileDisaster.Game.Effects
         // would shrink the cloud exactly when the camera is close enough to admire it.
         private const float PuffMaxScreenFraction = 4f;
 
+        /// <summary>
+        /// How much longer a fireball particle lives than the fireball takes to swell. Above 1
+        /// it goes on glowing after it has reached full size, which is what a real one does as
+        /// it cools - but only briefly. Lowered from 1.7 on playtest: at that value the ball was
+        /// still burning while the column was well clear of it, and the strike read as two
+        /// separate events rather than one.
+        /// </summary>
+        private const float FireballLingerFactor = 1.15f;
+
         // Colours, following how a real detonation looks rather than a palette: white hot, then
         // sodium yellow, then orange, then the brown of nitrogen dioxide and lofted earth.
         private static readonly Color FireballCore = new Color(1f, 0.99f, 0.94f, 1f);
@@ -100,7 +109,7 @@ namespace MissileDisaster.Game.Effects
             var go = ParticleBuilder.NewSystem("NuclearFireball", center, ParticleAssets.Fire);
             var ps = go.GetComponent<ParticleSystem>();
             var main = ps.main;
-            main.startLifetime = fireballT * 1.7f;
+            main.startLifetime = fireballT * FireballLingerFactor;
             main.startSpeed = radius * 0.05f;
             main.startSize = finalDiameter / growth; // the size curve below swells it to full
             main.startColor = new ParticleSystem.MinMaxGradient(FireballCore, FireballMid);
