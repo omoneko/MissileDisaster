@@ -41,18 +41,10 @@ namespace MissileDisaster.Core
         public const float StainRadiusMin = 80f;
         public const float StainRadiusMax = 6000f;
 
-        /// <summary>
-        /// How far downwind the stain's centre is pushed, against its radius, and how much it is
-        /// stretched along the wind and squeezed across it.
-        /// <para>
-        /// The Hiroshima rain did not fall in a circle around the hypocentre: it fell to the
-        /// north and west, because the column was carried on the wind before it came down. A
-        /// disc centred on the burst is the one shape it certainly was not.
-        /// </para>
-        /// </summary>
-        public const float DownwindOffsetFraction = 0.45f;
-        public const float DownwindStretch = 1.5f;
-        public const float CrosswindSquash = 0.72f;
+        // Note for anyone tempted: the real rain drifts. The Hiroshima rain fell to the north and
+        // west of the hypocentre, not in a ring around it, so a wind-borne ellipse would be more
+        // faithful than the disc drawn here. It was built once and taken back out again - it was
+        // never asked for - so this is a deliberate simplification rather than an oversight.
 
         /// <summary>
         /// The mark outlasts the shower that left it, but only just. It is soot on wet ground,
@@ -106,16 +98,6 @@ namespace MissileDisaster.Core
             return Clamp(burnRadius * StainRadiusPerBurn, StainRadiusMin, StainRadiusMax);
         }
 
-        /// <summary>
-        /// Where the stain's centre sits, given the burst point and the direction the wind is
-        /// blowing towards. Downwind by DownwindOffsetFraction of the radius.
-        /// </summary>
-        public static void Centre(float burstX, float burstZ, float radius,
-            float windX, float windZ, out float centreX, out float centreZ)
-        {
-            centreX = burstX + windX * radius * DownwindOffsetFraction;
-            centreZ = burstZ + windZ * radius * DownwindOffsetFraction;
-        }
 
         /// <summary>How long the ground stays marked, in simulation seconds.</summary>
         public static float StainSeconds(float rainSeconds)

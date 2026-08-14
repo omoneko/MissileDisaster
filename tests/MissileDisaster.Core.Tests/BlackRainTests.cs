@@ -75,31 +75,6 @@ public class BlackRainTests
         Assert.Equal(BlackRain.StainRadiusMax, BlackRain.StainRadius(1e6f), 3);
     }
 
-    [Fact]
-    public void The_stain_is_carried_downwind_rather_than_ringing_the_burst()
-    {
-        // The Hiroshima rain fell to the north and west of the hypocentre. A disc centred on the
-        // burst is the one shape it certainly was not.
-        float cx, cz;
-        BlackRain.Centre(0f, 0f, 1000f, 0f, 1f, out cx, out cz);
-
-        Assert.Equal(0f, cx, 3);
-        Assert.True(cz > 0f, "the stain did not move downwind at all");
-        Assert.Equal(1000f * BlackRain.DownwindOffsetFraction, cz, 3);
-
-        // And it follows the wind rather than a fixed compass direction.
-        BlackRain.Centre(0f, 0f, 1000f, -1f, 0f, out cx, out cz);
-        Assert.Equal(-1000f * BlackRain.DownwindOffsetFraction, cx, 3);
-        Assert.Equal(0f, cz, 3);
-    }
-
-    [Fact]
-    public void The_stain_is_longer_downwind_than_it_is_wide()
-    {
-        Assert.True(BlackRain.DownwindStretch > BlackRain.CrosswindSquash,
-            "the ellipse is not elongated along the wind");
-        Assert.True(BlackRain.CrosswindSquash < 1f, "it must also narrow across the wind");
-    }
 
     [Fact]
     public void The_stain_lifts_before_the_rain_stops()

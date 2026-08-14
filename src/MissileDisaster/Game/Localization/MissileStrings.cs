@@ -70,7 +70,7 @@ namespace MissileDisaster.Game
         public static string Options_BlackRainHelp =
             "Soot lifted by the burning city, scavenged out of the column by the water the " +
             "fireball condensed and falling dirty enough to mark what it lands on. It comes " +
-            "down about half the time, drifts downwind of the strike rather than ringing it, " +
+            "down about half the time, spreads across the ground the fires reached, " +
             "and lifts again shortly after the rain stops. The mark is only a mark: the fallout " +
             "that actually poisons the ground is the contamination the warhead already leaves.";
 

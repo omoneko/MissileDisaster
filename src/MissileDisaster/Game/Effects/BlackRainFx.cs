@@ -84,8 +84,7 @@ namespace MissileDisaster.Game.Effects
         /// Stains the ground across radius around groundZero, following the terrain. A radius or
         /// duration of zero draws nothing. A failure here never stops anything else.
         /// </summary>
-        public static void Play(Vector3 groundZero, float radius, float seconds,
-            float windX, float windZ)
+        public static void Play(Vector3 groundZero, float radius, float seconds)
         {
             if (radius <= 0f || seconds <= 0f) return;
             try
@@ -127,7 +126,7 @@ namespace MissileDisaster.Game.Effects
                 renderer.renderMode = ParticleSystemRenderMode.HorizontalBillboard;
 
                 ps.Play();
-                EmitOnTerrain(ps, groundZero, radius, patches, patchSize, seconds, windX, windZ);
+                EmitOnTerrain(ps, groundZero, radius, patches, patchSize, seconds);
 
                 go.AddComponent<SimulationTimed>().LifetimeSeconds = seconds + 1f;
                 ModConfig.Log("Black rain stained the ground at " + groundZero + ": radius "
@@ -149,17 +148,10 @@ namespace MissileDisaster.Game.Effects
         /// </para>
         /// </summary>
         private static void EmitOnTerrain(ParticleSystem ps, Vector3 centre, float radius,
-            int patches, float size, float seconds, float windX, float windZ)
+            int patches, float size, float seconds)
         {
             const float goldenAngle = 2.39996323f;   // radians
             TerrainManager terrain = TerrainManager.instance;
-
-            // The disc is stretched along the wind and squeezed across it, so the stain is an
-            // ellipse lying downwind rather than a ring around the burst.
-            var along = new Vector2(windX, windZ);
-            if (along.sqrMagnitude < 0.0001f) along = new Vector2(0f, 1f);
-            along.Normalize();
-            var across = new Vector2(-along.y, along.x);
 
             var p = new ParticleSystem.EmitParams();
             p.startLifetime = seconds;
@@ -176,13 +168,8 @@ namespace MissileDisaster.Game.Effects
                 float jx = (Frac(i * 0.7548777f) - 0.5f) * 2f * Jitter * size;
                 float jz = (Frac(i * 0.5698402f) - 0.5f) * 2f * Jitter * size;
 
-                // The spiral point, mapped onto the wind's axes before it becomes a world
-                // position: long downwind, short across.
-                float u = Mathf.Cos(a) * r * BlackRain.DownwindStretch;
-                float v = Mathf.Sin(a) * r * BlackRain.CrosswindSquash;
-                var pos = new Vector3(
-                    centre.x + along.x * u + across.x * v + jx, 0f,
-                    centre.z + along.y * u + across.y * v + jz);
+                var pos = new Vector3(centre.x + Mathf.Cos(a) * r + jx, 0f,
+                                      centre.z + Mathf.Sin(a) * r + jz);
                 pos.y = terrain != null
                     ? terrain.SampleRawHeightSmoothWithWater(pos, false, 0f) + GroundClearance
                     : centre.y + GroundClearance;
