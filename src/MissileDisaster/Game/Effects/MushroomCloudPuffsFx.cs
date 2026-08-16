@@ -37,10 +37,49 @@ namespace MissileDisaster.Game.Effects
         private const float ColumnAlpha = 0.88f;
         private const float FireAlpha = 0.8f;
 
+        // Big soft billboards get clamped by the renderer's default screen-size cap, which would
+        // shrink the cloud exactly when the camera is close enough to admire it.
+        private const float PuffMaxScreenFraction = 4f;
+
         private ParticleSystem _ps;
         private ParticleSystem.Particle[] _buffer;
         private PuffSpec[] _specs;
         private float _t;
+
+        /// <summary>
+        /// Builds a cloud: a renderer-only ParticleSystem whose puffs this component places along
+        /// the vortex-ring flow every frame. Emission stays off - the component owns every
+        /// particle - and the puffs are depth-sorted, because they are large, soft and
+        /// overlapping, which is exactly when sorting artefacts show.
+        /// <para>
+        /// Shared by the nuclear cloud and the conventional one. The two differ only in the
+        /// dimensions they pass: the flow, the puff crowd and its tuned opacity are the same
+        /// machinery at both scales, which is the point of the whole arrangement.
+        /// </para>
+        /// Main thread only.
+        /// </summary>
+        public static GameObject Create(string name, Vector3 groundZero,
+            NuclearCloudDimensions dims, bool airburst)
+        {
+            var go = ParticleBuilder.NewSystem(name, groundZero, ParticleAssets.Cloud);
+            var ps = go.GetComponent<ParticleSystem>();
+            var main = ps.main;
+            main.simulationSpace = ParticleSystemSimulationSpace.Local; // puff positions are metres from ground zero
+            main.maxParticles = CloudPuffs.TotalCount;
+            var emission = ps.emission;
+            emission.enabled = false;
+
+            var renderer = ps.GetComponent<ParticleSystemRenderer>();
+            renderer.sortMode = ParticleSystemSortMode.Distance;
+            renderer.maxParticleSize = PuffMaxScreenFraction;
+
+            var fx = go.AddComponent<MushroomCloudPuffsFx>();
+            fx.Dims = dims;
+            fx.Seed = (int)(UnityEngine.Random.value * 1000000f); // each strike boils its own way
+            fx.Airburst = airburst;
+            ps.Play();
+            return go;
+        }
 
         private void Start()
         {

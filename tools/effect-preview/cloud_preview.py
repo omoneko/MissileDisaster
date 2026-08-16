@@ -64,6 +64,35 @@ class Display150kt:
         self.fire_field = self.cap_radius * 2.5
 
 
+class ConventionalDims:
+    """ConventionalCloudDisplay.For(fireball_radius) - the column a bomb throws up.
+
+    The same puff flow at a hundredth of the scale, which is the whole point of the class:
+    the conventional mushroom used to be free-running particles and never grew a stem.
+    """
+    def __init__(self, fireball_radius):
+        def soft(v, floor, k, c):
+            if v < floor: return floor
+            if v <= k: return v
+            span = c - k
+            return k + span * (1.0 - math.exp(-(v - k) / span))
+
+        fb = soft(fireball_radius, 3.0, 18.0, 24.0)   # MinimumFireballRadius, FireballKnee/Ceiling
+        self.fireball = fb
+        self.cloud_top = fb * 9.0                     # CloudTopFactor
+        self.cap_base = self.cloud_top * 0.58         # CapBaseFraction
+        self.cap_depth = self.cloud_top - self.cap_base
+        self.cap_radius = fb * 2.0                    # CapRadiusFactor
+        self.stem_radius = fb * 0.7                   # StemRadiusFactor
+        self.fire_field = self.cap_radius * 1.2       # FireFieldFactor
+        self.rise = soft(0.55 * math.sqrt(fb), 1.5, 4.0, 6.0)
+        self.hold = min(max(self.rise * 0.9, 1.5), 5.0)
+        self.fade = min(max(self.rise * 1.6, 3.0), 8.0)
+        # The frame has to follow the cloud: the nuclear floor of 900 m would draw this as a
+        # smudge four pixels tall.
+        self.frame_metres = max(self.cloud_top * 1.5, self.fire_field * 2.3)
+
+
 def animation_at(t, rise, hold, fade):
     """CloudAnimation.At."""
     t = max(t, 0.0)
@@ -255,6 +284,38 @@ VAPOUR = np.array([0.93, 0.93, 0.94]); DUST_G = np.array([0.58, 0.43, 0.36])
 EMBER = np.array([1.0, 0.45, 0.12])
 
 
+def ground_dust_at(d, t, P, seed=23):
+    """ConventionalMushroomFx.CreateGroundDust - the skirt the column stands on.
+
+    CloudPuffs spaces the column by an ease-out climb, so two thirds of its puffs sit in the
+    top 45% and the lower stem reads as broken. This is what joins it back to the ground, so
+    it has to be drawn here or the preview passes a column the game shows with a gap in it.
+    """
+    stem = d.stem_radius
+    life = d.rise * P["dust_life"]
+    emit = d.rise * P["dust_emit"]
+    n = P["dust_count"]
+    up = stem * P["dust_rise"]
+    out = []
+    for i in range(n):
+        born = emit * i / n
+        age = t - born
+        if age <= 0.0 or age >= life:
+            continue
+        u = age / life
+        r0 = stem * P["dust_cone"] * math.sqrt(hash01(i, seed, 1))
+        az = hash01(i, seed, 2) * TAU
+        spread = math.radians(P["dust_angle"])
+        speed = stem * 0.15
+        r = r0 + speed * math.sin(spread) * age
+        y = (up + speed * math.cos(spread)) * age
+        size = stem * 0.9 * (0.6 + 1.3 * u) * (0.7 + 0.6 * hash01(i, seed, 3))
+        a = 0.7 + 0.1 * (u / 0.4) if u < 0.4 else 0.8 * (1.0 - (u - 0.4) / 0.6)
+        out.append((r * math.cos(az), y, r * math.sin(az), size, max(a, 0.0) * 0.75,
+                    hash01(i, seed, 4)))
+    return out
+
+
 def backdrop(W, H, metres_w, metres_h, horizon_px):
     img = np.zeros((H, W, 3))
     for r in range(H):
@@ -272,14 +333,17 @@ def backdrop(W, H, metres_w, metres_h, horizon_px):
 
 def render(P, d, t, elev_deg, path):
     W, H = 880, 660
-    metres_w = max(d.cap_radius * 2.6, d.fire_field * 2.3, 900.0)
+    metres_w = getattr(d, "frame_metres", None) or max(d.cap_radius * 2.6, d.fire_field * 2.3, 900.0)
     px = W / metres_w
     horizon = int(H * 0.86)
     img = backdrop(W, H, metres_w, metres_w * H / W, horizon)
     cover = np.zeros((H, W))
 
-    # The dust surge first: it is on the ground, behind everything the cloud does.
-    sv = surge_at(P.get("shock_radius", d.cap_radius * 3.2), t)
+    # The dust surge first: it is on the ground, behind everything the cloud does. A radius of
+    # zero means the blast never reaches ShockWave.DustSurgeMinRadius, which is every
+    # conventional warhead - the rings run alone behind a bomb.
+    shock_radius = P.get("shock_radius", d.cap_radius * 3.2)
+    sv = surge_at(shock_radius, t) if shock_radius > 0.0 else None
     if sv is not None:
         r, az, sy, ssize, salpha, sroll = sv
         for i in np.argsort(-np.cos(az)):  # far side first
@@ -294,6 +358,22 @@ def render(P, d, t, elev_deg, path):
             ta = puff_alpha_profile(dd, np.arctan2(gy - cy, gx - cx), P) * salpha
             col = SURGE_LIT * (1 - sroll[i]) + SURGE_SHADE * sroll[i]
             img[y0:y1, x0:x1] = img[y0:y1, x0:x1] * (1 - ta[..., None]) + col * ta[..., None]
+
+    # The ground dust skirt, behind the cloud puffs and in front of the surge.
+    if P.get("dust_count"):
+        for gx_, gy_, gz_, gsize, ga, groll in sorted(ground_dust_at(d, t, P), key=lambda v: -v[2]):
+            cx = int(W / 2 + gx_ * px)
+            cy = int(horizon - gy_ * px)
+            rad = max(int(gsize * 0.5 * px), 2)
+            x0, x1 = max(cx - rad, 0), min(cx + rad + 1, W)
+            y0, y1 = max(cy - rad, 0), min(cy + rad + 1, H)
+            if x0 >= x1 or y0 >= y1: continue
+            gy, gx = np.mgrid[y0:y1, x0:x1]
+            dd = np.sqrt((gx - cx) ** 2 + (gy - cy) ** 2) / rad
+            ta = puff_alpha_profile(dd, np.arctan2(gy - cy, gx - cx), P) * ga
+            col = np.array([0.55, 0.49, 0.40]) * (1 - groll) + np.array([0.32, 0.28, 0.23]) * groll
+            img[y0:y1, x0:x1] = img[y0:y1, x0:x1] * (1 - ta[..., None]) + col * ta[..., None]
+            cover[y0:y1, x0:x1] = cover[y0:y1, x0:x1] * (1 - ta) + ta
 
     anim = animation_at(t, d.rise, d.hold, d.fade)
     puffs = Puffs(P)
@@ -371,6 +451,27 @@ def main():
                          ("fade85", d.rise + d.hold + d.fade * 0.85)]:
             op = render(P, d, t, 0, os.path.join(out, f"{name}-{label}.png"))
             print(f"{name:8s} {label:9s} t={t:5.1f}s  cap-body opacity = {op:.3f}")
+
+    # The conventional column, through the same flow at the same puff density. Rendered
+    # whenever the nuclear profile is, because the two now share every constant but the
+    # dimensions - a change to CloudPuffs lands on both.
+    if which and which != "tuned":
+        return
+    # No dust surge behind a bomb - every conventional blast is under
+    # ShockWave.DustSurgeMinRadius - but a ground dust skirt, which is what the column stands on.
+    # Keep these in lockstep with ConventionalMushroomFx.
+    P = dict(PROFILES["tuned"], shock_radius=0.0, dust_count=90, dust_cone=2.1, dust_angle=24.0,
+             dust_life=1.1, dust_emit=0.8, dust_rise=2.8)
+    for charge, fb in [("1t", 15.0), ("thermobaric", 40.0)]:
+        d = ConventionalDims(fb)
+        print(f"conventional {charge}: fireball {d.fireball:.0f} m, column {d.cloud_top:.0f} m tall, "
+              f"cap {d.cap_radius * 2:.0f} m across, stem {d.stem_radius * 2:.0f} m, "
+              f"up for {d.rise + d.hold + d.fade:.1f} s")
+        for label, t in [("forming", d.rise * 0.5), ("risen", d.rise),
+                         ("standing", d.rise + d.hold * 0.5),
+                         ("fading", d.rise + d.hold + d.fade * 0.45)]:
+            op = render(P, d, t, 0, os.path.join(out, f"conventional-{charge}-{label}.png"))
+            print(f"conv-{charge:12s} {label:9s} t={t:5.1f}s  cap-body opacity = {op:.3f}")
 
 
 if __name__ == "__main__":

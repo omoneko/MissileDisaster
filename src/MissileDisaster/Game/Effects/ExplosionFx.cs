@@ -81,9 +81,10 @@ namespace MissileDisaster.Game.Effects
                 // A single detonation, conventional or thermobaric.
                 ExplosionFallback.Play(center, fireball);
                 DetonationFlashFx.PlayConventional(center, fireball);
-                // The column of dirt and smoke it lifts. It rises from the ground however high
-                // the warhead burst, the same way the nuclear cloud does.
-                SmallMushroomFx.Play(groundZero, fireball);
+                // The condensation shell behind the front, and the column of dirt and smoke it
+                // lifts. The column rises from the ground however high the warhead burst, the
+                // same way the nuclear cloud does.
+                ConventionalMushroomFx.Play(groundZero, center, fireball, spec.Airburst);
             }
             catch (Exception e)
             {

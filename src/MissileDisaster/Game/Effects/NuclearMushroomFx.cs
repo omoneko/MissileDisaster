@@ -33,10 +33,6 @@ namespace MissileDisaster.Game.Effects
         private const float CondensationRadiusFactor = 2.6f;
         private const float CondensationLifetime = 1.3f;
 
-        // Big soft billboards get clamped by the renderer's default screen-size cap, which
-        // would shrink the cloud exactly when the camera is close enough to admire it.
-        private const float PuffMaxScreenFraction = 4f;
-
         /// <summary>
         /// How much longer a fireball particle lives than the fireball takes to swell. Above 1
         /// it goes on glowing after it has reached full size, which is what a real one does as
@@ -82,7 +78,9 @@ namespace MissileDisaster.Game.Effects
                 CreateFireball(detonation, d.FireballRadius, d.FireballSeconds);
                 CreateCondensationDome(detonation, d.FireballRadius * CondensationRadiusFactor, d.FireballSeconds);
                 CreateGroundDust(groundZero, d.StemRadius, d.RiseSeconds);
-                CreateCloudPuffs(groundZero, d, airburst);
+                // The mushroom itself. The same call the conventional column goes through -
+                // see ConventionalMushroomFx - only at nuclear dimensions.
+                MushroomCloudPuffsFx.Create("NuclearMushroomCloud", groundZero, d, airburst);
             }
             catch (Exception e)
             {
@@ -193,33 +191,6 @@ namespace MissileDisaster.Game.Effects
                 new GradientAlphaKey(0.7f, 0f), new GradientAlphaKey(0.8f, 0.4f), new GradientAlphaKey(0f, 1f));
             ParticleBuilder.SizeCurve(ps, 0.6f, 1.9f);
             ParticleBuilder.PlayAndDestroy(go, rise * 0.75f + life + 1f);
-        }
-
-        /// <summary>
-        /// The mushroom itself: a renderer-only ParticleSystem whose puffs MushroomCloudPuffsFx
-        /// places along the vortex-ring flow every frame. Emission stays off - the component
-        /// owns every particle - and the puffs are depth-sorted, because they are large, soft
-        /// and overlapping, which is exactly when sorting artefacts show.
-        /// </summary>
-        private static void CreateCloudPuffs(Vector3 groundZero, NuclearCloudDimensions d, bool airburst)
-        {
-            var go = ParticleBuilder.NewSystem("NuclearMushroomCloud", groundZero, ParticleAssets.Cloud);
-            var ps = go.GetComponent<ParticleSystem>();
-            var main = ps.main;
-            main.simulationSpace = ParticleSystemSimulationSpace.Local; // puff positions are metres from ground zero
-            main.maxParticles = CloudPuffs.TotalCount;
-            var emission = ps.emission;
-            emission.enabled = false;
-
-            var renderer = ps.GetComponent<ParticleSystemRenderer>();
-            renderer.sortMode = ParticleSystemSortMode.Distance;
-            renderer.maxParticleSize = PuffMaxScreenFraction;
-
-            var fx = go.AddComponent<MushroomCloudPuffsFx>();
-            fx.Dims = d;
-            fx.Seed = (int)(UnityEngine.Random.value * 1000000f); // each strike boils its own way
-            fx.Airburst = airburst;
-            ps.Play();
         }
     }
 }
