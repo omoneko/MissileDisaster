@@ -196,7 +196,8 @@ public class ConventionalCloudDisplayTests
         // The cap reaches its own radius times the spread it keeps up after the rise, and the
         // fire smoke reaches the edge of its field. With the tight conventional fire field it is
         // the cap that is the widest thing, which is the other way round from the nuclear cloud.
-        float capReach = d.CapRadius * (1f + CloudAnimation.CapSpreadAfterRise);
+        float capReach = d.CapRadius * (1f + CloudAnimation.CapSpreadAfterRise)
+            * (1f + CloudPuffs.CapLobeDepth);
         float outerLimit = (capReach > d.FireFieldRadius ? capReach : d.FireFieldRadius) * 1.05f;
         float topLimit = d.CloudTop * 1.2f;
 

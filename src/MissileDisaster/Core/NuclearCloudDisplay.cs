@@ -213,7 +213,10 @@ namespace MissileDisaster.Core
         // stays too long". So the compression is steep: the cloud forms in seconds - fast enough
         // to be a spectacle rather than a wait - stands for a moment at full size, and thins
         // away. The whole 150 kt shot is about 25 s.
-        public const float RiseCompression = 45f;
+        // Eased from 45 with the growth curve - see CloudAnimation.RiseEasePower - because the
+        // column read as being pushed up rather than climbing. The two go together: a softer
+        // curve over a slightly longer rise, rather than either on its own.
+        public const float RiseCompression = 38f;
         public const float RiseSecondsMin = 5f;
         public const float RiseSecondsKnee = 10f;
         public const float RiseSecondsCeiling = 16f;

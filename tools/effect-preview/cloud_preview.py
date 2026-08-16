@@ -57,7 +57,7 @@ class Display150kt:
         self.cap_base = self.cloud_top * base_frac
         self.cap_depth = self.cloud_top - self.cap_base
         self.stem_radius = cap_real * cloud_scale * stem_frac
-        self.rise = soft(600.0 * (150.0 / 1000.0) ** 0.25 / 45.0, 10.0, 16.0)
+        self.rise = soft(600.0 * (150.0 / 1000.0) ** 0.25 / 38.0, 10.0, 16.0)  # RiseCompression
         self.rise = max(self.rise, 5.0)
         self.hold = min(max(self.rise * 1.2, 8.0), 16.0)
         self.fade = min(max(self.rise * 1.7, 12.0), 20.0)
@@ -85,7 +85,7 @@ class ConventionalDims:
         self.cap_radius = fb * 2.0                    # CapRadiusFactor
         self.stem_radius = fb * 0.7                   # StemRadiusFactor
         self.fire_field = self.cap_radius * 1.2       # FireFieldFactor
-        self.rise = soft(0.55 * math.sqrt(fb), 1.5, 4.0, 6.0)
+        self.rise = soft(0.7 * math.sqrt(fb), 1.5, 4.0, 6.0)   # RiseSecondsPerRootMetre
         self.hold = min(max(self.rise * 0.9, 1.5), 5.0)
         self.fade = min(max(self.rise * 1.6, 3.0), 8.0)
         # The frame has to follow the cloud: the nuclear floor of 900 m would draw this as a
@@ -97,7 +97,7 @@ def animation_at(t, rise, hold, fade):
     """CloudAnimation.At."""
     t = max(t, 0.0)
     u = min(t / rise, 1.0) if rise > 0 else 1.0
-    ease = 1.0 - (1.0 - u) ** 3
+    ease = 1.0 - (1.0 - u) ** 1.8            # CloudAnimation.RiseEasePower
     birth = 0.12
     h = birth + (1.0 - birth) * ease
     w = birth + (1.0 - birth) * ease ** 1.6
@@ -139,6 +139,9 @@ class Puffs:
         self.size01 = h(8)
         self.spin = (h(9) - 0.5) * 24.0
         self.lag = h(10)
+        self.wobble2 = h(11) * TAU
+        # One value for the whole strike, not one per puff - see PuffSpec.Phase.
+        self.phase = hash01(0, P["seed"], 12) * TAU
 
     def roll_time(self, t, rise, hold):
         if t <= rise: return t
@@ -160,21 +163,33 @@ class Puffs:
         ring, cross = capR * 0.55, capR * 0.45 * self.rho
         dist[c] = np.maximum(ring - cross[c] * np.cos(theta[c]), 0.0)
         y[c] = cap_base + cap_depth * 0.5 + cap_depth * 0.5 * self.rho[c] * np.sin(theta[c])
+        # The cauliflower heads, shared across the strike so the canopy stops being a torus.
+        dist[c] *= 1 + P["cap_lobe_depth"] * np.sin(P["cap_lobes"] * az[c] + self.phase)
+        y[c] += cap_depth * P["cap_lobe_rise"] * np.sin(P["cap_lobes"] * az[c] + self.phase + 1.3)
         size[c] = capR * (P["cap_size0"] + P["cap_size1"] * self.size01[c] ** P["size_bias"])
         dust[c] = 0.15 + 0.15 * (1 - self.rho[c])
         ember_env = max(1.0 - t / (d.rise * 0.7), 0.0)
         ember[c] = ember_env * (1 - self.rho[c]) * 0.8
 
         m = ~c & ~self.fire
-        loop = d.rise * 0.9
+        radial = 0.25 + 0.75 * self.rho[m]
+        # The boundary layer: the outside of the column is dragged along rather than driven, so
+        # it is on a longer loop and sits lower at any moment. Without it the stem rose as one
+        # piece, which is what made it look extruded.
+        rr = np.clip(radial, 0, 1) ** 2
+        profile = lambda edge: edge + (1 - edge) * (1 - rr)
+        loop = d.rise * 0.9 / profile(P["column_edge_speed"])
         u = np.mod(self.climb[m] + t / loop, 1.0)
-        column_top = cap_base + cap_depth * 0.2
+        # Only the core reaches the cap; the edge is entrained and tops out short.
+        column_top = (cap_base + cap_depth * 0.2) * profile(P["column_edge_reach"])
         y[m] = (1 - (1 - u) ** 2) * column_top
         shape = np.where(u < 0.35, 1.35 + (1.0 - 1.35) * smooth(u / 0.35),
                          1.0 + 0.2 * smooth((u - 0.35) / 0.65))
-        radial = 0.25 + 0.75 * self.rho[m]
-        wob = 1 + 0.18 * np.sin(self.wobble[m] + u * 9.4 + t * 0.4)
-        dist[m] = stemR * shape * radial * wob
+        wob = (1 + P["column_wobble"] * np.sin(self.wobble[m] + u * 9.4 + t * 0.4)
+                 + P["column_wobble_fast"] * np.sin(self.wobble2[m] + u * 24.7 - t * 0.9))
+        lobe = 1 + P["column_lobe_depth"] * np.sin(
+            P["column_lobes"] * az[m] + self.phase + u * P["column_lobe_twist"])
+        dist[m] = np.maximum(stemR * shape * radial * wob * lobe, 0.0)
         size[m] = stemR * (P["col_size0"] + P["col_size1"] * self.size01[m] ** P["size_bias"]) * (0.7 + 0.3 * smooth(u))
         edge = 0.06
         fade[m] = np.where(u < edge, smooth(u / edge), np.where(u > 1 - edge, smooth((1 - u) / edge), 1.0))
@@ -434,7 +449,11 @@ PROFILES = {
                   fire_size0=0.055, fire_size1=0.13, fire_pull=0.85, fire_alpha=0.8,
                   cap_alpha=0.97, col_alpha=0.88, texture="cloud",
                   tex_core=0.42, tex_edge=0.95, tex_wobble=0.10,
-                  cap_width_scale=1.3, screen_top=2000.0, knee=1400.0),
+                  cap_width_scale=1.3, screen_top=2000.0, knee=1400.0,
+                  column_edge_speed=0.55, column_edge_reach=0.82,
+                  column_wobble=0.26, column_wobble_fast=0.12,
+                  column_lobes=3.0, column_lobe_depth=0.18, column_lobe_twist=2.1,
+                  cap_lobes=5.0, cap_lobe_depth=0.20, cap_lobe_rise=0.10),
 }
 
 

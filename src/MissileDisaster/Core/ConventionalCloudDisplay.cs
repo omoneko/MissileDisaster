@@ -96,7 +96,10 @@ namespace MissileDisaster.Core
         // so unlike the nuclear cloud there is nothing to compress - the figures are already
         // watchable. The square root is what keeps a big charge's column from taking
         // proportionally longer: it climbs faster as well as higher.
-        public const float RiseSecondsPerRootMetre = 0.55f;
+        // Raised from 0.55 alongside CloudAnimation.RiseEasePower: the column was reported as
+        // standing up too quickly, and a softer growth curve over a slightly longer rise is what
+        // answers that. The nuclear cloud got the same treatment through RiseCompression.
+        public const float RiseSecondsPerRootMetre = 0.7f;
         public const float RiseSecondsMin = 1.5f;
         public const float RiseSecondsKnee = 4f;
         public const float RiseSecondsCeiling = 6f;

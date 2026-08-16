@@ -53,11 +53,18 @@ public class CloudPuffsTests
                 CloudAnimationState anim = CloudAnimation.At(t, d.RiseSeconds, d.HoldSeconds, d.FadeSeconds);
                 PuffPoint p = CloudPuffs.At(s, t, d, anim);
                 float dist = (float)System.Math.Sqrt(p.X * p.X + p.Z * p.Z);
-                // The fire smoke lives out in the burn field; everything else inside the cap.
-                float envelope = s.Fire ? d.FireFieldRadius : d.CapRadius * anim.WidthFraction;
+                // The fire smoke lives out in the burn field; everything else inside the cap,
+                // plus the cauliflower lobes, which are the whole point of the envelope not
+                // being a circle any more.
+                float envelope = s.Fire
+                    ? d.FireFieldRadius
+                    : d.CapRadius * anim.WidthFraction * (1f + CloudPuffs.CapLobeDepth);
                 Assert.True(dist <= envelope * 1.01f + 1f,
                     $"puff {i} at t={t}: {dist} m out against an envelope of {envelope}");
-                Assert.InRange(p.Y, -1f, d.CloudTop * anim.HeightFraction * 1.01f + 1f);
+                // The lobes ride up as well as out, so the canopy's crown is above the figure.
+                float top = d.CloudTop * anim.HeightFraction
+                    + d.CapDepth * anim.HeightFraction * CloudPuffs.CapLobeRise;
+                Assert.InRange(p.Y, -1f, top * 1.01f + 1f);
             }
         }
     }
@@ -291,5 +298,141 @@ public class CloudPuffsTests
         }
         Assert.True(sumLate < sumEarly * 0.6f, "the cap is markedly more transparent later in the fade");
         Assert.True(sumLate > 0f, "but it has not simply been switched off");
+    }
+
+    // ------------------------------------------------------------------ the boundary layer
+
+    [Fact]
+    public void The_column_has_a_velocity_profile_rather_than_one_speed()
+    {
+        // A rising column is a jet: the core carries the buoyancy and the outside is dragged
+        // along by it. Every puff used to climb at one rate whatever its radial position, which
+        // is what made the stem look extruded rather than drawn up.
+        Assert.Equal(1f, CloudPuffs.ClimbSpeed(0f), 3);
+        Assert.Equal(CloudPuffs.ColumnEdgeSpeed, CloudPuffs.ClimbSpeed(1f), 3);
+        Assert.True(CloudPuffs.ColumnEdgeSpeed < 1f, "there is no boundary layer at all");
+
+        float previous = float.MaxValue;
+        for (int i = 0; i <= 10; i++)
+        {
+            float v = CloudPuffs.ClimbSpeed(i / 10f);
+            Assert.True(v < previous, "the profile is not falling away from the axis");
+            previous = v;
+        }
+    }
+
+    [Fact]
+    public void The_edge_of_the_column_never_reaches_the_cap()
+    {
+        // The visible half of the same effect: slow air at the edge of a jet is entrained rather
+        // than merely late, so it tops out short and the column tapers.
+        Assert.Equal(1f, CloudPuffs.ClimbReach(0f), 3);
+        Assert.Equal(CloudPuffs.ColumnEdgeReach, CloudPuffs.ClimbReach(1f), 3);
+        Assert.InRange(CloudPuffs.ColumnEdgeReach, 0.5f, 0.95f);
+
+        // And through the flow itself: follow a core puff and an edge puff through a whole loop
+        // and the edge one must peak lower.
+        NuclearCloudDimensions d = Dims();
+        CloudAnimationState anim = FullyGrown(d);
+        PuffSpec core = ColumnPuff(7);
+        core.Rho01 = 0f;
+        PuffSpec edge = core;
+        edge.Rho01 = 1f;
+
+        Assert.True(PeakHeight(edge, d, anim) < PeakHeight(core, d, anim) * 0.95f,
+            "the outside of the column climbs as high as the middle");
+    }
+
+    // ------------------------------------------------------------------ the lumps
+
+    [Fact]
+    public void One_strike_agrees_with_itself_about_where_its_lumps_are()
+    {
+        // Phase is dealt from the seed alone, so every puff of a strike shares it. Anything
+        // per-puff averages out over hundreds of them and leaves a surface of revolution.
+        Assert.Equal(CloudPuffs.Spec(0, 7).Phase, CloudPuffs.Spec(1, 7).Phase, 6);
+        Assert.Equal(CloudPuffs.Spec(0, 7).Phase, CloudPuffs.Spec(CloudPuffs.TotalCount - 1, 7).Phase, 6);
+        Assert.NotEqual(CloudPuffs.Spec(0, 7).Phase, CloudPuffs.Spec(0, 8).Phase);
+    }
+
+    [Fact]
+    public void The_canopy_is_not_a_surface_of_revolution()
+    {
+        // The cauliflower heads. Hold everything about a cap puff fixed except where it sits
+        // around the cloud's axis, and the distance it is placed at has to change: if it does
+        // not, the canopy is a torus however much each puff boils along it.
+        NuclearCloudDimensions d = Dims();
+        CloudAnimationState anim = FullyGrown(d);
+        PuffSpec s = CloudPuffs.Spec(0, 7);
+        Assert.True(s.Cap);
+        s.Theta0 = 0.7f; s.Omega = 0f; s.Swirl = 0f; s.Rho01 = 0.6f;
+
+        float min = float.MaxValue, max = 0f;
+        for (int i = 0; i < 64; i++)
+        {
+            PuffSpec a = s;
+            a.Azimuth = (float)(2.0 * System.Math.PI * i / 64.0);
+            float dist = Radius(CloudPuffs.At(a, 0f, d, anim));
+            if (dist < min) min = dist;
+            if (dist > max) max = dist;
+        }
+        Assert.True((max - min) / max > 0.25f,
+            "the canopy varies by only " + ((max - min) / max).ToString("P0") + " around its axis");
+    }
+
+    [Fact]
+    public void The_column_is_lumpy_around_its_axis_too()
+    {
+        NuclearCloudDimensions d = Dims();
+        CloudAnimationState anim = FullyGrown(d);
+        PuffSpec s = ColumnPuff(7);
+        s.Rho01 = 0.6f; s.Swirl = 0f;
+
+        float min = float.MaxValue, max = 0f;
+        for (int i = 0; i < 64; i++)
+        {
+            PuffSpec a = s;
+            a.Azimuth = (float)(2.0 * System.Math.PI * i / 64.0);
+            float dist = Radius(CloudPuffs.At(a, 0f, d, anim));
+            if (dist < min) min = dist;
+            if (dist > max) max = dist;
+        }
+        Assert.True((max - min) / max > 0.18f,
+            "the stem varies by only " + ((max - min) / max).ToString("P0") + " around its axis");
+    }
+
+    [Fact]
+    public void The_columns_ripple_never_repeats()
+    {
+        // Two wobbles on incommensurate periods rather than one. A single sine is a period, and
+        // a period is exactly what the eye picks out of a crowd of puffs.
+        Assert.True(CloudPuffs.ColumnWobble > 0f && CloudPuffs.ColumnWobbleFast > 0f);
+        Assert.NotEqual(CloudPuffs.Spec(3, 7).Wobble, CloudPuffs.Spec(3, 7).Wobble2);
+    }
+
+    private static PuffSpec ColumnPuff(int seed)
+    {
+        for (int i = 0; i < CloudPuffs.TotalCount; i++)
+        {
+            PuffSpec s = CloudPuffs.Spec(i, seed);
+            if (!s.Cap && !s.Fire) return s;
+        }
+        throw new System.InvalidOperationException("no column puffs");
+    }
+
+    private static float Radius(PuffPoint p)
+    {
+        return (float)System.Math.Sqrt(p.X * p.X + p.Z * p.Z);
+    }
+
+    private static float PeakHeight(PuffSpec s, NuclearCloudDimensions d, CloudAnimationState anim)
+    {
+        float peak = 0f;
+        for (float t = 0f; t < d.RiseSeconds * 3f; t += 0.05f)
+        {
+            float y = CloudPuffs.At(s, t, d, anim).Y;
+            if (y > peak) peak = y;
+        }
+        return peak;
     }
 }

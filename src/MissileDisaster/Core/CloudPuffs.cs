@@ -14,9 +14,24 @@ namespace MissileDisaster.Core
         public float Omega;    // cap: circulation rate, radians per rolled second
         public float Climb01;  // column and fire: phase offset along the climb loop
         public float Wobble;   // column: radial wobble phase
+        public float Wobble2;  // column: a second, faster wobble on an incommensurate period
         public float Size01;   // relative size within its kind
         public float Spin;     // billboard rotation rate, degrees per second, signed
         public float Lag;      // 0..1, this puff's place in the staggered dissolve at the end
+
+        /// <summary>
+        /// The same value for every puff of one strike, and different between strikes.
+        ///
+        /// <para>
+        /// It looks out of place in a per-puff struct and it is here on purpose. The lumps in a
+        /// cloud are a property of the cloud, not of its puffs: a bulge on one side of the canopy
+        /// is a bulge every puff over there shares. Anything derived from a puff's own index
+        /// averages out over hundreds of them and leaves a surface of revolution, which is what
+        /// the cap and the column both were. This is the one number that lets them agree on where
+        /// their lumps are, and it is dealt from the seed alone.
+        /// </para>
+        /// </summary>
+        public float Phase;
     }
 
     /// <summary>Where one puff is at one moment, in metres from ground zero, and how it is shaded.</summary>
@@ -71,6 +86,58 @@ namespace MissileDisaster.Core
         public const float ColumnThroatFactor = 1.2f;
         public const float ColumnWaistAt = 0.35f;   // fraction of the climb where the waist sits
         public const float ColumnTopIntoCap = 0.2f; // how far into the cap's depth the column runs
+
+        /// <summary>
+        /// How fast a puff at the outside of the column climbs, against one on the axis.
+        ///
+        /// <para>
+        /// Every column puff used to climb at one rate whatever its radial position, which is
+        /// what made the whole stem shoot up as a single piece. A rising column is a jet, and a
+        /// jet has a velocity profile: the core carries nearly all the buoyancy while the air it
+        /// is shearing against barely moves, so the outside of the column lags well behind the
+        /// middle. That lag is most of what makes a real column look like it is being drawn up
+        /// rather than extruded.
+        /// </para>
+        ///
+        /// It is a profile rather than a single figure - see <see cref="ClimbSpeed"/> - and it
+        /// also breaks the lockstep in the recycling, because a slower puff is on a longer loop.
+        /// </summary>
+        /// Note what this does and does not do. A puff's place along its loop is uniform whatever
+        /// its speed, so on its own the rate changes nothing about a still frame: it is a motion
+        /// property, the shear that stops the stem translating upward as one piece. What gives
+        /// the boundary layer a shape as well is ColumnEdgeReach below.
+        public const float ColumnEdgeSpeed = 0.55f;
+
+        /// <summary>
+        /// How high a puff at the outside of the column gets, against one on the axis.
+        ///
+        /// <para>
+        /// The slow air at the edge of a jet does not merely arrive late, it never arrives: it is
+        /// entrained into the faster air beside it and tops out well short. So the column tapers
+        /// as it climbs - wide and slow at the skirt, narrow and quick where it feeds the cap -
+        /// which is the visible half of the same effect.
+        /// </para>
+        /// </summary>
+        public const float ColumnEdgeReach = 0.82f;
+
+        // How lumpy the column and the canopy are. The puffs used to sit on smooth surfaces of
+        // revolution - a cone with a slight ripple, and a torus - so however much each one boiled,
+        // the silhouette they made between them was geometry. A cloud is not geometry.
+        //
+        // Two wobbles on incommensurate periods rather than one, so the ripple never repeats, and
+        // a lobe term shared across the strike (PuffSpec.Phase) so the whole column leans and the
+        // whole canopy bulges instead of every puff wandering independently and averaging out.
+        public const float ColumnWobble = 0.26f;
+        public const float ColumnWobbleFast = 0.12f;
+        public const float ColumnLobes = 3f;        // bulges around the stem
+        // Shallower than the cap's. The stem is narrow to begin with, and at 0.28 the troughs
+        // pinched it into a broken thread rather than making it lumpy.
+        public const float ColumnLobeDepth = 0.18f;
+        public const float ColumnLobeTwist = 2.1f;  // how much the bulges spiral as they climb
+
+        public const float CapLobes = 5f;           // cauliflower heads around the canopy
+        public const float CapLobeDepth = 0.20f;
+        public const float CapLobeRise = 0.10f;     // of the cap depth: the lobes ride up and down too
 
         // How the circulation slows through the cloud's life.
         public const float RollRateHold = 0.35f;
@@ -141,6 +208,10 @@ namespace MissileDisaster.Core
             s.Size01 = Hash01(index, seed, 8);
             s.Spin = (Hash01(index, seed, 9) - 0.5f) * 24f;
             s.Lag = Hash01(index, seed, 10);
+            s.Wobble2 = Hash01(index, seed, 11) * (float)(2.0 * Math.PI);
+            // Index 0 rather than this puff's index, deliberately: every puff of one strike must
+            // get the same value. See PuffSpec.Phase.
+            s.Phase = Hash01(0, seed, 12) * (float)(2.0 * Math.PI);
             return s;
         }
 
@@ -207,6 +278,12 @@ namespace MissileDisaster.Core
                 dist = ringCore - crossR * (float)Math.Cos(theta);
                 if (dist < 0f) dist = 0f;
                 y = centreY + crossY * (float)Math.Sin(theta);
+                // The cauliflower heads. Without these the canopy is a torus - every puff boiling
+                // around a perfectly circular ring - and no amount of per-puff motion hides that
+                // the envelope is a surface of revolution.
+                float capLobe = (float)Math.Sin(CapLobes * azimuth + p.Phase);
+                dist *= 1f + CapLobeDepth * capLobe;
+                y += capDepth * CapLobeRise * (float)Math.Sin(CapLobes * azimuth + p.Phase + 1.3f);
                 point.Size = capR * (0.14f + 0.40f * SizeRoll(p.Size01));
                 point.Fade = 1f;
                 point.Dust = 0.15f + 0.15f * (1f - p.Rho01); // the inner cap keeps a little of the column's dust
@@ -218,14 +295,27 @@ namespace MissileDisaster.Core
                 // The column: an endless conveyor of puffs climbing from the skirt into the
                 // cap's underside, recycled at the top, fading in and out at the loop's ends so
                 // the recycling never pops.
-                float loopSeconds = dims.RiseSeconds * 0.9f;
+                float radial = 0.25f + 0.75f * p.Rho01;
+                // The boundary layer: a puff out at the edge of the stem is being dragged along
+                // by the core rather than driven, so it climbs at a fraction of the core's rate
+                // and is therefore lower down at any given moment. The whole column used to share
+                // one loop time and so rose as a single piece.
+                float loopSeconds = dims.RiseSeconds * 0.9f / ClimbSpeed(radial);
                 float u = Frac(p.Climb01 + t / loopSeconds);
-                float columnTop = capBase + capDepth * ColumnTopIntoCap;
+                // Only the core reaches the cap's underside; the edge is entrained and tops out
+                // short, which is what tapers the column instead of leaving it a cylinder.
+                float columnTop = (capBase + capDepth * ColumnTopIntoCap) * ClimbReach(radial);
                 y = EaseOutQuad(u) * columnTop;
                 float shape = ColumnShape(u);
-                float radial = 0.25f + 0.75f * p.Rho01;
-                float wobble = 1f + 0.18f * (float)Math.Sin(p.Wobble + u * 9.4f + t * 0.4f);
-                dist = stemR * shape * radial * wobble;
+                float wobble = 1f
+                    + ColumnWobble * (float)Math.Sin(p.Wobble + u * 9.4f + t * 0.4f)
+                    + ColumnWobbleFast * (float)Math.Sin(p.Wobble2 + u * 24.7f - t * 0.9f);
+                // Bulges that the whole column agrees on, spiralling slowly as they climb, so the
+                // stem is a lumpy twisting thing rather than a cone with a ripple on it.
+                float lobe = 1f + ColumnLobeDepth
+                    * (float)Math.Sin(ColumnLobes * azimuth + p.Phase + u * ColumnLobeTwist);
+                dist = stemR * shape * radial * wobble * lobe;
+                if (dist < 0f) dist = 0f;
                 point.Size = stemR * (0.45f + 0.95f * SizeRoll(p.Size01)) * (0.7f + 0.3f * Smooth(u));
                 point.Fade = LoopFade(u);
                 point.Dust = 0.85f - 0.5f * u; // dust at the base, paling as it climbs
@@ -260,6 +350,33 @@ namespace MissileDisaster.Core
             point.Y = y;
             point.Z = dist * (float)Math.Sin(azimuth);
             return point;
+        }
+
+        /// <summary>
+        /// How fast a column puff climbs against one on the axis, from its radial position in the
+        /// stem (0 at the axis, 1 at the wall). A jet's profile: nearly full rate through the
+        /// core, falling away to <see cref="ColumnEdgeSpeed"/> at the outside where the column is
+        /// shearing against still air.
+        /// </summary>
+        public static float ClimbSpeed(float radial)
+        {
+            return Profile(radial, ColumnEdgeSpeed);
+        }
+
+        /// <summary>
+        /// How high a column puff gets against one on the axis, on the same profile: the core
+        /// runs all the way into the cap's underside, the edge is entrained and stops short.
+        /// </summary>
+        public static float ClimbReach(float radial)
+        {
+            return Profile(radial, ColumnEdgeReach);
+        }
+
+        /// <summary>The jet profile the two above share: 1 on the axis, falling to edge at the wall.</summary>
+        private static float Profile(float radial, float edge)
+        {
+            float r = radial < 0f ? 0f : (radial > 1f ? 1f : radial);
+            return edge + (1f - edge) * (1f - r * r);
         }
 
         /// <summary>The column's silhouette factor along its climb: skirt, waist, throat.</summary>

@@ -41,12 +41,26 @@ public class CloudAnimationTests
     }
 
     [Fact]
-    public void Most_of_the_growth_happens_early()
+    public void The_growth_is_front_loaded_but_does_not_leap()
     {
-        // Ease-out: by the middle of the rise the cloud is already most of the way up. This is
-        // the pace complaint made flesh - the spectacle is at the start, not the end.
-        var s = CloudAnimation.At(Rise * 0.5f, Rise, Hold, Fade);
-        Assert.True(s.HeightFraction > 0.85f, "over 85% grown at half time");
+        // Both halves of this matter and they pull against each other.
+        //
+        // It is an ease-out, because a real cloud rises fastest through its first seconds and
+        // settles asymptotically - so by half time it must be past where a constant climb would
+        // have it. But it was a cube, which put it over 85% up at half time and two thirds up
+        // inside the first third, and that was reported as the column being pushed into the sky
+        // rather than climbing it.
+        float linear = CloudAnimation.BirthFraction
+            + (1f - CloudAnimation.BirthFraction) * 0.5f;
+        var half = CloudAnimation.At(Rise * 0.5f, Rise, Hold, Fade);
+
+        Assert.True(half.HeightFraction > linear, "the climb has stopped easing out at all");
+        Assert.InRange(half.HeightFraction, 0.65f, 0.82f);
+
+        // And the early third, which is where the old curve did its damage.
+        var third = CloudAnimation.At(Rise / 3f, Rise, Hold, Fade);
+        Assert.True(third.HeightFraction < 0.62f,
+            "still most of the way up inside the first third: " + third.HeightFraction);
     }
 
     [Fact]

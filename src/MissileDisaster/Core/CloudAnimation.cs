@@ -15,7 +15,7 @@ namespace MissileDisaster.Core
     /// The mushroom cloud's life as a pure timeline - grow, stand, fade - so the shape of the
     /// animation can be tested without Unity. The frame loop just asks where it is now.
     ///
-    /// The growth follows an ease-out cube, which is the right shape for the physics as well as
+    /// The growth follows an ease-out curve, which is the right shape for the physics as well as
     /// the eye: a cloud rises fastest through its first seconds and settles asymptotically into
     /// its stabilised height. The width runs the same ease raised to WidthLagPower, so it trails
     /// the height - in every photograph the column climbs first and the cap billows out of its
@@ -23,6 +23,21 @@ namespace MissileDisaster.Core
     /// </summary>
     public static class CloudAnimation
     {
+        /// <summary>
+        /// How sharply the growth front-loads itself: 1 is a constant climb, and the higher it
+        /// goes the more of the height is reached in the first moments.
+        ///
+        /// <para>
+        /// It was a cube, and a cube is too eager - two thirds of the height inside the first
+        /// third of the rise, which reads as the cloud being pushed up rather than climbing. The
+        /// shape is still an ease-out, because a real cloud does decelerate into its stabilised
+        /// height; it just does not leap. Lowering the exponent is the right knob for that and
+        /// lengthening the rise is not, because a longer rise at the same curve simply spends
+        /// more of it standing still at the top.
+        /// </para>
+        /// </summary>
+        public const float RiseEasePower = 1.8f;
+
         /// <summary>The scale the cloud is born at, small enough to be hidden inside the fireball.</summary>
         public const float BirthFraction = 0.12f;
 
@@ -58,7 +73,7 @@ namespace MissileDisaster.Core
             // Growth, over the rise, from the birth fraction up to 1.
             float u = riseSeconds > 0f ? t / riseSeconds : 1f;
             if (u > 1f) u = 1f;
-            float ease = EaseOutCubic(u);
+            float ease = EaseOut(u);
             s.HeightFraction = BirthFraction + (1f - BirthFraction) * ease;
             s.WidthFraction = BirthFraction + (1f - BirthFraction) * (float)Math.Pow(ease, WidthLagPower);
 
@@ -98,10 +113,11 @@ namespace MissileDisaster.Core
             return s;
         }
 
-        private static float EaseOutCubic(float u)
+        private static float EaseOut(float u)
         {
-            float inv = 1f - u;
-            return 1f - inv * inv * inv;
+            if (u <= 0f) return 0f;
+            if (u >= 1f) return 1f;
+            return 1f - (float)Math.Pow(1f - u, RiseEasePower);
         }
     }
 }
