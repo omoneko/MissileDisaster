@@ -197,4 +197,61 @@ public class ExplosionScaleTests
         Assert.Equal(ExplosionScale.EmitAreaFloor * ExplosionScale.DensityPerMagnitude,
                      ExplosionScale.ParticlesPerSecond(0f, 1f), 3);
     }
+
+    [Fact]
+    public void The_flame_is_drawn_larger_than_life_but_not_by_much()
+    {
+        // The physical figure is right and still smaller than one building at the zoom the game
+        // is played at, so the drawn flame gets a readability allowance - the same one the crater
+        // has had all along. What it must not do is undo the report that started this work, where
+        // a 1.5 t warhead threw a fireball as wide as its destruction radius.
+        var spec = Conventional(1500);
+        float physical = ExplosionScale.FireballRadius(spec);
+        float drawn = ExplosionScale.DrawnFireballRadius(spec);
+
+        Assert.True(drawn > physical, "the flame is drawn at the bare figure again");
+        Assert.True(drawn < physical * 2f, "the allowance has grown into an exaggeration");
+        // The old drawing put the spawn disc at half the destruction radius - 41 m for this
+        // warhead, which is the figure that was reported. Compared by area, which is what is
+        // actually seen: the flame must stay under half of what it was.
+        float oldDrawn = spec.DestructionRadius * 0.5f;
+        Assert.True(drawn * drawn < oldDrawn * oldDrawn * 0.5f,
+            "the drawn flame covers " + (drawn * drawn / (oldDrawn * oldDrawn)).ToString("P0")
+            + " of the area that was reported as too big");
+    }
+
+    [Fact]
+    public void The_allowance_never_reaches_the_blast_it_sits_inside()
+    {
+        // However large the charge, the flame must stay inside the area the warhead damages -
+        // a fireball wider than the destruction radius is the exact thing that was reported.
+        foreach (int kg in new[] { 100, 1000, 1500, 10000, 100000 })
+        {
+            var spec = Conventional(kg);
+            Assert.True(ExplosionScale.DrawnFireballRadius(spec) < ExplosionScale.BlastRadius(spec),
+                kg + " kg draws a flame wider than its own blast");
+        }
+
+        var thermobaric = WarheadSpec.For(WarheadType.Thermobaric);
+        Assert.True(ExplosionScale.DrawnFireballRadius(thermobaric) < ExplosionScale.BlastRadius(thermobaric));
+    }
+
+    [Fact]
+    public void The_allowance_is_only_on_what_is_drawn()
+    {
+        // The water a burst displaces is an energy coupling and the column it lifts is already
+        // large enough to read, so both stay on the physical fireball. Only the flame and its
+        // flash get the allowance, and this is what pins that down.
+        var spec = Conventional(1000);
+        Assert.Equal(spec.FireballRadius, ExplosionScale.FireballRadius(spec), 3);
+        Assert.Equal(spec.FireballRadius * ExplosionScale.DrawnFireballFactor,
+            ExplosionScale.DrawnFireballRadius(spec), 3);
+    }
+
+    [Fact]
+    public void A_dud_is_drawn_at_nothing_rather_than_at_a_negative_size()
+    {
+        var dud = WarheadSpec.For(WarheadType.Nuclear); // carries no fireball radius of its own
+        Assert.Equal(0f, ExplosionScale.DrawnFireballRadius(dud), 3);
+    }
 }

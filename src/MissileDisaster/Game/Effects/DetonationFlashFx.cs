@@ -24,7 +24,11 @@ namespace MissileDisaster.Game.Effects
         // on purpose - a long flash reads as a bug, not as a bomb.
         private const float RiseSeconds = 0.06f;   // to full brightness
         private const float HoldSeconds = 0.10f;   // at full brightness
-        private const float FadeSeconds = 0.70f;   // back to nothing
+        private const float NuclearFadeSeconds = 0.70f;      // back to nothing
+        // A bomb's flash is not a small nuclear one drawn dimmer, it is a different event: it
+        // snaps rather than glares. Sharing the nuclear fade gave it a three-quarter-second
+        // afterglow, which reads as a light being turned down over a street.
+        private const float ConventionalFadeSeconds = 0.35f;
 
         // The point light reaches far beyond the fireball itself, which is what makes the ground
         // near the burst read as scorched by it rather than as merely lit.
@@ -50,14 +54,17 @@ namespace MissileDisaster.Game.Effects
         // A conventional warhead flashes too - it has to, now that the mod draws its own fireball
         // instead of the vanilla effect that used to carry a LightEffect - but it lights its
         // surroundings, not the county. No directional component at all.
-        private const float ConventionalIntensityPerMetre = 0.5f;
-        private const float ConventionalIntensityMin = 3f;
-        private const float ConventionalIntensityMax = 25f;
+        // Raised from 0.5 per metre: at a 1 t charge's fireball that solved to 7.5, against the
+        // 20 a nuclear flash starts at, and the old cap of 25 needed a 37 t charge to reach, so
+        // it was a ceiling nothing could touch. A bomb at night should light the block.
+        private const float ConventionalIntensityPerMetre = 0.9f;
+        private const float ConventionalIntensityMin = 5f;
+        private const float ConventionalIntensityMax = 40f;
 
         // How far past the fireball the visible glow reaches. A nuclear flash is seen from the
         // next county, so its glow dwarfs the fireball that made it; a bomb's barely leaves it.
         private const float NuclearGlowFactor = 6f;
-        private const float ConventionalGlowFactor = 1.8f;
+        private const float ConventionalGlowFactor = 2.6f;
 
         // White with the faintest warmth. A nuclear flash is near-white; tinting it orange makes
         // it read as an ordinary explosion.
@@ -71,7 +78,7 @@ namespace MissileDisaster.Game.Effects
         {
             Spawn("MissileDisaster_NuclearFlash", burstPoint, fireballRadius,
                 PeakIntensity(yieldKilotons), DirectionalIntensity(yieldKilotons),
-                yieldKilotons + " kt");
+                NuclearFadeSeconds, NuclearGlowFactor, yieldKilotons + " kt");
         }
 
         /// <summary>
@@ -84,11 +91,13 @@ namespace MissileDisaster.Game.Effects
             float peak = Mathf.Clamp(fireballRadius * ConventionalIntensityPerMetre,
                 ConventionalIntensityMin, ConventionalIntensityMax);
             Spawn("MissileDisaster_Flash", burstPoint, fireballRadius, peak, 0f,
+                ConventionalFadeSeconds, ConventionalGlowFactor,
                 fireballRadius.ToString("0") + " m fireball");
         }
 
         private static void Spawn(string name, Vector3 burstPoint, float fireballRadius,
-            float peakIntensity, float directionalIntensity, string what)
+            float peakIntensity, float directionalIntensity, float fadeSeconds, float glowFactor,
+            string what)
         {
             try
             {
@@ -104,13 +113,14 @@ namespace MissileDisaster.Game.Effects
 
                 var flash = go.AddComponent<FlashBehaviour>();
                 flash.PeakIntensity = peakIntensity;
+                flash.FadeSeconds = fadeSeconds;
 
                 // A Light lights surfaces. It puts nothing in the air, so from a camera looking at
                 // the sky the flash simply is not there - which is what "it does not spread into
                 // the sky" means. This is the glow itself: an additive ball at the burst that
                 // swells and fades, drawn against the sky rather than on the ground.
-                GlowFx.Play(burstPoint, fireballRadius, RiseSeconds + HoldSeconds + FadeSeconds,
-                    directionalIntensity > 0f ? NuclearGlowFactor : ConventionalGlowFactor);
+                GlowFx.Play(burstPoint, fireballRadius, RiseSeconds + HoldSeconds + fadeSeconds,
+                    glowFactor);
 
                 if (directionalIntensity > 0f)
                 {
@@ -178,6 +188,7 @@ namespace MissileDisaster.Game.Effects
         private class FlashBehaviour : MonoBehaviour
         {
             public float PeakIntensity;
+            public float FadeSeconds;    // a bomb snaps, a warhead glares - see the two constants
             public Light Daylight;       // optional; the map-wide wash
             public float PeakDaylight;
 
@@ -206,10 +217,11 @@ namespace MissileDisaster.Game.Effects
             /// Squared because a linear fade reads as a dimmer being turned down, where a flash
             /// drops away fast and then lingers faintly.
             /// </summary>
-            private static float Envelope(float age)
+            private float Envelope(float age)
             {
                 if (age < RiseSeconds) return age / RiseSeconds;
                 if (age < RiseSeconds + HoldSeconds) return 1f;
+                if (FadeSeconds <= 0f) return -1f;
 
                 float fade = (age - RiseSeconds - HoldSeconds) / FadeSeconds;
                 if (fade >= 1f) return -1f;

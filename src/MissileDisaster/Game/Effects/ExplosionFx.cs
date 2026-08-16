@@ -36,10 +36,16 @@ namespace MissileDisaster.Game.Effects
         {
             try
             {
-                // Two different sizes, deliberately. The fireball is what the charge looks like;
-                // the blast front is what it damages. They used to be the same number, which made
-                // every conventional fireball as wide as its destruction radius.
+                // Three different sizes, deliberately.
+                //  - fireball: the physical ball, which sizes the column of smoke it lifts
+                //  - drawn:    the same ball with a readability allowance on it, which is what
+                //              the flame and its flash are actually drawn at - the physical
+                //              figure is right and still smaller than one building
+                //  - blast:    what the warhead damages, which the shock front sweeps
+                // The fireball and the blast used to be one number, which made every conventional
+                // fireball as wide as its destruction radius.
                 float fireball = ExplosionScale.FireballRadius(spec);
+                float drawn = ExplosionScale.DrawnFireballRadius(spec);
                 float blast = ExplosionScale.BlastRadius(spec);
 
                 if (spec.Type == WarheadType.Nuclear)
@@ -70,17 +76,17 @@ namespace MissileDisaster.Game.Effects
                     for (int i = 0; i < offs.Length; i++)
                     {
                         ExplosionFallback.Play(
-                            new Vector3(center.x + offs[i].X, center.y, center.z + offs[i].Z), fireball);
+                            new Vector3(center.x + offs[i].X, center.y, center.z + offs[i].Z), drawn);
                     }
                     // One flash for the pattern rather than fourteen stacked on top of each other,
                     // and no mushroom: scattered bomblets throw up a haze, not a column.
-                    DetonationFlashFx.PlayConventional(center, Mathf.Max(fireball, spec.SpreadRadius * 0.25f));
+                    DetonationFlashFx.PlayConventional(center, Mathf.Max(drawn, spec.SpreadRadius * 0.25f));
                     return;
                 }
 
                 // A single detonation, conventional or thermobaric.
-                ExplosionFallback.Play(center, fireball);
-                DetonationFlashFx.PlayConventional(center, fireball);
+                ExplosionFallback.Play(center, drawn);
+                DetonationFlashFx.PlayConventional(center, drawn);
                 // The condensation shell behind the front, and the column of dirt and smoke it
                 // lifts. The column rises from the ground however high the warhead burst, the
                 // same way the nuclear cloud does.

@@ -74,11 +74,15 @@ namespace MissileDisaster.Game.Effects
                     radius, duration * 0.85f, speed, Count(AirParticles, scale), radius * AirSizeFraction,
                     AirFront, AirFront, 1f, 1.8f, 0f);
 
-                // The rolling wall of earth belongs to a large explosion. Behind a bomb it reads
-                // as a dust storm arriving from nowhere, so below the threshold the rings run
-                // alone - which is also what makes a small blast finish quickly, since the surge
-                // is the longest-lived part of the effect.
-                if (radius >= ShockWave.DustSurgeMinRadius) CreateDustSurge(origin, radius, duration, speed);
+                // The rolling wall of earth belongs to a large explosion. Behind a single bomb it
+                // reads as a dust storm arriving from nowhere, so below the threshold the rings
+                // run alone. Above it the wall is drawn at a count that follows the radius, the
+                // same way the rings are - a full 360-clod wall on a 120 m front was never the
+                // alternative, and it is what made the threshold have to sit so high.
+                if (radius >= ShockWave.DustSurgeMinRadius)
+                {
+                    CreateDustSurge(origin, radius, duration, speed, Count(SurgeParticles, scale));
+                }
             }
             catch (Exception e)
             {
@@ -87,16 +91,23 @@ namespace MissileDisaster.Game.Effects
         }
 
         /// <summary>
-        /// How much of the full particle budget a front of this radius needs, 0.25 to 1. A ring
-        /// reads as continuous when the gaps between its particles are small against its
+        /// How much of the full particle budget a front of this radius needs, MinScale to 1. A
+        /// ring reads as continuous when the gaps between its particles are small against its
         /// circumference, and that circumference grows with the radius - so the small end can be
-        /// drawn with a quarter of the particles and look identical.
+        /// drawn with a fraction of the particles and look identical.
         /// </summary>
+        /// The floor is not free, though, and a quarter was below it. Every length here is a
+        /// fraction of the radius, so the arithmetic comes out the same at every size: a puff is
+        /// DustSizeFraction of the radius and grows 2.6x, so covering a circumference of 2*PI*R
+        /// takes 2*PI / (0.055 * 2.6) = 44 of them however large the front is. At 0.25 the rings
+        /// were drawn with 24, and a small blast's front was a string of beads.
+        private const float MinScale = 0.45f;   // 96 * 0.45 = 43, just over the 44 above
+
         private static float CountScale(float radius)
         {
             const float full = 1500f;   // at and above this the full budget is spent
             float k = radius / full;
-            if (k < 0.25f) return 0.25f;
+            if (k < MinScale) return MinScale;
             return k > 1f ? 1f : k;
         }
 
@@ -133,7 +144,8 @@ namespace MissileDisaster.Game.Effects
         /// It is drawn with the opaque-cored cloud material, unlike the thin rings: this is the
         /// part that has to look like a wall of dirt rather than a haze.
         /// </summary>
-        private static void CreateDustSurge(Vector3 origin, float radius, float duration, AnimationCurve speed)
+        private static void CreateDustSurge(Vector3 origin, float radius, float duration,
+            AnimationCurve speed, int count)
         {
             float life = duration * SurgeDurationFactor;
             var go = ParticleBuilder.NewSystem("ShockWaveDustSurge", origin, ParticleAssets.Cloud);
@@ -146,9 +158,9 @@ namespace MissileDisaster.Game.Effects
             float biggest = radius * SurgeSizeFraction;
             main.startSize = new ParticleSystem.MinMaxCurve(biggest * 0.55f, biggest);
             main.startColor = new ParticleSystem.MinMaxGradient(SurgeLit, SurgeShade);
-            main.maxParticles = SurgeParticles * 2;
+            main.maxParticles = count * 2;
 
-            ParticleBuilder.Burst(ps, SurgeParticles);
+            ParticleBuilder.Burst(ps, count);
             ParticleBuilder.GroundRing(ps, ShockWave.StartRadius(radius));
             ParticleBuilder.SpeedCurve(ps, speed, 1f);
             ParticleBuilder.Gravity(ps, -SurgeLift); // negative gravity: the wall climbs as it rolls

@@ -82,6 +82,43 @@ namespace MissileDisaster.Core
         }
 
         /// <summary>
+        /// How much larger than life the flame is drawn, against the physical fireball above.
+        ///
+        /// <para>
+        /// The physical figure is right and it is still too small to read. A 1 t charge's
+        /// fireball is 35 m across; a Cities: Skylines building footprint is 32 m, so a
+        /// correctly-sized explosion is about the size of one house and is gone inside a second.
+        /// A subscriber's report after the last change - that conventional strikes had stopped
+        /// having any impact - is that, and it is a rendering problem rather than a physics one.
+        /// </para>
+        ///
+        /// <para>
+        /// This mod already answers it twice elsewhere, in the same terms. WarheadSpec exaggerates
+        /// every non-nuclear crater by about 2.4x because a real 1 t crater is "barely wider than
+        /// a bus, which is invisible at the zoom the game is played at". NuclearCloudDisplay draws
+        /// its fireball at 0.38 against the cloud's 0.06 - over six times its proportional share -
+        /// because "it is the smallest part of the effect and the only part judged against the
+        /// buildings around it". The conventional fireball was given neither allowance and was
+        /// held to the bare figure, which is the inconsistency.
+        /// </para>
+        ///
+        /// It is kept modest on purpose. The complaint that started this work was the opposite
+        /// one - the fireball was drawn at the damage radius, 41 m for a 1.5 t warhead - and at
+        /// 1.45 the drawn ball is still barely a quarter of that in area. What must not come back
+        /// is a bomb that looks like a bomb four times its size.
+        public const float DrawnFireballFactor = 1.45f;
+
+        /// <summary>
+        /// The radius the flame and its flash are actually drawn at. Only those two: the water it
+        /// displaces and the column it lifts are both driven by the physical fireball, because
+        /// one is an energy coupling and the other is already large enough to read.
+        /// </summary>
+        public static float DrawnFireballRadius(WarheadSpec spec)
+        {
+            return FireballRadius(spec) * DrawnFireballFactor;
+        }
+
+        /// <summary>
         /// How far the blast front sweeps, in metres: the widest of what the warhead destroys,
         /// half of what it sets alight, and one and a half times the crater. The shock wave
         /// follows this - it is the one effect that genuinely should span the damaged area, and

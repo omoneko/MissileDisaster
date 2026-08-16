@@ -104,10 +104,10 @@ public class ShockWaveTests
     }
 
     [Fact]
-    public void The_dust_surge_threshold_sits_above_every_conventional_warhead()
+    public void One_ordinary_bomb_raises_no_dust_surge()
     {
-        // The rolling wall of earth is a large-explosion phenomenon. It must not appear behind a
-        // bomb, and it must still appear for a nuclear burst.
+        // The rolling wall of earth must not appear behind a single bomb, where it reads as a
+        // dust storm arriving from nowhere.
         foreach (WarheadType type in new[]
                  { WarheadType.Conventional, WarheadType.Cluster, WarheadType.WhitePhosphorus })
         {
@@ -115,6 +115,23 @@ public class ShockWaveTests
             Assert.True(ExplosionScale.BlastRadius(spec) < ShockWave.DustSurgeMinRadius,
                 type + " at 2 t would raise a dust surge");
         }
+    }
+
+    [Fact]
+    public void The_big_conventional_warheads_do_raise_one()
+    {
+        // The other half, and the half that was broken. At the old 250 m threshold nothing below
+        // a nuclear warhead ever reached it - a thermobaric needed 2.7 t and a conventional 42 t -
+        // so the longest-lived and most substantial part of a blast was silently switched off for
+        // every ordinary strike. A thermobaric at its default charge must raise one.
+        var thermobaric = WarheadSpec.For(WarheadType.Thermobaric);
+        Assert.True(ExplosionScale.BlastRadius(thermobaric) >= ShockWave.DustSurgeMinRadius,
+            "a thermobaric warhead raises no dust surge, which is what left conventional strikes flat");
+
+        // And a heavy conventional charge, somewhere the player can actually reach by typing one.
+        var heavy = WarheadSpec.For(WarheadType.Conventional).Scaled(ConventionalYields.Multiplier(10000));
+        Assert.True(ExplosionScale.BlastRadius(heavy) >= ShockWave.DustSurgeMinRadius,
+            "a 10 t charge raises no dust surge");
 
         var nuke = WarheadSpec.For(WarheadType.Nuclear);
         Assert.True(nuke.DestructionRadius > ShockWave.DustSurgeMinRadius,

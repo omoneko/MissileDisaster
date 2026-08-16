@@ -30,14 +30,33 @@ namespace MissileDisaster.Core
         // the "it does not scale with the explosion" that was reported. 0.35 s is still about
         // twenty frames - long enough to read - and small charges now finish visibly sooner than
         // large ones.
+        //
+        // Do not raise it to buy a longer-lasting blast, however tempting. A 206 m front takes
+        // 0.38 s of its own, so anything above about 0.35 puts every conventional warhead back on
+        // the floor together and undoes the scaling above. What makes a small strike last is the
+        // dust surge, the flame and the column of smoke, all of which are sized independently.
         public const float MinimumSeconds = 0.35f;
 
         /// <summary>
-        /// Below this radius the blast is a bomb going off, not a front sweeping a city: the
-        /// rolling wall of earth that chases the rings is a large-explosion phenomenon and reads
-        /// as absurd behind a 1.5 t warhead. ShockWaveFx draws the rings alone below it.
+        /// Below this radius the rings run alone, without the rolling wall of earth behind them.
+        ///
+        /// <para>
+        /// It was 250 m, which sounded like a judgement about bombs and was in practice a
+        /// switch that turned the surge off entirely: a conventional warhead reaches 250 m of
+        /// destruction at about 42 t of charge and a thermobaric at 2.7 t, so no ordinary strike
+        /// ever saw it. The surge is the longest-lived and most substantial part of the blast, so
+        /// losing it silently is most of what "the disaster does not have the same impact
+        /// anymore" was describing.
+        /// </para>
+        ///
+        /// At 110 m a thermobaric warhead gets one at its default charge and a conventional one
+        /// from about 4 t up, while a single 1 t bomb still does not - a rolling wall of dirt
+        /// behind one bomb really does read as a dust storm arriving from nowhere, which was the
+        /// original and correct half of the argument. ShockWaveFx also scales the wall's particle
+        /// count with the radius now, so the smaller ones are proportionate rather than a
+        /// full-sized wall on a short leash.
         /// </summary>
-        public const float DustSurgeMinRadius = 250f;
+        public const float DustSurgeMinRadius = 110f;
         // The other end is a soft ceiling rather than a clamp: every strategic yield shared the
         // old 14 s, so a 50 Mt front - which really takes about 48 s to cross its 26 km - was
         // drawn crossing the ground three times faster than a 1 Mt one instead of taking longer
