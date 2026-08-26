@@ -1,3 +1,4 @@
+using System;
 using MissileDisaster.Core;
 using UnityEngine;
 
@@ -29,6 +30,26 @@ namespace MissileDisaster.Game.Effects
         // snaps rather than glares. Sharing the nuclear fade gave it a three-quarter-second
         // afterglow, which reads as a light being turned down over a street.
         private const float ConventionalFadeSeconds = 0.35f;
+
+        // The afterglow: the incandescent ball itself, which outlives the flash by seconds.
+        //
+        // A Workshop report - "i did like the big ball of light that stayed for several seconds
+        // instead of just the flash now" - was about a real regression, though not the one it
+        // sounds like. The fireball is still drawn for its full swell, about eight seconds at
+        // 150 kt; what vanished was its LIGHT. The flash is deliberately brief, so once it was
+        // over the ball went dark and read as embers rather than as something incandescent.
+        //
+        // Glasstone's two pulses are the answer: the flash is the first, over in a fraction of a
+        // second, and the second - the one carrying 99% of the thermal energy - runs for
+        // seconds. So the light does not simply switch off at the end of the fade. It drops to a
+        // fraction of its peak and decays over the fireball's own lifetime, cooling as the ball
+        // cools. The size of the fireball is untouched: this restores the several seconds of
+        // light, not the kilometre-wide ball that came from drawing it at the damage radius.
+        private const float AfterglowPeakFraction = 0.22f;  // of the flash's peak, where the fade hands over
+        private const float AfterglowSecondsFactor = 0.9f;  // of the fireball's swell time
+        private const float AfterglowSecondsMin = 2.5f;
+        private const float AfterglowSecondsMax = 12f;
+        private const float AfterglowGlowFactor = 2.6f;     // the visible ball, tighter than the flash's wash
 
         // The point light reaches far beyond the fireball itself, which is what makes the ground
         // near the burst read as scorched by it rather than as merely lit.
@@ -70,15 +91,28 @@ namespace MissileDisaster.Game.Effects
         // it read as an ordinary explosion.
         private static readonly Color FlashColor = new Color(1f, 0.97f, 0.90f, 1f);
 
+        // The afterglow is warmer than the flash and gets warmer as it cools: the flash is
+        // near-white because the fireball is at tens of thousands of degrees, and by the time it
+        // is a ball hanging over the city it has dropped into orange.
+        private static readonly Color AfterglowColor = new Color(1f, 0.72f, 0.38f, 1f);
+
         /// <summary>
         /// The flash of a nuclear detonation: a blaze at the burst plus a brief wash of daylight
         /// over the whole map. A failure here never stops the detonation resolving.
         /// </summary>
-        public static void PlayNuclear(Vector3 burstPoint, int yieldKilotons, float fireballRadius)
+        public static void PlayNuclear(Vector3 burstPoint, int yieldKilotons, float fireballRadius,
+            float fireballSeconds)
         {
+            float peak = PeakIntensity(yieldKilotons);
             Spawn("MissileDisaster_NuclearFlash", burstPoint, fireballRadius,
-                PeakIntensity(yieldKilotons), DirectionalIntensity(yieldKilotons),
+                peak, DirectionalIntensity(yieldKilotons),
                 NuclearFadeSeconds, NuclearGlowFactor, yieldKilotons + " kt");
+
+            // The second pulse: the ball goes on burning after the flash has gone.
+            float afterglowSeconds = Mathf.Clamp(fireballSeconds * AfterglowSecondsFactor,
+                AfterglowSecondsMin, AfterglowSecondsMax);
+            SpawnAfterglow(burstPoint, fireballRadius, peak * AfterglowPeakFraction,
+                RiseSeconds + HoldSeconds + NuclearFadeSeconds, afterglowSeconds);
         }
 
         /// <summary>
@@ -185,6 +219,79 @@ namespace MissileDisaster.Game.Effects
         /// Its own component rather than SimulationTimed because there are no ParticleSystems
         /// here to set a simulation speed on - what has to follow the clock is the intensity.
         /// </summary>
+        /// <summary>
+        /// The incandescent ball after the flash has gone: a point light that starts at a
+        /// fraction of the flash's peak and cools away over seconds, with the glow to match.
+        /// It waits out the flash first, so the two never stack into a double-bright moment.
+        /// No directional component - the map-wide wash belongs to the flash alone; a second one
+        /// running for seconds would be daylight, not a detonation.
+        /// </summary>
+        private static void SpawnAfterglow(Vector3 burstPoint, float fireballRadius,
+            float peakIntensity, float delaySeconds, float seconds)
+        {
+            try
+            {
+                var go = new GameObject("MissileDisaster_NuclearAfterglow");
+                go.transform.position = burstPoint;
+
+                Light light = go.AddComponent<Light>();
+                light.type = LightType.Point;
+                light.color = AfterglowColor;
+                light.range = Mathf.Min(Mathf.Max(fireballRadius, 1f) * RangePerFireballRadius, RangeMax);
+                light.intensity = 0f;
+                light.shadows = LightShadows.None;
+
+                var glow = go.AddComponent<AfterglowBehaviour>();
+                glow.PeakIntensity = peakIntensity;
+                glow.DelaySeconds = delaySeconds;
+                glow.Seconds = seconds;
+
+                // The visible ball, handed the same span so the light and what the eye sees on
+                // the sky cool together.
+                GlowFx.PlayDelayed(burstPoint, fireballRadius, seconds, AfterglowGlowFactor,
+                    delaySeconds, AfterglowColor);
+            }
+            catch (Exception e)
+            {
+                ModConfig.LogError("DetonationFlashFx.SpawnAfterglow error: " + e);
+            }
+        }
+
+        /// <summary>
+        /// Holds off through the flash, then decays from the peak to nothing over Seconds.
+        /// The decay is cubed rather than squared: a cooling body loses its light faster than it
+        /// loses its heat, so most of the brightness goes early and a dull glow rides out the
+        /// rest - which is what keeps this reading as a fireball rather than a lamp.
+        /// </summary>
+        private class AfterglowBehaviour : MonoBehaviour
+        {
+            public float PeakIntensity;
+            public float DelaySeconds;
+            public float Seconds;
+
+            private Light _light;
+            private float _age;
+
+            private void Start()
+            {
+                _light = GetComponent<Light>();
+            }
+
+            private void Update()
+            {
+                if (_light == null) { Destroy(gameObject); return; }
+
+                _age += EffectClock.Delta;
+                if (_age < DelaySeconds) { _light.intensity = 0f; return; }
+
+                float t = Seconds > 0f ? (_age - DelaySeconds) / Seconds : 1f;
+                if (t >= 1f) { Destroy(gameObject); return; }
+
+                float k = 1f - t;
+                _light.intensity = PeakIntensity * k * k * k;
+            }
+        }
+
         private class FlashBehaviour : MonoBehaviour
         {
             public float PeakIntensity;

@@ -82,6 +82,11 @@ namespace MissileDisaster.Game.Effects
                 if (radius >= ShockWave.DustSurgeMinRadius)
                 {
                     CreateDustSurge(origin, radius, duration, speed, Count(SurgeParticles, scale));
+
+                // The solid part: the rubble of whatever stood here, thrown out and up on
+                // ballistic arcs and falling back across the city. Without it a detonation is
+                // all smoke, which reads as weather rather than as a building coming apart.
+                DebrisFx.Play(groundZero, radius);
                 }
             }
             catch (Exception e)

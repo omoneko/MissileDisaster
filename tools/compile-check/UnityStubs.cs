@@ -49,6 +49,7 @@ namespace UnityEngine
         public static int RoundToInt(float f) { return (int)Math.Round(f); }
         public static float Sqrt(float f) { return (float)Math.Sqrt(f); }
         public const float Rad2Deg = 57.29578f;
+        public const float Deg2Rad = 0.0174533f;
     }
 
     public struct Keyframe
@@ -263,6 +264,12 @@ namespace UnityEngine
             public MinMaxCurve limit { get; set; }
         }
 
+        public struct RotationOverLifetimeModule
+        {
+            public bool enabled { get; set; }
+            public MinMaxCurve z { get; set; }
+        }
+
         public struct VelocityOverLifetimeModule
         {
             public bool enabled { get; set; }
@@ -277,6 +284,7 @@ namespace UnityEngine
         public SizeOverLifetimeModule sizeOverLifetime { get { return new SizeOverLifetimeModule(); } }
         public LimitVelocityOverLifetimeModule limitVelocityOverLifetime { get { return new LimitVelocityOverLifetimeModule(); } }
         public VelocityOverLifetimeModule velocityOverLifetime { get { return new VelocityOverLifetimeModule(); } }
+        public RotationOverLifetimeModule rotationOverLifetime { get { return new RotationOverLifetimeModule(); } }
         public void Play() { }
     }
 }

@@ -35,7 +35,23 @@ namespace MissileDisaster.Game.Effects
         /// is seen from the next county and dwarfs its own fireball, a bomb's barely leaves it.
         /// seconds is how long the flash it belongs to lasts. A failure never stops anything else.
         /// </summary>
+        /// <summary>
+        /// The same ball, held back for delaySeconds and drawn in its own colour: the cooling
+        /// afterglow that follows a nuclear flash, which is orange where the flash is white.
+        /// </summary>
+        public static void PlayDelayed(Vector3 burstPoint, float fireballRadius, float seconds,
+            float factor, float delaySeconds, Color colour)
+        {
+            Play(burstPoint, fireballRadius, seconds, factor, delaySeconds, colour, colour);
+        }
+
         public static void Play(Vector3 burstPoint, float fireballRadius, float seconds, float factor)
+        {
+            Play(burstPoint, fireballRadius, seconds, factor, 0f, GlowCore, GlowEdge);
+        }
+
+        private static void Play(Vector3 burstPoint, float fireballRadius, float seconds, float factor,
+            float delaySeconds, Color core, Color edge)
         {
             if (fireballRadius <= 0f || seconds <= 0f || factor <= 0f) return;
             try
@@ -45,12 +61,13 @@ namespace MissileDisaster.Game.Effects
                 var go = ParticleBuilder.NewSystem("DetonationGlow", burstPoint, ParticleAssets.Fire);
                 var ps = go.GetComponent<ParticleSystem>();
                 var main = ps.main;
+                main.startDelay = delaySeconds;
                 main.startLifetime = seconds;
                 main.startSpeed = radius * SpreadFraction / seconds;
                 // One particle already spans the glow; several overlapping make it solid at the
                 // centre and ragged at the edge, which is what a flash in air looks like.
                 main.startSize = new ParticleSystem.MinMaxCurve(radius * 1.1f, radius * 1.8f);
-                main.startColor = new ParticleSystem.MinMaxGradient(GlowCore, GlowEdge);
+                main.startColor = new ParticleSystem.MinMaxGradient(core, edge);
                 main.maxParticles = Particles * 2;
 
                 ParticleBuilder.Burst(ps, Particles);
@@ -61,7 +78,7 @@ namespace MissileDisaster.Game.Effects
                     new GradientAlphaKey(0.6f, 0f), new GradientAlphaKey(1f, 0.06f),
                     new GradientAlphaKey(0.35f, 0.4f), new GradientAlphaKey(0f, 1f));
                 ParticleBuilder.SizeCurve(ps, 0.75f, Growth);
-                ParticleBuilder.PlayAndDestroy(go, seconds + 0.5f);
+                ParticleBuilder.PlayAndDestroy(go, delaySeconds + seconds + 0.5f);
             }
             catch (Exception e)
             {

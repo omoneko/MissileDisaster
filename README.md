@@ -72,6 +72,14 @@ radioactive fallout that you can clean up with a dedicated decontamination facil
   **concentric wall of dust** — a tsunami of earth the front tears off the ground, starting a
   beat after the blast passes, piling up and climbing as it spreads, and outlasting the front
   itself
+- **Blast debris** — the rubble of whatever stood at ground zero is thrown out and up on real
+  ballistic arcs, tumbling as it goes and landing back across the city, with the dust it carries.
+  The launch speed and hang time are solved from how far the pieces should land, so a 1 t charge
+  throws its wreckage 18 m and a 150 kt warhead throws it 900 m
+- **Trees catch fire** inside the thermal ring, fiercest at the centre and petering out at the
+  edge, up to a few hundred at a time so a strike costs the simulation about what a natural
+  disaster does. *(Needs the Natural Disasters DLC — the game's own tree‑burning API is gated on
+  it. Without the DLC nothing happens; everything else in the mod is unaffected.)*
 - **Distance‑based destruction** — total destruction near ground zero, falling off with distance
 - **Fire** for incendiary/thermobaric/nuclear warheads
   - White Phosphorus is a pure incendiary: no crater and almost no blast **at any charge** —

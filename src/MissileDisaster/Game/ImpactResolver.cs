@@ -1,4 +1,5 @@
 using ColossalFramework;
+using ColossalFramework.Math;
 using MissileDisaster.Core;
 using UnityEngine;
 
@@ -89,6 +90,11 @@ namespace MissileDisaster.Game
             float burnMin = core;
             if (burnMin > burnMax * 0.5f) burnMin = burnMax * 0.5f; // hold the inner edge back so the burn band cannot invert
             DisasterHelpers.DestroyStuff(seed, null, pos, outer, outer, removeRadius, destMin, destMax, burnMin, burnMax);
+
+            // Trees inside the thermal ring catch. Natural Disasters only - see TreeFires, which
+            // lights nothing at all without it rather than failing.
+            Randomizer treeRandomizer = SimulationManager.instance.m_randomizer;
+            TreeFires.Ignite(pos, burnMax, ref treeRandomizer);
 
             SplashWater(pos, spec);
             StartBlackRain(pos, spec);

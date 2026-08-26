@@ -1,0 +1,107 @@
+using System;
+
+namespace MissileDisaster.Core
+{
+    /// <summary>
+    /// What the blast throws: the rubble of whatever stood at ground zero, flung outward and
+    /// upward and falling back across the city. Pure, with no UnityEngine dependency.
+    ///
+    /// The shock wave already carries the air and the dust it scrapes off the ground - a front
+    /// racing outward and a wall of earth rolling behind it. What was missing is the solid part.
+    /// A building inside the destruction radius does not fade away; it comes apart, and the
+    /// pieces go with the blast. Drawing only smoke leaves a detonation looking like weather.
+    ///
+    /// The flight is ballistic and solved backwards from where the pieces should land. Given a
+    /// range and a launch angle, the speed that reaches it is v = sqrt(g R / sin 2θ), and the
+    /// time it spends in the air follows from the same throw. That way the debris is specified
+    /// by the one number that matters visually - how far it is thrown - and the speed and the
+    /// hang time come out of the physics rather than being dialled in against each other.
+    /// </summary>
+    public static class BlastDebris
+    {
+        public const float Gravity = 9.81f;
+
+        /// <summary>
+        /// How far the pieces are thrown, against what the warhead destroys. Well short of it:
+        /// the far edge of a destruction radius is where buildings are damaged rather than
+        /// demolished, and rubble raining down there would read as wrong. This is the ring where
+        /// there is nothing left standing.
+        /// </summary>
+        public const float RangeFraction = 0.35f;
+
+        /// <summary>The launch angle, in degrees. Not 45: a blast throws its rubble out rather than up, and a flatter arc keeps it in frame and lands it sooner.</summary>
+        public const float LaunchAngleDegrees = 32f;
+
+        /// <summary>The bounds on the throw, in metres. The floor keeps a small charge from merely dribbling; the ceiling keeps a strategic one from raining masonry across the whole map.</summary>
+        public const float RangeMin = 18f;
+        public const float RangeMax = 900f;
+
+        /// <summary>Hang time is capped so a big strike is not still dropping bricks a minute later.</summary>
+        public const float FlightSecondsMax = 9f;
+
+        /// <summary>How far the pieces are thrown, in metres, for a warhead with this blast radius.</summary>
+        public static float Range(float blastRadius)
+        {
+            if (blastRadius <= 0f) return 0f;
+            float range = blastRadius * RangeFraction;
+            if (range < RangeMin) return RangeMin;
+            return range > RangeMax ? RangeMax : range;
+        }
+
+        /// <summary>
+        /// The launch speed, in m/s, that carries a piece to that range on the launch angle:
+        /// v = sqrt(g R / sin 2θ).
+        /// </summary>
+        public static float LaunchSpeed(float range)
+        {
+            if (range <= 0f) return 0f;
+            double twoTheta = 2.0 * LaunchAngleDegrees * Math.PI / 180.0;
+            double sin = Math.Sin(twoTheta);
+            if (sin <= 0.0001) return 0f;
+            return (float)Math.Sqrt(Gravity * range / sin);
+        }
+
+        /// <summary>
+        /// How long a piece launched at that speed stays up: t = 2 v sin(theta) / g, held under
+        /// the ceiling.
+        /// </summary>
+        public static float FlightSeconds(float launchSpeed)
+        {
+            if (launchSpeed <= 0f) return 0f;
+            double theta = LaunchAngleDegrees * Math.PI / 180.0;
+            float t = (float)(2.0 * launchSpeed * Math.Sin(theta) / Gravity);
+            return t > FlightSecondsMax ? FlightSecondsMax : t;
+        }
+
+        /// <summary>
+        /// The size of the largest pieces, in metres. Tied to the throw rather than to the blast
+        /// radius: a bomb that levels one building throws pieces of that building, and a warhead
+        /// that levels a district throws the same masonry, just further and in more quantity.
+        /// </summary>
+        public const float ChunkSizeFraction = 0.035f;
+        public const float ChunkSizeMin = 2.5f;
+        public const float ChunkSizeMax = 26f;
+
+        public static float ChunkSize(float range)
+        {
+            float size = range * ChunkSizeFraction;
+            if (size < ChunkSizeMin) return ChunkSizeMin;
+            return size > ChunkSizeMax ? ChunkSizeMax : size;
+        }
+
+        /// <summary>
+        /// How many pieces to throw. It grows with the throw - a bigger blast tears up more - but
+        /// far slower than the area does, because the count is a drawing budget and not a census.
+        /// </summary>
+        public const int ChunksMin = 24;
+        public const int ChunksMax = 140;
+
+        public static int ChunkCount(float range)
+        {
+            if (range <= 0f) return 0;
+            int n = (int)(ChunksMin + (ChunksMax - ChunksMin) * Math.Sqrt(range / RangeMax));
+            if (n < ChunksMin) return ChunksMin;
+            return n > ChunksMax ? ChunksMax : n;
+        }
+    }
+}

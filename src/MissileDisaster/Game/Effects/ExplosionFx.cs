@@ -57,8 +57,9 @@ namespace MissileDisaster.Game.Effects
                     // Because it skips the vanilla effect it also skips that effect's LightEffect,
                     // so the flash it would have carried is played here instead.
                     NuclearMushroomFx.Play(groundZero, center, spec.YieldKilotons, spec.Airburst);
+                    NuclearCloudDimensions flashDims = NuclearCloudDisplay.For(spec.YieldKilotons);
                     DetonationFlashFx.PlayNuclear(center, Mathf.RoundToInt(spec.YieldKilotons),
-                        NuclearCloudDisplay.For(spec.YieldKilotons).FireballRadius);
+                        flashDims.FireballRadius, flashDims.FireballSeconds);
                     ShockWaveFx.Play(groundZero, spec.DestructionRadius);
                     return;
                 }
