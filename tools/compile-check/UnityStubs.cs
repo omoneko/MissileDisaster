@@ -6,6 +6,11 @@
 // written in it. Anything whose existence is in doubt is listed in the report, not here.
 using System;
 
+namespace UnityEngine.Rendering
+{
+    public enum ShadowCastingMode { Off, On, TwoSided, ShadowsOnly }
+}
+
 namespace UnityEngine
 {
     public struct Vector3
@@ -37,6 +42,7 @@ namespace UnityEngine
     public struct Quaternion
     {
         public static Quaternion Euler(float x, float y, float z) { return new Quaternion(); }
+        public static Quaternion Euler(Vector3 euler) { return new Quaternion(); }
     }
 
     public static class Mathf
@@ -158,6 +164,9 @@ namespace UnityEngine
     {
         public Material[] materials { get; set; }
         public Material[] sharedMaterials { get; set; }
+        public Material sharedMaterial { get; set; }
+        public Rendering.ShadowCastingMode shadowCastingMode { get; set; }
+        public bool receiveShadows { get; set; }
     }
 
     public class GameObject : Object

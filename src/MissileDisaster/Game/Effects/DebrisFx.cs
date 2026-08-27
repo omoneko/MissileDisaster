@@ -38,9 +38,17 @@ namespace MissileDisaster.Game.Effects
         private const float TumbleDegreesPerSecond = 220f;
         private const float ChunkSizeVariety = 0.45f;   // the smallest chunk against the largest
 
-        // The renderer clamps a particle to half the screen by default, which crops the chunks
-        // exactly when the camera is close enough to look at them.
+        // The renderer clamps a particle to half the screen by default, which crops the dust
+        // exactly when the camera is close enough to look at it.
         private const float MaxScreenFraction = 4f;
+
+        // Chunks are real objects now, so the budget is an object budget rather than a particle
+        // one. Ninety tumbling pieces read as a blast tearing a district apart; several hundred
+        // GameObjects would only cost frames for pieces nobody can pick out anyway.
+        private const int MaxChunkObjects = 90;
+
+        /// <summary>How long a chunk lies where it fell before it is removed.</summary>
+        private const float SettleSeconds = 2.5f;
 
         // Concrete and brick, lit and shaded, with the dust a shade paler - it is the same
         // material ground finer.
@@ -80,7 +88,7 @@ namespace MissileDisaster.Game.Effects
                 Mesh[] meshes = DebrisMeshes.Chunks;
                 ModConfig.LogAlways(string.Format(
                     "debris: blast {0:F0} m -> thrown from a {9:F0} m disc, {1:F0} m further, "
-                    + "{2} chunks of {3:F1} m at {4:F0} m/s for {5:F1} s; emitted {6}; "
+                    + "{2} chunks of {3:F1} m at {4:F0} m/s for {5:F1} s; spawned {6} objects; "
                     + "meshes {7}; shader {8}",
                     blastRadius, range, chunks, chunkSize, speed, flight, emitted,
                     meshes == null ? 0 : meshes.Length,
@@ -94,21 +102,23 @@ namespace MissileDisaster.Game.Effects
         }
 
         /// <summary>
-        /// The solid pieces: real geometry, lit by the scene, tumbling on all three axes and
-        /// landing where the physics puts them.
+        /// The solid pieces. Each is its own GameObject with a MeshFilter and a MeshRenderer,
+        /// flown by DebrisChunkFx along the arc Core.DebrisFlight computes.
         ///
-        /// Mesh render mode rather than billboards is the whole difference between rubble and
-        /// brown smoke. A soft round sprite has no silhouette to read and no faces to catch the
-        /// light, so it can only ever be a puff; a chunk built to the proportions of the game's
-        /// own rock props tumbles, flashes its facets and lands like debris.
+        /// Not mesh particles. That was the previous attempt, and when nothing appeared there
+        /// was no way to ask a ParticleSystemRenderer why. This is the same path the mod's own
+        /// missile model renders through, which is known to work in this game.
+        ///
+        /// The count is lower than a particle system's would be - these are objects, and a few
+        /// dozen tumbling chunks read as a blast throwing wreckage where several hundred would
+        /// only cost frames.
         /// </summary>
-        /// <summary>Returns how many particles the system actually holds, so the caller can say so in the log.</summary>
         private static int CreateChunks(Vector3 origin, float emitRadius, float speed, float flight,
             float chunkSize, int count)
         {
             Mesh[] meshes = DebrisMeshes.Chunks;
             Material material = DebrisMeshes.ChunkMaterial;
-            if (meshes == null || meshes.Length == 0 || material == null)
+            if (meshes == null || meshes.Length == 0 || meshes[0] == null || material == null)
             {
                 // This used to return in silence, which is how the rubble managed to be missing
                 // for two rounds without anything saying so.
@@ -116,42 +126,39 @@ namespace MissileDisaster.Game.Effects
                 return 0;
             }
 
-            var go = ParticleBuilder.NewSystem("BlastDebris", origin, material);
-            var ps = go.GetComponent<ParticleSystem>();
-            var main = ps.main;
-            main.startLifetime = flight;
-            // A spread of speeds, so they do not all land on the same ring.
-            main.startSpeed = new ParticleSystem.MinMaxCurve(speed * 0.55f, speed);
-            main.startSize = new ParticleSystem.MinMaxCurve(chunkSize * ChunkSizeVariety, chunkSize);
-            main.startColor = new ParticleSystem.MinMaxGradient(ChunkLit, ChunkShade);
-            main.maxParticles = count * 2;
-            main.gravityModifier = 1f; // real gravity: the arc is the one BlastDebris solved for
-            // Tumbling on every axis, each piece starting at its own attitude. A chunk spinning
-            // about one axis like a coin is the other way to give geometry away.
-            main.startRotation3D = true;
-            main.startRotationX = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
-            main.startRotationY = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
-            main.startRotationZ = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
+            int wanted = count > MaxChunkObjects ? MaxChunkObjects : count;
+            int seed = (int)(UnityEngine.Random.value * 1000000f);
+            int made = 0;
 
-            var renderer = ps.GetComponent<ParticleSystemRenderer>();
-            renderer.renderMode = ParticleSystemRenderMode.Mesh;
-            renderer.SetMeshes(meshes, meshes.Length); // a different shape per particle
-            renderer.alignment = ParticleSystemRenderSpace.World;
-            renderer.maxParticleSize = MaxScreenFraction; // the default 0.5 clips them up close
+            for (int i = 0; i < wanted; i++)
+            {
+                DebrisLaunch launch = DebrisFlight.Launch(i, seed, emitRadius, speed, chunkSize,
+                    meshes.Length);
+                float life = DebrisFlight.FlightSeconds(launch);
+                if (life <= 0.05f) continue;
+                if (life > flight) life = flight;
 
-            ParticleBuilder.Burst(ps, count);
-            ParticleBuilder.ConeUp(ps, emitRadius, ConeAngle);
+                var go = new GameObject("MissileDisaster_DebrisChunk");
+                go.transform.position = origin;
+                go.transform.localScale = new Vector3(launch.Scale, launch.Scale, launch.Scale);
 
-            var rot = ps.rotationOverLifetime;
-            rot.enabled = true;
-            rot.separateAxes = true;
-            float tumble = TumbleDegreesPerSecond * Mathf.Deg2Rad;
-            rot.x = new ParticleSystem.MinMaxCurve(-tumble, tumble);
-            rot.y = new ParticleSystem.MinMaxCurve(-tumble * 0.6f, tumble * 0.6f);
-            rot.z = new ParticleSystem.MinMaxCurve(-tumble, tumble);
+                MeshFilter filter = go.AddComponent<MeshFilter>();
+                filter.sharedMesh = meshes[launch.Variant];
+                MeshRenderer renderer = go.AddComponent<MeshRenderer>();
+                renderer.sharedMaterial = material;
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                renderer.receiveShadows = false;
 
-            ParticleBuilder.PlayAndDestroy(go, flight + 1f);
-            return ps.particleCount;
+                var chunk = go.AddComponent<DebrisChunkFx>();
+                chunk.Launch = launch;
+                chunk.Origin = origin;
+                chunk.GroundY = origin.y;
+                // It lies where it fell for a moment before going, rather than blinking out the
+                // instant it lands.
+                chunk.LifeSeconds = life + SettleSeconds;
+                made++;
+            }
+            return made;
         }
 
         /// <summary>The dust thrown with the pieces: slower, softer, and dying in the air.</summary>

@@ -76,7 +76,8 @@ radioactive fallout that you can clean up with a dedicated decontamination facil
   ballistic arcs, tumbling on all three axes and landing back across the city, with the dust it
   carries. The pieces are **real geometry, lit by the scene** — low‑poly chunks generated to the
   proportions of the game's own rock props (measured off them: ~31–58 triangles, 4.0 × 1.8 × 2.6 m,
-  flat rather than cubic), not billboards. The launch speed and hang time are solved from how far
+  flat rather than cubic) — **real objects with their own mesh and renderer**, the same path the
+  mod's missile model draws through, not billboards and not mesh particles. The launch speed and hang time are solved from how far
   the pieces should land, so a 1 t charge throws its wreckage 30 m and a strategic warhead throws
   it 620 m — the range chosen so the longest arc still lands before the chunk's life runs out
 - **Trees catch fire** inside the thermal ring, fiercest at the centre and petering out at the
