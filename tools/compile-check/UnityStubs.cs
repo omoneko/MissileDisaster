@@ -50,6 +50,7 @@ namespace UnityEngine
         public static float Sqrt(float f) { return (float)Math.Sqrt(f); }
         public const float Rad2Deg = 57.29578f;
         public const float Deg2Rad = 0.0174533f;
+        public const float PI = 3.1415927f;
     }
 
     public struct Keyframe
@@ -126,6 +127,7 @@ namespace UnityEngine
         public Texture mainTexture { get; set; }
         public bool HasProperty(string name) { return false; }
         public void SetFloat(string name, float value) { }
+        public void SetColor(string name, Color value) { }
         public void SetTexture(string name, Texture value) { }
     }
 
@@ -139,6 +141,11 @@ namespace UnityEngine
     public class Mesh : Object
     {
         public Bounds bounds { get { return new Bounds(); } }
+        public Vector3[] vertices { get; set; }
+        public int[] triangles { get; set; }
+        public void Clear() { }
+        public void RecalculateNormals() { }
+        public void RecalculateBounds() { }
     }
 
     public class MeshFilter : Component
@@ -161,6 +168,7 @@ namespace UnityEngine
     }
 
     public enum ParticleSystemSimulationSpace { Local, World, Custom }
+    public enum ParticleSystemRenderSpace { View, World, Local, Facing }
     public enum ParticleSystemSortMode { None, Distance, OldestInFront, YoungestInFront }
     public enum ParticleSystemRenderMode { Billboard, Stretch, HorizontalBillboard, VerticalBillboard, Mesh, None }
     public enum ParticleSystemShapeType
@@ -176,6 +184,9 @@ namespace UnityEngine
         public ParticleSystemRenderMode renderMode { get; set; }
         public ParticleSystemSortMode sortMode { get; set; }
         public float maxParticleSize { get; set; }
+        public Mesh mesh { get; set; }
+        public ParticleSystemRenderSpace alignment { get; set; }
+        public void SetMeshes(Mesh[] meshes, int size) { }
     }
 
     public class ParticleSystem : Component
@@ -227,6 +238,10 @@ namespace UnityEngine
             public float gravityModifier { get; set; }
             public int maxParticles { get; set; }
             public ParticleSystemSimulationSpace simulationSpace { get; set; }
+            public bool startRotation3D { get; set; }
+            public MinMaxCurve startRotationX { get; set; }
+            public MinMaxCurve startRotationY { get; set; }
+            public MinMaxCurve startRotationZ { get; set; }
         }
 
         public struct EmissionModule
@@ -267,6 +282,9 @@ namespace UnityEngine
         public struct RotationOverLifetimeModule
         {
             public bool enabled { get; set; }
+            public bool separateAxes { get; set; }
+            public MinMaxCurve x { get; set; }
+            public MinMaxCurve y { get; set; }
             public MinMaxCurve z { get; set; }
         }
 
@@ -313,6 +331,7 @@ namespace MissileDisaster.Game.Effects
     public static class RenderAssets
     {
         public static UnityEngine.Shader FindFirst(params string[] names) { return null; }
+        public static UnityEngine.Shader FindLoadedContaining(string[] excludeLower, params string[] substrsLower) { return null; }
         public static void ApplyDepthOcclusion(UnityEngine.Material mat) { }
     }
 

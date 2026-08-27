@@ -78,6 +78,41 @@ public class BlastDebrisTests
     }
 
     [Fact]
+    public void No_chunk_is_smaller_than_the_rubble_the_game_already_draws()
+    {
+        // The game's own rock props measure about 4 m on their longest axis. Anything under
+        // that is smaller than the wreckage lying around the map already, and reads as grit -
+        // which is why a 2.5 m floor made a conventional strike look like nothing happened.
+        foreach (float blast in new[] { 18f, 72f, 180f, 3720f })
+        {
+            Assert.True(BlastDebris.ChunkSize(BlastDebris.Range(blast)) >= 4f);
+        }
+    }
+
+    [Fact]
+    public void No_chunk_grows_into_a_boulder()
+    {
+        // Debris size does not really scale with yield - the ceiling is a readability
+        // allowance, and it stops well short of something that reads as terrain.
+        Assert.True(BlastDebris.ChunkSize(BlastDebris.Range(1e6f)) <= 14f);
+    }
+
+    [Fact]
+    public void The_longest_throw_still_lands_before_its_lifetime_runs_out()
+    {
+        // The effect gives a chunk FlightSeconds to live. If the real arc were longer than the
+        // cap, the pieces would be destroyed in mid-air instead of landing - which is exactly
+        // what a 900 m throw did, winking out 1.7 s short of the ground.
+        float range = BlastDebris.Range(1e6f);
+        float speed = BlastDebris.LaunchSpeed(range);
+        double theta = BlastDebris.LaunchAngleDegrees * Math.PI / 180.0;
+        float trueFlight = (float)(2.0 * speed * Math.Sin(theta) / BlastDebris.Gravity);
+        Assert.True(trueFlight <= BlastDebris.FlightSecondsMax,
+            $"the longest throw takes {trueFlight:F1} s against a {BlastDebris.FlightSecondsMax} s life");
+        Assert.Equal(trueFlight, BlastDebris.FlightSeconds(speed), 2);
+    }
+
+    [Fact]
     public void A_strategic_warhead_does_not_rain_masonry_across_the_map()
     {
         float range = BlastDebris.Range(1e6f);
@@ -103,7 +138,7 @@ public class BlastDebrisTests
         // are still standing.
         foreach (float blast in new[] { 72f, 500f, 3720f })
         {
-            Assert.True(BlastDebris.Range(blast) < blast * 0.5f);
+            Assert.True(BlastDebris.Range(blast) <= blast * 0.5f);
         }
     }
 }

@@ -33,10 +33,14 @@ namespace MissileDisaster.Core
         public const float LaunchAngleDegrees = 32f;
 
         /// <summary>The bounds on the throw, in metres. The floor keeps a small charge from merely dribbling; the ceiling keeps a strategic one from raining masonry across the whole map.</summary>
-        public const float RangeMin = 18f;
-        public const float RangeMax = 900f;
+        public const float RangeMin = 30f;
+        // Solved from the hang time rather than picked: at this launch angle a 620 m throw is
+        // just under nine seconds in the air. Setting it any further would make the flight
+        // outlast the lifetime the effect gives a chunk, and the pieces would wink out in
+        // mid-air instead of landing - which is what a 900 m throw was doing.
+        public const float RangeMax = 620f;
 
-        /// <summary>Hang time is capped so a big strike is not still dropping bricks a minute later.</summary>
+        /// <summary>Hang time is capped so a big strike is not still dropping bricks a minute later. RangeMax is set so this never actually bites.</summary>
         public const float FlightSecondsMax = 9f;
 
         /// <summary>How far the pieces are thrown, in metres, for a warhead with this blast radius.</summary>
@@ -78,9 +82,19 @@ namespace MissileDisaster.Core
         /// radius: a bomb that levels one building throws pieces of that building, and a warhead
         /// that levels a district throws the same masonry, just further and in more quantity.
         /// </summary>
+        // The floor is the game's own rubble. Its rock props - rock_small_01..04 - measure about
+        // 4.0 m on their longest axis, so a chunk smaller than that is smaller than the wreckage
+        // the player already sees lying around the map, and reads as grit.
+        //
+        // The ceiling is a readability allowance, and the only one here. Debris size does not
+        // really scale with yield: a warhead does not make bigger masonry, it breaks more of it
+        // and throws it further. But a 4 m chunk seen from the altitude a kilometre-wide strike
+        // is watched at is a speck, so the pieces are allowed to grow towards something
+        // building-sized - and no further, because a 26 m boulder reads as a mountain, not as a
+        // wall that used to be a bank.
         public const float ChunkSizeFraction = 0.035f;
-        public const float ChunkSizeMin = 2.5f;
-        public const float ChunkSizeMax = 26f;
+        public const float ChunkSizeMin = 4f;
+        public const float ChunkSizeMax = 14f;
 
         public static float ChunkSize(float range)
         {

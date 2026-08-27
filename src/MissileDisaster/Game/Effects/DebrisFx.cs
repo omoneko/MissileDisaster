@@ -39,6 +39,10 @@ namespace MissileDisaster.Game.Effects
         private const float TumbleDegreesPerSecond = 220f;
         private const float ChunkSizeVariety = 0.45f;   // the smallest chunk against the largest
 
+        // The renderer clamps a particle to half the screen by default, which crops the chunks
+        // exactly when the camera is close enough to look at them.
+        private const float MaxScreenFraction = 4f;
+
         // Concrete and brick, lit and shaded, with the dust a shade paler - it is the same
         // material ground finer.
         private static readonly Color ChunkLit = new Color(0.50f, 0.46f, 0.42f, 1f);
@@ -74,11 +78,23 @@ namespace MissileDisaster.Game.Effects
             }
         }
 
-        /// <summary>The solid pieces: opaque, tumbling, and landing where the physics puts them.</summary>
+        /// <summary>
+        /// The solid pieces: real geometry, lit by the scene, tumbling on all three axes and
+        /// landing where the physics puts them.
+        ///
+        /// Mesh render mode rather than billboards is the whole difference between rubble and
+        /// brown smoke. A soft round sprite has no silhouette to read and no faces to catch the
+        /// light, so it can only ever be a puff; a chunk built to the proportions of the game's
+        /// own rock props tumbles, flashes its facets and lands like debris.
+        /// </summary>
         private static void CreateChunks(Vector3 origin, float range, float speed, float flight,
             float chunkSize, int count)
         {
-            var go = ParticleBuilder.NewSystem("BlastDebris", origin, ParticleAssets.Cloud);
+            Mesh[] meshes = DebrisMeshes.Chunks;
+            Material material = DebrisMeshes.ChunkMaterial;
+            if (meshes == null || meshes.Length == 0 || material == null) return;
+
+            var go = ParticleBuilder.NewSystem("BlastDebris", origin, material);
             var ps = go.GetComponent<ParticleSystem>();
             var main = ps.main;
             main.startLifetime = flight;
@@ -88,18 +104,30 @@ namespace MissileDisaster.Game.Effects
             main.startColor = new ParticleSystem.MinMaxGradient(ChunkLit, ChunkShade);
             main.maxParticles = count * 2;
             main.gravityModifier = 1f; // real gravity: the arc is the one BlastDebris solved for
+            // Tumbling on every axis, each piece starting at its own attitude. A chunk spinning
+            // about one axis like a coin is the other way to give geometry away.
+            main.startRotation3D = true;
+            main.startRotationX = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
+            main.startRotationY = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
+            main.startRotationZ = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
+
+            var renderer = ps.GetComponent<ParticleSystemRenderer>();
+            renderer.renderMode = ParticleSystemRenderMode.Mesh;
+            renderer.SetMeshes(meshes, meshes.Length); // a different shape per particle
+            renderer.alignment = ParticleSystemRenderSpace.World;
+            renderer.maxParticleSize = MaxScreenFraction; // the default 0.5 clips them up close
 
             ParticleBuilder.Burst(ps, count);
             ParticleBuilder.ConeUp(ps, range * EmitRadiusFraction, ConeAngle);
-            // Tumbling is what separates a chunk of masonry from a puff of smoke.
+
             var rot = ps.rotationOverLifetime;
             rot.enabled = true;
-            rot.z = new ParticleSystem.MinMaxCurve(-TumbleDegreesPerSecond * Mathf.Deg2Rad,
-                TumbleDegreesPerSecond * Mathf.Deg2Rad);
-            // Solid all the way, and gone at the moment it lands rather than fading in mid-air.
-            ParticleBuilder.Fade(ps,
-                new GradientAlphaKey(1f, 0f), new GradientAlphaKey(1f, 0.85f),
-                new GradientAlphaKey(0f, 1f));
+            rot.separateAxes = true;
+            float tumble = TumbleDegreesPerSecond * Mathf.Deg2Rad;
+            rot.x = new ParticleSystem.MinMaxCurve(-tumble, tumble);
+            rot.y = new ParticleSystem.MinMaxCurve(-tumble * 0.6f, tumble * 0.6f);
+            rot.z = new ParticleSystem.MinMaxCurve(-tumble, tumble);
+
             ParticleBuilder.PlayAndDestroy(go, flight + 1f);
         }
 
@@ -122,6 +150,9 @@ namespace MissileDisaster.Game.Effects
             main.startColor = new ParticleSystem.MinMaxGradient(DustNear, DustFar);
             main.maxParticles = count * 2;
             main.gravityModifier = DustGravity;
+
+            var dustRenderer = ps.GetComponent<ParticleSystemRenderer>();
+            dustRenderer.maxParticleSize = MaxScreenFraction;
 
             ParticleBuilder.Burst(ps, count);
             ParticleBuilder.ConeUp(ps, range * EmitRadiusFraction, ConeAngle);
