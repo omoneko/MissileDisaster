@@ -34,7 +34,6 @@ namespace MissileDisaster.Game.Effects
         // but not a full hemisphere: the ones that go straight up would simply come back down on
         // the crater and read as a fountain.
         private const float ConeAngle = 58f;
-        private const float EmitRadiusFraction = 0.08f; // of the range, so they start off a point
 
         private const float TumbleDegreesPerSecond = 220f;
         private const float ChunkSizeVariety = 0.45f;   // the smallest chunk against the largest
@@ -67,10 +66,26 @@ namespace MissileDisaster.Game.Effects
 
                 float chunkSize = BlastDebris.ChunkSize(range);
                 int chunks = BlastDebris.ChunkCount(range);
+                // The disc the rubble comes off - the destroyed area, not a point at the centre.
+                float emitRadius = BlastDebris.EmitRadius(blastRadius);
                 Vector3 origin = groundZero + Vector3.up * (chunkSize * 0.5f);
 
-                CreateChunks(origin, range, speed, flight, chunkSize, chunks);
-                CreateDust(origin, range, speed, flight, chunkSize, chunks);
+                int emitted = CreateChunks(origin, emitRadius, speed, flight, chunkSize, chunks);
+                CreateDust(origin, emitRadius, speed, flight, chunkSize, chunks);
+
+                // Unconditional, because "I still cannot see the rubble" is not answerable from
+                // the screen alone: it cannot tell a system that never spawned from one drawing
+                // 14 m chunks somewhere behind the fireball. This line says which.
+                Material mat = DebrisMeshes.ChunkMaterial;
+                Mesh[] meshes = DebrisMeshes.Chunks;
+                ModConfig.LogAlways(string.Format(
+                    "debris: blast {0:F0} m -> thrown from a {9:F0} m disc, {1:F0} m further, "
+                    + "{2} chunks of {3:F1} m at {4:F0} m/s for {5:F1} s; emitted {6}; "
+                    + "meshes {7}; shader {8}",
+                    blastRadius, range, chunks, chunkSize, speed, flight, emitted,
+                    meshes == null ? 0 : meshes.Length,
+                    mat == null || mat.shader == null ? "NONE - nothing will draw" : mat.shader.name,
+                    emitRadius));
             }
             catch (Exception e)
             {
@@ -87,12 +102,19 @@ namespace MissileDisaster.Game.Effects
         /// light, so it can only ever be a puff; a chunk built to the proportions of the game's
         /// own rock props tumbles, flashes its facets and lands like debris.
         /// </summary>
-        private static void CreateChunks(Vector3 origin, float range, float speed, float flight,
+        /// <summary>Returns how many particles the system actually holds, so the caller can say so in the log.</summary>
+        private static int CreateChunks(Vector3 origin, float emitRadius, float speed, float flight,
             float chunkSize, int count)
         {
             Mesh[] meshes = DebrisMeshes.Chunks;
             Material material = DebrisMeshes.ChunkMaterial;
-            if (meshes == null || meshes.Length == 0 || material == null) return;
+            if (meshes == null || meshes.Length == 0 || material == null)
+            {
+                // This used to return in silence, which is how the rubble managed to be missing
+                // for two rounds without anything saying so.
+                ModConfig.LogError("DebrisFx: no chunk meshes or no material - drawing nothing");
+                return 0;
+            }
 
             var go = ParticleBuilder.NewSystem("BlastDebris", origin, material);
             var ps = go.GetComponent<ParticleSystem>();
@@ -118,7 +140,7 @@ namespace MissileDisaster.Game.Effects
             renderer.maxParticleSize = MaxScreenFraction; // the default 0.5 clips them up close
 
             ParticleBuilder.Burst(ps, count);
-            ParticleBuilder.ConeUp(ps, range * EmitRadiusFraction, ConeAngle);
+            ParticleBuilder.ConeUp(ps, emitRadius, ConeAngle);
 
             var rot = ps.rotationOverLifetime;
             rot.enabled = true;
@@ -129,10 +151,11 @@ namespace MissileDisaster.Game.Effects
             rot.z = new ParticleSystem.MinMaxCurve(-tumble, tumble);
 
             ParticleBuilder.PlayAndDestroy(go, flight + 1f);
+            return ps.particleCount;
         }
 
         /// <summary>The dust thrown with the pieces: slower, softer, and dying in the air.</summary>
-        private static void CreateDust(Vector3 origin, float range, float speed, float flight,
+        private static void CreateDust(Vector3 origin, float emitRadius, float speed, float flight,
             float chunkSize, int chunks)
         {
             int count = (int)(chunks * DustCountFactor);
@@ -155,7 +178,7 @@ namespace MissileDisaster.Game.Effects
             dustRenderer.maxParticleSize = MaxScreenFraction;
 
             ParticleBuilder.Burst(ps, count);
-            ParticleBuilder.ConeUp(ps, range * EmitRadiusFraction, ConeAngle);
+            ParticleBuilder.ConeUp(ps, emitRadius, ConeAngle);
             ParticleBuilder.Fade(ps,
                 new GradientAlphaKey(0f, 0f), new GradientAlphaKey(0.9f, 0.08f),
                 new GradientAlphaKey(0.6f, 0.5f), new GradientAlphaKey(0f, 1f));

@@ -123,6 +123,7 @@ namespace UnityEngine
     public class Material : Object
     {
         public Material(Shader shader) { }
+        public Shader shader { get; set; }
         public Color color { get; set; }
         public Texture mainTexture { get; set; }
         public bool HasProperty(string name) { return false; }
@@ -202,6 +203,7 @@ namespace UnityEngine
         }
 
         public void SetParticles(Particle[] particles, int size) { }
+        public int particleCount { get { return 0; } }
 
         public struct MinMaxCurve
         {

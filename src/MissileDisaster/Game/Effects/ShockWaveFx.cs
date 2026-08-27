@@ -82,12 +82,15 @@ namespace MissileDisaster.Game.Effects
                 if (radius >= ShockWave.DustSurgeMinRadius)
                 {
                     CreateDustSurge(origin, radius, duration, speed, Count(SurgeParticles, scale));
+                }
 
                 // The solid part: the rubble of whatever stood here, thrown out and up on
                 // ballistic arcs and falling back across the city. Without it a detonation is
                 // all smoke, which reads as weather rather than as a building coming apart.
+                // Every warhead throws rubble - unlike the dust wall, which belongs to a large
+                // blast. This sat inside the wall's threshold by mistake, so nothing under a
+                // 110 m blast radius threw anything at all.
                 DebrisFx.Play(groundZero, radius);
-                }
             }
             catch (Exception e)
             {

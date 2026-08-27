@@ -93,8 +93,46 @@ public class BlastDebrisTests
     public void No_chunk_grows_into_a_boulder()
     {
         // Debris size does not really scale with yield - the ceiling is a readability
-        // allowance, and it stops well short of something that reads as terrain.
-        Assert.True(BlastDebris.ChunkSize(BlastDebris.Range(1e6f)) <= 14f);
+        // allowance. It was raised to 34 m once the numbers showed a 14 m chunk is 4.5% of a
+        // 150 kt fireball's width, but it still stops short of reading as terrain.
+        Assert.True(BlastDebris.ChunkSize(BlastDebris.Range(1e6f)) <= BlastDebris.ChunkSizeMax);
+    }
+
+    [Fact]
+    public void The_rubble_is_thrown_from_the_destroyed_area_not_from_a_point()
+    {
+        // Launching it all from ground zero is what buried it: at 150 kt the pieces left a 50 m
+        // circle and spent their first seconds inside a 310 m fireball. The fireball vaporises
+        // what stands at the centre anyway - the rubble comes from the ring around it.
+        float emit = BlastDebris.EmitRadius(3720f);
+        Assert.True(emit > 310f, $"the disc clears the 310 m fireball (got {emit:F0} m)");
+        Assert.True(emit > BlastDebris.Range(3720f) * 0.5f, "and is a real area, not a nozzle");
+    }
+
+    [Fact]
+    public void The_emit_disc_stays_inside_what_the_warhead_destroyed()
+    {
+        // Rubble launching from where the buildings are still standing would read as wrong.
+        foreach (float blast in new[] { 72f, 500f, 3720f, 1e6f })
+        {
+            Assert.True(BlastDebris.EmitRadius(blast) <= blast * 0.5f + 12f);
+        }
+    }
+
+    [Fact]
+    public void Even_a_tiny_blast_throws_from_a_patch_rather_than_a_pinpoint()
+    {
+        Assert.Equal(BlastDebris.EmitRadiusMin, BlastDebris.EmitRadius(1f), 3);
+        Assert.Equal(0f, BlastDebris.EmitRadius(0f), 3);
+    }
+
+    [Fact]
+    public void A_nuclear_chunk_is_big_enough_to_read_against_its_own_fireball()
+    {
+        // A 150 kt fireball is drawn 310 m across. Anything under a few per cent of that is a
+        // pixel at the zoom a strike that size is watched from.
+        float chunk = BlastDebris.ChunkSize(BlastDebris.Range(3720f));
+        Assert.True(chunk / 310f > 0.08f, $"{chunk:F0} m against a 310 m fireball");
     }
 
     [Fact]

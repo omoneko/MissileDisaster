@@ -32,6 +32,30 @@ namespace MissileDisaster.Core
         /// <summary>The launch angle, in degrees. Not 45: a blast throws its rubble out rather than up, and a flatter arc keeps it in frame and lands it sooner.</summary>
         public const float LaunchAngleDegrees = 32f;
 
+        /// <summary>
+        /// How wide an area the rubble is thrown FROM, against the blast radius.
+        ///
+        /// Launching it all from a point at ground zero is what made it invisible at nuclear
+        /// scale: at 150 kt the pieces left a 50 m circle and spent the first four seconds
+        /// inside a 310 m fireball, which is simply a brighter object in the same place. It is
+        /// also wrong. The fireball vaporises what stands at the centre; the rubble comes from
+        /// the ring around it, where buildings were knocked down rather than consumed. So the
+        /// pieces are thrown from across the destroyed area, and start their arc outside the
+        /// fireball where there is something to see them against.
+        /// </summary>
+        public const float EmitFraction = 0.30f;
+        public const float EmitRadiusMin = 12f;
+        public const float EmitRadiusMax = 1400f;
+
+        /// <summary>The disc the rubble is thrown from, in metres.</summary>
+        public static float EmitRadius(float blastRadius)
+        {
+            if (blastRadius <= 0f) return 0f;
+            float r = blastRadius * EmitFraction;
+            if (r < EmitRadiusMin) return EmitRadiusMin;
+            return r > EmitRadiusMax ? EmitRadiusMax : r;
+        }
+
         /// <summary>The bounds on the throw, in metres. The floor keeps a small charge from merely dribbling; the ceiling keeps a strategic one from raining masonry across the whole map.</summary>
         public const float RangeMin = 30f;
         // Solved from the hang time rather than picked: at this launch angle a 620 m throw is
@@ -92,9 +116,14 @@ namespace MissileDisaster.Core
         // is watched at is a speck, so the pieces are allowed to grow towards something
         // building-sized - and no further, because a 26 m boulder reads as a mountain, not as a
         // wall that used to be a bank.
-        public const float ChunkSizeFraction = 0.035f;
+        // Raised from 14 m on measurement rather than taste: at 150 kt a 14 m chunk is 4.5% of
+        // the fireball's width and about a thousandth of the frame the strike is watched in.
+        // Individual rubble cannot read at that zoom whatever colour it is, so the pieces are
+        // allowed to grow until they can - and the count grows with them, because what actually
+        // reads at nuclear scale is the mass of the spray rather than any one piece.
+        public const float ChunkSizeFraction = 0.055f;
         public const float ChunkSizeMin = 4f;
-        public const float ChunkSizeMax = 14f;
+        public const float ChunkSizeMax = 34f;
 
         public static float ChunkSize(float range)
         {
@@ -108,7 +137,7 @@ namespace MissileDisaster.Core
         /// far slower than the area does, because the count is a drawing budget and not a census.
         /// </summary>
         public const int ChunksMin = 24;
-        public const int ChunksMax = 140;
+        public const int ChunksMax = 260;
 
         public static int ChunkCount(float range)
         {
