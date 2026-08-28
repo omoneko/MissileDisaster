@@ -22,10 +22,10 @@ namespace MissileDisaster.Game.Effects
     /// </summary>
     public static class DebrisFx
     {
-        // The dust rides the same throw at a fraction of the speed, so it lags behind the chunks
+        // The dust rides the same sweep at a fraction of the speed, so it lags behind the pieces
         // and hangs where they have passed.
         private const float DustSpeedFraction = 0.55f;
-        private const float DustGravity = 0.12f;   // it drifts down rather than falling
+        private const float DustGravity = 0.06f;   // it rolls out along the ground, it does not fall
         private const float DustCountFactor = 3.5f; // against the chunk count
         private const int DustCountMax = 320;
         // The dust is sized from the throw, not from the chunk. It used to be a multiple of the
@@ -33,14 +33,6 @@ namespace MissileDisaster.Game.Effects
         // cloud to a 12 m puff - the blast would have lost its dust to a change about masonry.
         private const float DustSizeFraction = 0.19f; // against the throw, in metres
         private const float DustSizeMin = 9f;
-
-        // The cone the pieces leave in. Wide, because a blast throws in every direction at once,
-        // but not a full hemisphere: the ones that go straight up would simply come back down on
-        // the crater and read as a fountain.
-        private const float ConeAngle = 58f;
-
-        private const float TumbleDegreesPerSecond = 220f;
-        private const float ChunkSizeVariety = 0.45f;   // the smallest chunk against the largest
 
         // The renderer clamps a particle to half the screen by default, which crops the dust
         // exactly when the camera is close enough to look at it.
@@ -55,7 +47,7 @@ namespace MissileDisaster.Game.Effects
         // three hundred of them is small change beside the city already on screen.
         private const int MaxChunkObjects = 320;
 
-        /// <summary>How long a chunk lies where it fell before it is removed.</summary>
+        /// <summary>How long a piece lies where the blast left it before it is removed.</summary>
         private const float SettleSeconds = 2.5f;
 
         // Concrete and brick, lit and shaded, with the dust a shade paler - it is the same
@@ -66,8 +58,9 @@ namespace MissileDisaster.Game.Effects
         private static readonly Color DustFar = new Color(0.42f, 0.38f, 0.33f, 0.75f);
 
         /// <summary>
-        /// Throws the rubble of a blast of this radius from groundZero. A radius of zero or less
-        /// does nothing. Never throws: the strike's damage does not depend on this drawing.
+        /// Sweeps the rubble of a blast of this radius outward from groundZero. A radius of zero
+        /// or less does nothing. Never throws: the strike's damage does not depend on this
+        /// drawing.
         /// </summary>
         public static void Play(Vector3 groundZero, float blastRadius)
         {
@@ -76,9 +69,11 @@ namespace MissileDisaster.Game.Effects
 
             try
             {
-                float speed = BlastDebris.LaunchSpeed(range);
-                float flight = BlastDebris.FlightSeconds(speed);
-                if (speed <= 0f || flight <= 0f) return;
+                // The rubble is on the front's clock, not on a clock of its own: it moves while
+                // the wave that is pushing it is crossing the ground, so the pieces and the dust
+                // travel out as one ring instead of as two effects that happen to overlap.
+                float carry = DebrisSweep.CarrySeconds(ShockWave.Duration(blastRadius));
+                if (carry <= 0f) return;
 
                 float chunkSize = BlastDebris.ChunkSize(range);
                 int chunks = BlastDebris.ChunkCount(range);
@@ -88,9 +83,12 @@ namespace MissileDisaster.Game.Effects
 
                 float dustSize = range * DustSizeFraction;
                 if (dustSize < DustSizeMin) dustSize = DustSizeMin;
+                // The dust is given the sweep's own average pace so it keeps station with the
+                // pieces rather than outrunning them or being left at the crater.
+                float dustSpeed = range / carry;
 
-                int emitted = CreateChunks(origin, emitRadius, speed, flight, chunkSize, chunks);
-                CreateDust(origin, emitRadius, speed, flight, dustSize, chunks);
+                int emitted = CreateChunks(origin, emitRadius, range, carry, chunkSize, chunks);
+                CreateDust(origin, emitRadius, dustSpeed, carry, dustSize, chunks);
 
                 // Unconditional, because "I still cannot see the rubble" is not answerable from
                 // the screen alone: it cannot tell a system that never spawned from one drawing
@@ -98,10 +96,10 @@ namespace MissileDisaster.Game.Effects
                 Material mat = DebrisMeshes.ChunkMaterial;
                 Mesh[] meshes = DebrisMeshes.Chunks;
                 ModConfig.LogAlways(string.Format(
-                    "debris: blast {0:F0} m -> thrown from a {9:F0} m disc, {1:F0} m further, "
-                    + "{2} chunks of {3:F1} m at {4:F0} m/s for {5:F1} s; spawned {6} objects; "
-                    + "meshes {7}; shader {8}",
-                    blastRadius, range, chunks, chunkSize, speed, flight, emitted,
+                    "debris: blast {0:F0} m -> swept off a {8:F0} m disc out to {1:F0} m over "
+                    + "{4:F1} s; {2} pieces of {3:F1} m; spawned {5} objects; meshes {6}; "
+                    + "shader {7}",
+                    blastRadius, range, chunks, chunkSize, carry, emitted,
                     meshes == null ? 0 : meshes.Length,
                     mat == null || mat.shader == null ? "NONE - nothing will draw" : mat.shader.name,
                     emitRadius));
@@ -114,17 +112,13 @@ namespace MissileDisaster.Game.Effects
 
         /// <summary>
         /// The solid pieces. Each is its own GameObject with a MeshFilter and a MeshRenderer,
-        /// flown by DebrisChunkFx along the arc Core.DebrisFlight computes.
+        /// pushed outward by DebrisChunkFx along the run Core.DebrisSweep computes.
         ///
         /// Not mesh particles. That was the previous attempt, and when nothing appeared there
         /// was no way to ask a ParticleSystemRenderer why. This is the same path the mod's own
         /// missile model renders through, which is known to work in this game.
-        ///
-        /// The count is lower than a particle system's would be - these are objects, and a few
-        /// dozen tumbling chunks read as a blast throwing wreckage where several hundred would
-        /// only cost frames.
         /// </summary>
-        private static int CreateChunks(Vector3 origin, float emitRadius, float speed, float flight,
+        private static int CreateChunks(Vector3 origin, float emitRadius, float range, float carry,
             float chunkSize, int count)
         {
             Mesh[] meshes = DebrisMeshes.Chunks;
@@ -143,47 +137,47 @@ namespace MissileDisaster.Game.Effects
 
             for (int i = 0; i < wanted; i++)
             {
-                DebrisLaunch launch = DebrisFlight.Launch(i, seed, emitRadius, speed, chunkSize,
+                DebrisRide ride = DebrisSweep.Deal(i, seed, emitRadius, range, carry, chunkSize,
                     meshes.Length);
-                // Each chunk lives its OWN arc, not the nominal one. Clamping to the average
-                // flight is what destroyed the steepest pieces in mid-air: they are thrown at a
-                // spread of angles, so a quarter of them are up for longer than the figure the
-                // range was solved from. BlastDebris.RangeMax is what keeps even those under
-                // the ceiling; this guard is only a backstop.
-                float life = DebrisFlight.FlightSeconds(launch);
-                if (life <= 0.05f) continue;
-                if (life > BlastDebris.FlightSecondsMax) life = BlastDebris.FlightSecondsMax;
+                if (ride.CarrySeconds <= 0.05f) continue;
 
                 var go = new GameObject("MissileDisaster_DebrisChunk");
                 go.transform.position = origin;
-                go.transform.localScale = new Vector3(launch.Scale, launch.Scale, launch.Scale);
+                go.transform.localScale = new Vector3(ride.Scale, ride.Scale, ride.Scale);
 
                 MeshFilter filter = go.AddComponent<MeshFilter>();
-                filter.sharedMesh = meshes[launch.Variant];
+                filter.sharedMesh = meshes[ride.Variant];
                 MeshRenderer renderer = go.AddComponent<MeshRenderer>();
                 renderer.sharedMaterial = material;
                 renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 renderer.receiveShadows = false;
 
                 var chunk = go.AddComponent<DebrisChunkFx>();
-                chunk.Launch = launch;
+                chunk.Ride = ride;
                 chunk.Origin = origin;
                 chunk.GroundY = origin.y;
-                // It lies where it fell for a moment before going, rather than blinking out the
-                // instant it lands.
-                chunk.LifeSeconds = life + SettleSeconds;
+                // It lies where the blast left it for a moment before going, rather than
+                // blinking out the instant it stops.
+                chunk.LifeSeconds = ride.CarrySeconds + SettleSeconds;
                 made++;
             }
             return made;
         }
 
-        /// <summary>The dust thrown with the pieces: slower, softer, and dying in the air.</summary>
-        private static void CreateDust(Vector3 origin, float emitRadius, float speed, float flight,
+        /// <summary>
+        /// The dust swept along with the pieces: slower, softer, and thinning as it goes.
+        ///
+        /// It is emitted on a flat disc rather than in a cone, so it travels straight out across
+        /// the ground in the plane the rubble is being pushed along. A cone sent it upward and
+        /// the two effects then separated - a puff over the crater and a scatter of chunks - when
+        /// what they are meant to be is one wave.
+        /// </summary>
+        private static void CreateDust(Vector3 origin, float emitRadius, float speed, float carry,
             float dustSize, int chunks)
         {
             int count = (int)(chunks * DustCountFactor);
             if (count > DustCountMax) count = DustCountMax;
-            float life = flight * 1.4f; // it hangs after the rubble has come down
+            float life = carry * 1.4f; // it hangs on after the rubble has come to rest
 
             var go = ParticleBuilder.NewSystem("BlastDebrisDust", origin, ParticleAssets.Cloud);
             var ps = go.GetComponent<ParticleSystem>();
@@ -200,7 +194,7 @@ namespace MissileDisaster.Game.Effects
             dustRenderer.maxParticleSize = MaxScreenFraction;
 
             ParticleBuilder.Burst(ps, count);
-            ParticleBuilder.ConeUp(ps, emitRadius, ConeAngle);
+            ParticleBuilder.FlatDisc(ps, emitRadius);
             ParticleBuilder.Fade(ps,
                 new GradientAlphaKey(0f, 0f), new GradientAlphaKey(0.9f, 0.08f),
                 new GradientAlphaKey(0.6f, 0.5f), new GradientAlphaKey(0f, 1f));

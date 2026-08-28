@@ -1,17 +1,18 @@
-"""Draws the rubble a strike throws, at true scale, so its size can be judged before a playtest.
+"""Draws the rubble a blast sweeps outward, at true scale, so it can be judged before a playtest.
 
-This is a faithful port of Core/BlastDebris + Core/DebrisFlight plus the object budget in
+This is a faithful port of Core/BlastDebris + Core/DebrisSweep plus the object budget in
 Game/Effects/DebrisFx. If a constant changes in C# it must change here - the point of this
 script is that what it draws is what the player gets.
 
-It exists because the debris was wrong twice in ways the screen alone could not explain, and
-then wrong a third time in a way it could: the pieces were 34 m across, which is a building,
-not rubble. Sizes are now measured against the game's own vehicles rather than chosen.
+It exists because the debris was wrong three times in a row: invisible twice for reasons the
+screen could not explain, then 34 m across, which is a building rather than rubble. It is now
+car-sized and swept outward as one ring rather than thrown on individual arcs, and both of
+those are things a picture can settle.
 
 Usage:  python tools/effect-preview/debris_preview.py <out-folder>
 
-Outputs a top-down field of the rubble at its landing spread for a conventional and a nuclear
-strike, drawn at true metres, and prints the size and coverage figures.
+Outputs the ring at four moments of its run for a conventional and a nuclear strike, drawn at
+true metres from directly above, and prints where the band is and how high the pieces get.
 """
 import math
 import os
@@ -24,26 +25,46 @@ import numpy as np
 # ------------------------------------------------------------------ C# ports (keep in sync)
 
 # Core/BlastDebris
-GRAVITY = 9.81
 RANGE_FRACTION = 0.35
-LAUNCH_ANGLE_DEG = 32.0
 EMIT_FRACTION = 0.07
 EMIT_RADIUS_MIN, EMIT_RADIUS_MAX = 12.0, 420.0
 RANGE_MIN, RANGE_MAX = 30.0, 400.0
-FLIGHT_SECONDS_MAX = 9.0
 CHUNK_SIZE_FRACTION = 0.01375
 CHUNK_SIZE_MIN, CHUNK_SIZE_MAX = 4.0, 5.5
 CHUNKS_MIN, CHUNKS_MAX = 40, 520
 
+# Core/ShockWave
+FRONT_EXPONENT = 0.4
+AVERAGE_FRONT_SPEED = 540.0
+FRONT_SECONDS_MIN, FRONT_KNEE, FRONT_CEILING = 0.35, 14.0, 26.0
+
+# Core/DebrisSweep
+SWEEP_EXPONENT = FRONT_EXPONENT
+TARGET_MIN, TARGET_MAX = 0.75, 1.15
+MIN_TRAVEL_FRACTION = 0.15
+CARRY_FACTOR = 1.4
+CARRY_SECONDS_MIN, CARRY_SECONDS_MAX = 1.5, 9.0
+HOP_HEIGHT_MIN, HOP_HEIGHT_MAX = 1.2, 3.0
+HOPS_MIN, HOPS_MAX = 2, 4
+ROLL_SLIP = 0.35
+HOP_HEIGHT_RANGE_CAP = 0.10
+
 # Game/Effects/DebrisFx
 MAX_CHUNK_OBJECTS = 320
-
-# Core/DebrisFlight
-DRAG = 0.12
 
 
 def clamp(v, lo, hi):
     return lo if v < lo else (hi if v > hi else v)
+
+
+def soft_ceiling(v, floor, knee, ceiling):
+    """Core/EffectCeiling.Soft."""
+    if v < floor:
+        return floor
+    if v <= knee:
+        return v
+    span = ceiling - knee
+    return knee + span * (1.0 - math.exp(-(v - knee) / span))
 
 
 def emit_radius(blast):
@@ -52,10 +73,6 @@ def emit_radius(blast):
 
 def throw_range(blast):
     return 0.0 if blast <= 0 else clamp(blast * RANGE_FRACTION, RANGE_MIN, RANGE_MAX)
-
-
-def launch_speed(r):
-    return 0.0 if r <= 0 else math.sqrt(GRAVITY * r / math.sin(2 * math.radians(LAUNCH_ANGLE_DEG)))
 
 
 def chunk_size(r):
@@ -69,6 +86,15 @@ def chunk_count(r):
                      CHUNKS_MIN, CHUNKS_MAX))
 
 
+def front_seconds(blast):
+    return 0.0 if blast <= 0 else soft_ceiling(blast / AVERAGE_FRONT_SPEED,
+                                               FRONT_SECONDS_MIN, FRONT_KNEE, FRONT_CEILING)
+
+
+def carry_seconds(front):
+    return clamp(front * CARRY_FACTOR, CARRY_SECONDS_MIN, CARRY_SECONDS_MAX)
+
+
 def hash01(index, seed, salt):
     h = np.uint32((index * 374761393 + seed * 668265263 + salt * 1274126177) & 0xFFFFFFFF)
     h ^= h >> np.uint32(13)
@@ -77,29 +103,44 @@ def hash01(index, seed, salt):
     return float(int(h) & 0xFFFFFF) / float(0x1000000)
 
 
-class Launch:
-    """DebrisFlight.Launch."""
-    def __init__(self, i, seed, emit_r, speed, size, variants=4):
+class Ride:
+    """DebrisSweep.Deal."""
+    def __init__(self, i, seed, emit_r, rng, carry, size, variants=4):
         az = hash01(i, seed, 1) * 2 * math.pi
-        radius = emit_r * math.sqrt(hash01(i, seed, 2))
-        c, s = math.cos(az), math.sin(az)
-        self.x, self.y, self.z = radius * c, 0.0, radius * s
-        ang = math.radians(LAUNCH_ANGLE_DEG * (0.7 + 0.6 * hash01(i, seed, 3)))
-        v = speed * (0.55 + 0.45 * hash01(i, seed, 4))
-        horiz = v * math.cos(ang)
-        self.vx, self.vy, self.vz = horiz * c, v * math.sin(ang), horiz * s
+        start = emit_r * math.sqrt(hash01(i, seed, 2))
+        self.dir_x, self.dir_z = math.cos(az), math.sin(az)
+        self.start_x, self.start_z = start * self.dir_x, start * self.dir_z
+
+        target = rng * (TARGET_MIN + (TARGET_MAX - TARGET_MIN) * hash01(i, seed, 3))
+        self.distance = max(target - start, rng * MIN_TRAVEL_FRACTION)
+        self.carry = carry * (0.8 + 0.4 * hash01(i, seed, 4))
+
         roll = hash01(i, seed, 8)
         self.scale = size * (0.5 + 0.5 * roll * roll)
         self.variant = int(hash01(i, seed, 9) * variants) % variants
+        self.hop_height = min(
+            self.scale * (HOP_HEIGHT_MIN + (HOP_HEIGHT_MAX - HOP_HEIGHT_MIN) * hash01(i, seed, 5)),
+            rng * HOP_HEIGHT_RANGE_CAP)
+        self.hops = min(HOPS_MIN + int(hash01(i, seed, 6) * (HOPS_MAX - HOPS_MIN + 1)), HOPS_MAX)
+        self.roll_degrees = 360.0 * self.distance / (math.pi * self.scale) * ROLL_SLIP
+
+    def progress(self, t):
+        return clamp(t / self.carry, 0.0, 1.0) if self.carry > 0 else 1.0
+
+    def travel_at(self, t):
+        return self.distance * self.progress(t) ** SWEEP_EXPONENT
+
+    def height_at(self, t):
+        u = self.progress(t)
+        if u >= 1.0 or self.hops <= 0:
+            return 0.0
+        return self.hop_height * abs(math.sin(math.pi * self.hops * u)) * (1.0 - u) ** 2
 
     def position_at(self, t):
-        travel = (1.0 - math.exp(-DRAG * t)) / DRAG if DRAG > 0 else t
-        return (self.x + self.vx * travel,
-                self.y + self.vy * t - 0.5 * GRAVITY * t * t,
-                self.z + self.vz * travel)
-
-    def flight_seconds(self):
-        return 0.0 if self.vy <= 0 else 2 * self.vy / GRAVITY
+        travel = self.travel_at(t)
+        return (self.start_x + self.dir_x * travel,
+                self.height_at(t),
+                self.start_z + self.dir_z * travel)
 
 
 # ---------------------------------------------------------------------------- rendering
@@ -119,52 +160,65 @@ def write_png(path, rgb):
         f.write(chunk(b"IEND", b""))
 
 
-def draw_field(blast, label, px=760):
-    """Top-down: where the rubble lands and how big each piece is, at true metres."""
-    r = throw_range(blast)
-    speed = launch_speed(r)
-    size = chunk_size(r)
-    count = min(chunk_count(r), MAX_CHUNK_OBJECTS)
-    emit_r = emit_radius(blast)
+def draw_moment(rides, t, emit_r, rng, frame, px):
+    """Straight down on the strike, at true metres."""
+    mpp = 2 * frame / px
+    img = np.full((px, px, 3), 40, np.uint8)
 
-    launches = [Launch(i, 7, emit_r, speed, size) for i in range(count)]
-    landings = [l.position_at(l.flight_seconds()) for l in launches]
-    dists = [math.hypot(p[0], p[2]) for p in landings]
-
-    frame = max(dists) * 1.12
-    mpp = 2 * frame / px                       # metres per pixel
-    img = np.full((px, px, 3), 40, np.uint8)   # ground
-
-    # The emit disc and the throw ring, for scale.
     yy, xx = np.mgrid[0:px, 0:px]
     d = np.hypot(xx - px / 2, yy - px / 2) * mpp
-    img[d < emit_r] = (58, 50, 44)
-    ring = np.abs(d - r) < mpp
-    img[ring] = (86, 74, 62)
+    img[d < emit_r] = (58, 50, 44)                 # the destroyed disc
+    img[np.abs(d - rng) < mpp] = (78, 68, 58)      # where the sweep is aimed
 
-    covered = 0
-    for l, p in zip(launches, landings):
-        cx = int(px / 2 + p[0] / mpp)
-        cy = int(px / 2 + p[2] / mpp)
-        half = max(l.scale / 2 / mpp, 0.5)
-        x0, x1 = int(cx - half), int(math.ceil(cx + half))
-        y0, y1 = int(cy - half), int(math.ceil(cy + half))
-        x0, y0 = max(x0, 0), max(y0, 0)
-        x1, y1 = min(x1, px), min(y1, px)
+    radii = []
+    for r in rides:
+        p = r.position_at(t)
+        radii.append(math.hypot(p[0], p[2]))
+        cx, cy = int(px / 2 + p[0] / mpp), int(px / 2 + p[2] / mpp)
+        half = max(r.scale / 2 / mpp, 0.5)
+        x0, y0 = max(int(cx - half), 0), max(int(cy - half), 0)
+        x1, y1 = min(int(math.ceil(cx + half)), px), min(int(math.ceil(cy + half)), px)
         if x1 <= x0 or y1 <= y0:
             continue
-        shade = 120 + int(70 * (l.variant / 3.0))
-        img[y0:y1, x0:x1] = (shade, int(shade * 0.90), int(shade * 0.82))
-        covered += (x1 - x0) * (y1 - y0)
+        # Brighter the higher it is skipping, so the bounce is visible from above.
+        lift = min(p[1] / max(r.hop_height, 0.001), 1.0)
+        shade = int(110 + 60 * (r.variant / 3.0) + 55 * lift)
+        img[y0:y1, x0:x1] = (min(shade, 255), int(shade * 0.90), int(shade * 0.82))
+    return img, radii
 
-    stats = dict(
-        label=label, blast=blast, throw=r, emit=emit_r, count=count,
-        size_min=min(l.scale for l in launches), size_max=max(l.scale for l in launches),
-        land_min=min(dists), land_max=max(dists),
-        flight_max=max(l.flight_seconds() for l in launches),
-        frame=2 * frame, coverage=covered / float(px * px),
-    )
-    return img, stats
+
+def run(blast, label, px=520):
+    rng = throw_range(blast)
+    emit_r = emit_radius(blast)
+    carry = carry_seconds(front_seconds(blast))
+    size = chunk_size(rng)
+    count = min(chunk_count(rng), MAX_CHUNK_OBJECTS)
+    rides = [Ride(i, 7, emit_r, rng, carry, size) for i in range(count)]
+
+    frame = rng * TARGET_MAX * 1.25
+    moments = [carry * f for f in (0.08, 0.3, 0.6, 1.0)]
+    panels, lines = [], []
+    for t in moments:
+        img, radii = draw_moment(rides, t, emit_r, rng, frame, px)
+        panels.append(img)
+        band = (max(radii) - min(radii)) / max(radii)
+        lines.append("    t={0:4.1f}s  band {1:4.0f}-{2:4.0f} m (spread {3:3.0%})"
+                     .format(t, min(radii), max(radii), band))
+
+    highest = max(max(r.height_at(t) for t in np.linspace(0, r.carry, 60)) for r in rides)
+    print("{0}: blast {1:.0f} m -> {2} pieces of {3:.1f}-{4:.1f} m swept off a {5:.0f} m disc "
+          "out to {6:.0f} m over {7:.1f} s".format(
+              label, blast, count, min(r.scale for r in rides), max(r.scale for r in rides),
+              emit_r, rng, carry))
+    print("\n".join(lines))
+    print("    highest skip {0:.1f} m, which is {1:.1%} of how far it travels"
+          .format(highest, highest / rng))
+
+    gap = np.full((px, 6, 3), 24, np.uint8)
+    row = [panels[0]]
+    for p in panels[1:]:
+        row += [gap, p]
+    return np.hstack(row)
 
 
 def main():
@@ -172,19 +226,10 @@ def main():
     if not os.path.isdir(out):
         os.makedirs(out)
 
-    cases = [(72.0, "1 t conventional"), (3720.0, "150 kt nuclear")]
-    panels = []
-    for blast, label in cases:
-        img, st = draw_field(blast, label)
-        panels.append(img)
-        print("{label}: blast {blast:.0f} m -> {count} chunks of {size_min:.1f}-{size_max:.1f} m,"
-              " thrown from a {emit:.0f} m disc {throw:.0f} m further".format(**st))
-        print("    landing {land_min:.0f}-{land_max:.0f} m, longest flight {flight_max:.1f} s,"
-              " frame {frame:.0f} m, rubble covers {coverage:.3%} of it".format(**st))
-
-    gap = np.full((panels[0].shape[0], 8, 3), 24, np.uint8)
-    write_png(os.path.join(out, "debris-field.png"), np.hstack([panels[0], gap, panels[1]]))
-    print("wrote " + os.path.join(out, "debris-field.png"))
+    rows = [run(72.0, "1 t conventional"), run(3720.0, "150 kt nuclear")]
+    gap = np.full((6, rows[0].shape[1], 3), 24, np.uint8)
+    write_png(os.path.join(out, "debris-sweep.png"), np.vstack([rows[0], gap, rows[1]]))
+    print("wrote " + os.path.join(out, "debris-sweep.png"))
 
 
 if __name__ == "__main__":

@@ -43,6 +43,8 @@ namespace UnityEngine
     {
         public static Quaternion Euler(float x, float y, float z) { return new Quaternion(); }
         public static Quaternion Euler(Vector3 euler) { return new Quaternion(); }
+        public static Quaternion AngleAxis(float angle, Vector3 axis) { return new Quaternion(); }
+        public static Quaternion operator *(Quaternion a, Quaternion b) { return new Quaternion(); }
     }
 
     public static class Mathf

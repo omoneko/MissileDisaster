@@ -72,18 +72,22 @@ radioactive fallout that you can clean up with a dedicated decontamination facil
   **concentric wall of dust** — a tsunami of earth the front tears off the ground, starting a
   beat after the blast passes, piling up and climbing as it spreads, and outlasting the front
   itself
-- **Blast debris** — the rubble of whatever stood at ground zero is thrown out and up on real
-  ballistic arcs, tumbling on all three axes and landing back across the city, with the dust it
-  carries. The pieces are **real geometry, lit by the scene** — low‑poly chunks generated to the
-  proportions of the game's own rock props (measured off them: ~31–58 triangles, flat rather than
-  cubic) — **real objects with their own mesh and renderer**, the same path the mod's missile
-  model draws through, not billboards and not mesh particles. Every piece is **car‑sized**, 2–5.5 m,
-  measured against the game's own fleet (a sedan is 4.4 m, a van 7.8 m): debris size does not
-  scale with yield, because a bigger warhead does not make bigger masonry — it breaks more of it
-  and throws it further. What carries a nuclear strike is the count and the dust, not the piece.
-  The launch speed and hang time are solved from how far the pieces should land, so a 1 t charge
-  throws its wreckage 30 m and a strategic warhead throws it 400 m — the range solved so that even
-  the *steepest* arc in the spread lands before the chunk's life runs out, not merely the average one
+- **Blast debris** — the rubble of whatever stood at ground zero is **swept outward as one
+  expanding ring**, travelling with the dust rather than scattering: every piece goes straight out
+  from ground zero, low, skipping along the ground and tumbling over the axis it is rolling on,
+  decelerating on the same Sedov `t^0.4` law as the front that is pushing it. It is on the shock
+  front's clock, so the wreckage and the dust are one wave instead of two effects that happen to
+  start together. *(It used to be ballistic — a separate arc per piece — which is what a shell
+  does, and at city scale it read as confetti. See `Core/DebrisSweep` for what replaced it, and
+  for the one declared departure from physics that makes the ring converge.)* The pieces are
+  **real geometry, lit by the scene** — low‑poly chunks generated to the proportions of the game's
+  own rock props (measured off them: ~31–58 triangles, flat rather than cubic) — **real objects
+  with their own mesh and renderer**, the same path the mod's missile model draws through, not
+  billboards and not mesh particles. Every piece is **car‑sized**, 2–5.5 m, measured against the
+  game's own fleet (a sedan is 4.4 m, a van 7.8 m): debris size does not scale with yield, because
+  a bigger warhead does not make bigger masonry — it breaks more of it and pushes it further. What
+  carries a nuclear strike is the count and the dust, not the piece. A 1 t charge sweeps its
+  wreckage 30 m in 1.5 s; a strategic warhead sweeps it 400 m over 9 s
 - **Trees catch fire** inside the thermal ring, fiercest at the centre and petering out at the
   edge, up to a few hundred at a time so a strike costs the simulation about what a natural
   disaster does. *(Needs the Natural Disasters DLC — the game's own tree‑burning API is gated on
