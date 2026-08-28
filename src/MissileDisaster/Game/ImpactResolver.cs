@@ -96,6 +96,11 @@ namespace MissileDisaster.Game
             Randomizer treeRandomizer = SimulationManager.instance.m_randomizer;
             TreeFires.Ignite(pos, burnMax, ref treeRandomizer);
 
+            // And the traffic and the people go with the blast. The game's own AddWind, the same
+            // call the vanilla meteor makes - see BlownTraffic for what it reaches and what it
+            // cannot (trains, planes and ships have no AddWind to call).
+            BlownTraffic.Blow(pos, outer);
+
             SplashWater(pos, spec);
             StartBlackRain(pos, spec);
         }

@@ -88,6 +88,17 @@ radioactive fallout that you can clean up with a dedicated decontamination facil
   a bigger warhead does not make bigger masonry — it breaks more of it and pushes it further. What
   carries a nuclear strike is the count and the dust, not the piece. A 1 t charge sweeps its
   wreckage 30 m in 1.5 s; a strategic warhead sweeps it 400 m over 9 s
+- **Traffic and people are thrown** away from ground zero — cars, trucks, buses, service vehicles
+  and parked cars tumble outward and land, and pedestrians and animals go with them. This is the
+  game's own machinery rather than a takeover of it: `DisasterHelpers.AddWind` is the call the
+  vanilla meteor makes, and `CarAI.AddWind` clears the vehicle's destination and sets
+  `Vehicle.Flags2.Blown`, after which the simulation flies it with `CarAI.SimulationStepBlown`
+  until it settles and resumes. Nothing writes a vehicle's position frame by frame, which is what
+  would break saves. No DLC needed. **Trains, planes and ships are not thrown** — their AIs never
+  override `AddWind`, and the base `VehicleAI.AddWind` returns false, so there is nothing to ask.
+  The strength does not scale with yield (the wind at a given fraction of the destruction radius
+  is about the same at any yield, because that radius is *defined* by an overpressure); the reach
+  does
 - **Trees catch fire** inside the thermal ring, fiercest at the centre and petering out at the
   edge, up to a few hundred at a time so a strike costs the simulation about what a natural
   disaster does. *(Needs the Natural Disasters DLC — the game's own tree‑burning API is gated on
