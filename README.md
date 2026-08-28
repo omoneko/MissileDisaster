@@ -4,9 +4,11 @@ A Cities: Skylines (2015 / base game) mod that lets you launch missiles with sev
 types at any location — and defend against them. Nuclear strikes leave realistic, persistent
 radioactive fallout that you can clean up with a dedicated decontamination facility.
 
-> Base game only (no DLC required). If the **Natural Disasters** DLC is present, the vanilla
-> meteor impact effect is used for the explosion flash; otherwise a built‑in particle fireball is
-> used. The nuclear mushroom cloud is always the mod's own, so its size can be tied to the blast.
+> Base game only (no DLC required). Every explosion, fireball and mushroom cloud is the mod's
+> own rather than a vanilla effect, so each one is built to the size of the warhead that made it.
+> The one thing that needs the **Natural Disasters** DLC is setting trees alight, because the
+> game's own tree‑burning API is gated on it; without the DLC that step does nothing and
+> everything else is unaffected.
 
 ## Features
 
