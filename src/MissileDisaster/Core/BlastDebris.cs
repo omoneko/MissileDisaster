@@ -43,9 +43,16 @@ namespace MissileDisaster.Core
         /// pieces are thrown from across the destroyed area, and start their arc outside the
         /// fireball where there is something to see them against.
         /// </summary>
-        public const float EmitFraction = 0.30f;
+        ///
+        /// The fraction was 0.30, which threw a 150 kt strike's rubble off a 1116 m disc, and
+        /// that was an over-correction resting on an arithmetic slip: the disc was sized to
+        /// clear "a 310 m fireball", but 310 m is the fireball's WIDTH and the radius it has to
+        /// clear is 155 m. Spreading car-sized pieces over a square kilometre of ground is how
+        /// you make them vanish just as surely as launching them from a point. So the disc is
+        /// only as wide as it needs to be to start the pieces outside the fireball.
+        public const float EmitFraction = 0.07f;
         public const float EmitRadiusMin = 12f;
-        public const float EmitRadiusMax = 1400f;
+        public const float EmitRadiusMax = 420f;
 
         /// <summary>The disc the rubble is thrown from, in metres.</summary>
         public static float EmitRadius(float blastRadius)
@@ -58,11 +65,12 @@ namespace MissileDisaster.Core
 
         /// <summary>The bounds on the throw, in metres. The floor keeps a small charge from merely dribbling; the ceiling keeps a strategic one from raining masonry across the whole map.</summary>
         public const float RangeMin = 30f;
-        // Solved from the hang time rather than picked: at this launch angle a 620 m throw is
-        // just under nine seconds in the air. Setting it any further would make the flight
-        // outlast the lifetime the effect gives a chunk, and the pieces would wink out in
-        // mid-air instead of landing - which is what a 900 m throw was doing.
-        public const float RangeMax = 620f;
+        // Solved from the hang time rather than picked, and solved for the LONGEST arc rather
+        // than the average one. 620 m put the nominal chunk at 8.9 s, safely under the ceiling -
+        // but chunks are thrown at a spread of angles and speeds, and the steepest of them was
+        // 10.9 s, so the outliers were still being destroyed two seconds before they landed.
+        // At 400 m the steepest chunk in the spread comes down at 8.95 s, so none of them do.
+        public const float RangeMax = 400f;
 
         /// <summary>Hang time is capped so a big strike is not still dropping bricks a minute later. RangeMax is set so this never actually bites.</summary>
         public const float FlightSecondsMax = 9f;
@@ -102,28 +110,23 @@ namespace MissileDisaster.Core
         }
 
         /// <summary>
-        /// The size of the largest pieces, in metres. Tied to the throw rather than to the blast
-        /// radius: a bomb that levels one building throws pieces of that building, and a warhead
-        /// that levels a district throws the same masonry, just further and in more quantity.
+        /// The size of the largest pieces, in metres: the length of a car.
+        ///
+        /// This is a deliberate retreat from a readability allowance. The ceiling used to be
+        /// 34 m so that one chunk could be picked out from the altitude a kilometre-wide strike
+        /// is watched at. It worked, and it looked like a warhead throwing office blocks whole -
+        /// nothing in a city is a single 34 m lump of masonry.
+        ///
+        /// So the figure is what it physically should be, measured off the game's own vehicles
+        /// with UnityPy: 2.8-4.4 m for a car, 5-8 m for a van. What has to carry the effect at
+        /// nuclear zoom is the mass of the spray instead - many more pieces (ChunksMax), and
+        /// the dust travelling with them, which is sized from the blast and not from the chunk.
         /// </summary>
-        // The floor is the game's own rubble. Its rock props - rock_small_01..04 - measure about
-        // 4.0 m on their longest axis, so a chunk smaller than that is smaller than the wreckage
-        // the player already sees lying around the map, and reads as grit.
-        //
-        // The ceiling is a readability allowance, and the only one here. Debris size does not
-        // really scale with yield: a warhead does not make bigger masonry, it breaks more of it
-        // and throws it further. But a 4 m chunk seen from the altitude a kilometre-wide strike
-        // is watched at is a speck, so the pieces are allowed to grow towards something
-        // building-sized - and no further, because a 26 m boulder reads as a mountain, not as a
-        // wall that used to be a bank.
-        // Raised from 14 m on measurement rather than taste: at 150 kt a 14 m chunk is 4.5% of
-        // the fireball's width and about a thousandth of the frame the strike is watched in.
-        // Individual rubble cannot read at that zoom whatever colour it is, so the pieces are
-        // allowed to grow until they can - and the count grows with them, because what actually
-        // reads at nuclear scale is the mass of the spray rather than any one piece.
-        public const float ChunkSizeFraction = 0.055f;
-        public const float ChunkSizeMin = 4f;
-        public const float ChunkSizeMax = 34f;
+        // DebrisFlight then deals each piece somewhere between half this and all of it, so the
+        // spread a strike throws runs from a hatchback to a van either way round.
+        public const float ChunkSizeFraction = 0.01375f;
+        public const float ChunkSizeMin = 4f;    // a sedan: 4.4 m in the game's own fleet
+        public const float ChunkSizeMax = 5.5f;  // a van, the far end of car-sized
 
         public static float ChunkSize(float range)
         {
@@ -135,9 +138,14 @@ namespace MissileDisaster.Core
         /// <summary>
         /// How many pieces to throw. It grows with the throw - a bigger blast tears up more - but
         /// far slower than the area does, because the count is a drawing budget and not a census.
+        ///
+        /// The ceiling went up with the pieces coming down to car size: a strategic warhead
+        /// throwing 260 four-metre chunks over a kilometre is a sparse scatter, and what should
+        /// read there is a field of wreckage. The pieces are cheap - a few dozen triangles each -
+        /// so the budget buys density rather than detail.
         /// </summary>
-        public const int ChunksMin = 24;
-        public const int ChunksMax = 260;
+        public const int ChunksMin = 40;
+        public const int ChunksMax = 520;
 
         public static int ChunkCount(float range)
         {

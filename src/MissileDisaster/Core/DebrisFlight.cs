@@ -71,8 +71,11 @@ namespace MissileDisaster.Core
             l.SpinZ = (Hash01(index, seed, 7) - 0.5f) * 2f * SpinDegreesPerSecond;
 
             // Many small pieces and a few large ones, the same bias the cloud's puffs use.
+            // The floor is half rather than a third: now that the largest chunk is a van rather
+            // than an office block, a third of it is a bin bag, and the spread has to stay
+            // inside the range of things a blast actually throws.
             float roll = Hash01(index, seed, 8);
-            l.Scale = chunkSize * (0.35f + 0.65f * roll * roll);
+            l.Scale = chunkSize * (0.5f + 0.5f * roll * roll);
             l.Variant = variants > 0 ? (int)(Hash01(index, seed, 9) * variants) % variants : 0;
             return l;
         }

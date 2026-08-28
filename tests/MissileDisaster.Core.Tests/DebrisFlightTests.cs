@@ -10,7 +10,8 @@ using Xunit;
 public class DebrisFlightTests
 {
     private static DebrisLaunch L(int i) =>
-        DebrisFlight.Launch(i, 7, emitRadius: 300f, speed: 82f, chunkSize: 20f, variants: 4);
+        DebrisFlight.Launch(i, 7, emitRadius: 300f, speed: 82f,
+            chunkSize: BlastDebris.ChunkSizeMax, variants: 4);
 
     [Fact]
     public void Every_chunk_starts_somewhere_on_the_destroyed_disc()
@@ -118,7 +119,11 @@ public class DebrisFlightTests
         }
         Assert.Equal(4, variants.Count);
         Assert.True(max > min * 1.8f, $"a real spread of sizes ({min:F1}..{max:F1} m)");
-        Assert.InRange(max, 0f, 20f); // never larger than the size it was asked for
+        Assert.InRange(max, 0f, BlastDebris.ChunkSizeMax); // never larger than it was asked for
+        // Car-sized, which is what a blast actually throws. The whole spread has to stay there:
+        // the largest piece a van, the smallest a slab of wall - not a bin bag.
+        Assert.InRange(min, 1.2f, 3.5f);
+        Assert.InRange(max, 4f, 8f);
     }
 
     [Fact]

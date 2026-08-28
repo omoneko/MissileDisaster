@@ -28,7 +28,11 @@ namespace MissileDisaster.Game.Effects
         private const float DustGravity = 0.12f;   // it drifts down rather than falling
         private const float DustCountFactor = 3.5f; // against the chunk count
         private const int DustCountMax = 320;
-        private const float DustSizeFactor = 2.2f;  // against the chunk size
+        // The dust is sized from the throw, not from the chunk. It used to be a multiple of the
+        // chunk, and when the pieces came down to car size that quietly shrank a 75 m rolling
+        // cloud to a 12 m puff - the blast would have lost its dust to a change about masonry.
+        private const float DustSizeFraction = 0.19f; // against the throw, in metres
+        private const float DustSizeMin = 9f;
 
         // The cone the pieces leave in. Wide, because a blast throws in every direction at once,
         // but not a full hemisphere: the ones that go straight up would simply come back down on
@@ -45,7 +49,11 @@ namespace MissileDisaster.Game.Effects
         // Chunks are real objects now, so the budget is an object budget rather than a particle
         // one. Ninety tumbling pieces read as a blast tearing a district apart; several hundred
         // GameObjects would only cost frames for pieces nobody can pick out anyway.
-        private const int MaxChunkObjects = 90;
+        // Raised with the pieces coming down to car size: ninety four-metre chunks spread over
+        // a kilometre is a scatter, and what has to read at that zoom is a field of wreckage.
+        // Each is a few dozen triangles with no shadow, so the cost is in the object count, and
+        // three hundred of them is small change beside the city already on screen.
+        private const int MaxChunkObjects = 320;
 
         /// <summary>How long a chunk lies where it fell before it is removed.</summary>
         private const float SettleSeconds = 2.5f;
@@ -78,8 +86,11 @@ namespace MissileDisaster.Game.Effects
                 float emitRadius = BlastDebris.EmitRadius(blastRadius);
                 Vector3 origin = groundZero + Vector3.up * (chunkSize * 0.5f);
 
+                float dustSize = range * DustSizeFraction;
+                if (dustSize < DustSizeMin) dustSize = DustSizeMin;
+
                 int emitted = CreateChunks(origin, emitRadius, speed, flight, chunkSize, chunks);
-                CreateDust(origin, emitRadius, speed, flight, chunkSize, chunks);
+                CreateDust(origin, emitRadius, speed, flight, dustSize, chunks);
 
                 // Unconditional, because "I still cannot see the rubble" is not answerable from
                 // the screen alone: it cannot tell a system that never spawned from one drawing
@@ -134,9 +145,14 @@ namespace MissileDisaster.Game.Effects
             {
                 DebrisLaunch launch = DebrisFlight.Launch(i, seed, emitRadius, speed, chunkSize,
                     meshes.Length);
+                // Each chunk lives its OWN arc, not the nominal one. Clamping to the average
+                // flight is what destroyed the steepest pieces in mid-air: they are thrown at a
+                // spread of angles, so a quarter of them are up for longer than the figure the
+                // range was solved from. BlastDebris.RangeMax is what keeps even those under
+                // the ceiling; this guard is only a backstop.
                 float life = DebrisFlight.FlightSeconds(launch);
                 if (life <= 0.05f) continue;
-                if (life > flight) life = flight;
+                if (life > BlastDebris.FlightSecondsMax) life = BlastDebris.FlightSecondsMax;
 
                 var go = new GameObject("MissileDisaster_DebrisChunk");
                 go.transform.position = origin;
@@ -163,7 +179,7 @@ namespace MissileDisaster.Game.Effects
 
         /// <summary>The dust thrown with the pieces: slower, softer, and dying in the air.</summary>
         private static void CreateDust(Vector3 origin, float emitRadius, float speed, float flight,
-            float chunkSize, int chunks)
+            float dustSize, int chunks)
         {
             int count = (int)(chunks * DustCountFactor);
             if (count > DustCountMax) count = DustCountMax;
@@ -175,8 +191,7 @@ namespace MissileDisaster.Game.Effects
             main.startLifetime = life;
             main.startSpeed = new ParticleSystem.MinMaxCurve(
                 speed * DustSpeedFraction * 0.4f, speed * DustSpeedFraction);
-            main.startSize = new ParticleSystem.MinMaxCurve(
-                chunkSize * DustSizeFactor * 0.5f, chunkSize * DustSizeFactor);
+            main.startSize = new ParticleSystem.MinMaxCurve(dustSize * 0.5f, dustSize);
             main.startColor = new ParticleSystem.MinMaxGradient(DustNear, DustFar);
             main.maxParticles = count * 2;
             main.gravityModifier = DustGravity;

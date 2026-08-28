@@ -78,35 +78,43 @@ public class BlastDebrisTests
     }
 
     [Fact]
-    public void No_chunk_is_smaller_than_the_rubble_the_game_already_draws()
+    public void Every_piece_of_rubble_is_the_size_of_a_car()
     {
-        // The game's own rock props measure about 4 m on their longest axis. Anything under
-        // that is smaller than the wreckage lying around the map already, and reads as grit -
-        // which is why a 2.5 m floor made a conventional strike look like nothing happened.
-        foreach (float blast in new[] { 18f, 72f, 180f, 3720f })
+        // Measured off the game's own vehicles with UnityPy: electric-car04 is 2.8 m long,
+        // a sedan 4.4 m, Van_02 7.8 m. Whatever the warhead, the wreckage it throws has to sit
+        // in that range - a city is not built out of anything a blast breaks into 30 m lumps.
+        foreach (float blast in new[] { 18f, 72f, 180f, 3720f, 25000f, 1e6f })
         {
-            Assert.True(BlastDebris.ChunkSize(BlastDebris.Range(blast)) >= 4f);
+            float chunk = BlastDebris.ChunkSize(BlastDebris.Range(blast));
+            Assert.InRange(chunk, 2.8f, 8f);
         }
     }
 
     [Fact]
-    public void No_chunk_grows_into_a_boulder()
+    public void The_biggest_warhead_does_not_throw_a_bigger_piece_of_the_city()
     {
-        // Debris size does not really scale with yield - the ceiling is a readability
-        // allowance. It was raised to 34 m once the numbers showed a 14 m chunk is 4.5% of a
-        // 150 kt fireball's width, but it still stops short of reading as terrain.
+        // Debris size does not scale with yield: a warhead does not make bigger masonry, it
+        // breaks more of it and throws it further. The ceiling used to be a 34 m readability
+        // allowance, and it looked like office blocks being thrown whole.
         Assert.True(BlastDebris.ChunkSize(BlastDebris.Range(1e6f)) <= BlastDebris.ChunkSizeMax);
+        Assert.True(BlastDebris.ChunkSizeMax <= 8f, "still a van, not a building");
     }
 
     [Fact]
     public void The_rubble_is_thrown_from_the_destroyed_area_not_from_a_point()
     {
         // Launching it all from ground zero is what buried it: at 150 kt the pieces left a 50 m
-        // circle and spent their first seconds inside a 310 m fireball. The fireball vaporises
-        // what stands at the centre anyway - the rubble comes from the ring around it.
+        // circle and spent their first seconds inside the fireball, which vaporises what stands
+        // at the centre anyway - the rubble comes from the ring around it.
+        //
+        // The figure to clear is the fireball's RADIUS. At 150 kt that is 155 m: the real
+        // 55 W^0.4 radius is 408 m and NuclearCloudDisplay draws it at FireballScale 0.38. This
+        // test used to demand 310 m, which is the width, and the disc that satisfied it was
+        // 1116 m across - so wide that car-sized rubble scattered over it disappeared.
         float emit = BlastDebris.EmitRadius(3720f);
-        Assert.True(emit > 310f, $"the disc clears the 310 m fireball (got {emit:F0} m)");
-        Assert.True(emit > BlastDebris.Range(3720f) * 0.5f, "and is a real area, not a nozzle");
+        Assert.True(emit > 155f, $"the disc clears the 155 m fireball radius (got {emit:F0} m)");
+        Assert.True(emit < 155f * 3f, $"and no wider than it has to be (got {emit:F0} m)");
+        Assert.True(emit > BlastDebris.EmitRadiusMin, "and is a real area, not a nozzle");
     }
 
     [Fact]
@@ -127,12 +135,16 @@ public class BlastDebrisTests
     }
 
     [Fact]
-    public void A_nuclear_chunk_is_big_enough_to_read_against_its_own_fireball()
+    public void What_reads_at_nuclear_scale_is_the_count_not_the_piece()
     {
-        // A 150 kt fireball is drawn 310 m across. Anything under a few per cent of that is a
-        // pixel at the zoom a strike that size is watched from.
-        float chunk = BlastDebris.ChunkSize(BlastDebris.Range(3720f));
-        Assert.True(chunk / 310f > 0.08f, $"{chunk:F0} m against a 310 m fireball");
+        // A car-sized chunk is under 2% of a 150 kt fireball's 310 m width, so no single piece
+        // can carry the effect at that zoom - and the size must not be inflated until one can,
+        // because that is what turned the rubble into flying office blocks. The mass of the
+        // spray carries it instead: hundreds of pieces over a 620 m throw.
+        float range = BlastDebris.Range(3720f);
+        Assert.True(BlastDebris.ChunkSize(range) < 310f * 0.03f, "no piece pretends to be a building");
+        Assert.True(BlastDebris.ChunkCount(range) >= 400,
+            $"the spray has to carry it instead (got {BlastDebris.ChunkCount(range)} pieces)");
     }
 
     [Fact]

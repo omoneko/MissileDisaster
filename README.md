@@ -75,11 +75,15 @@ radioactive fallout that you can clean up with a dedicated decontamination facil
 - **Blast debris** — the rubble of whatever stood at ground zero is thrown out and up on real
   ballistic arcs, tumbling on all three axes and landing back across the city, with the dust it
   carries. The pieces are **real geometry, lit by the scene** — low‑poly chunks generated to the
-  proportions of the game's own rock props (measured off them: ~31–58 triangles, 4.0 × 1.8 × 2.6 m,
-  flat rather than cubic) — **real objects with their own mesh and renderer**, the same path the
-  mod's missile model draws through, not billboards and not mesh particles. The launch speed and hang time are solved from how far
-  the pieces should land, so a 1 t charge throws its wreckage 30 m and a strategic warhead throws
-  it 620 m — the range chosen so the longest arc still lands before the chunk's life runs out
+  proportions of the game's own rock props (measured off them: ~31–58 triangles, flat rather than
+  cubic) — **real objects with their own mesh and renderer**, the same path the mod's missile
+  model draws through, not billboards and not mesh particles. Every piece is **car‑sized**, 2–5.5 m,
+  measured against the game's own fleet (a sedan is 4.4 m, a van 7.8 m): debris size does not
+  scale with yield, because a bigger warhead does not make bigger masonry — it breaks more of it
+  and throws it further. What carries a nuclear strike is the count and the dust, not the piece.
+  The launch speed and hang time are solved from how far the pieces should land, so a 1 t charge
+  throws its wreckage 30 m and a strategic warhead throws it 400 m — the range solved so that even
+  the *steepest* arc in the spread lands before the chunk's life runs out, not merely the average one
 - **Trees catch fire** inside the thermal ring, fiercest at the centre and petering out at the
   edge, up to a few hundred at a time so a strike costs the simulation about what a natural
   disaster does. *(Needs the Natural Disasters DLC — the game's own tree‑burning API is gated on
