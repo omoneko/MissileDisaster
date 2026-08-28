@@ -96,9 +96,12 @@ radioactive fallout that you can clean up with a dedicated decontamination facil
   until it settles and resumes. Nothing writes a vehicle's position frame by frame, which is what
   would break saves. No DLC needed. **Trains, planes and ships are not thrown** — their AIs never
   override `AddWind`, and the base `VehicleAI.AddWind` returns false, so there is nothing to ask.
-  The strength does not scale with yield (the wind at a given fraction of the destruction radius
-  is about the same at any yield, because that radius is *defined* by an overpressure); the reach
-  does
+  The strength scales with the blast radius, because what throws a car is an impulse — dynamic
+  pressure times the positive phase — and that phase grows with the cube root of the yield. So a
+  1 t bomb shoves the cars within 5 m of it about 13 m, while a 150 kt warhead throws them 98 m
+  and a kilometre out still moves them. What is *not* modelled, because the game's own blown-car
+  step does not: a landing car stops dead rather than bouncing or rolling, and its tumble is a
+  random jitter rather than real angular momentum
 - **Trees catch fire** inside the thermal ring, fiercest at the centre and petering out at the
   edge, up to a few hundred at a time so a strike costs the simulation about what a natural
   disaster does. *(Needs the Natural Disasters DLC — the game's own tree‑burning API is gated on

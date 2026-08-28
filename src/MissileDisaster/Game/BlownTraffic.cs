@@ -46,8 +46,8 @@ namespace MissileDisaster.Game
                 // that threw them. A missile strike is not a disaster instance, so there is
                 // nothing to tie them to - InstanceManager.SetGroup takes null and means it.
                 DisasterHelpers.AddWind(groundZero, reach,
-                    new Vector3(0f, BlastWind.Lift, 0f),
-                    BlastWind.Rotational, BlastWind.Radial, null);
+                    new Vector3(0f, BlastWind.Lift(destructionRadius), 0f),
+                    BlastWind.Rotational, BlastWind.Radial(destructionRadius), null);
             }
             catch (Exception e)
             {
