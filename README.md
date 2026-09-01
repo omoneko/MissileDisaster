@@ -74,13 +74,18 @@ radioactive fallout that you can clean up with a dedicated decontamination facil
   **concentric wall of dust** — a tsunami of earth the front tears off the ground, starting a
   beat after the blast passes, piling up and climbing as it spreads, and outlasting the front
   itself
-- **Base surge** — a ground burst raises a dome of dirt from the foot of the column that expands
-  outward and upward at once, leaps out in its first seconds and then creeps, and grows until it
-  is wider than the cap and reaching into its underside — the mushroom ends up standing in a bowl
-  of its own dust rather than on clean ground, which is what photographs of surface shots show.
-  It runs on its own clock, 2.6× the cloud's rise, so the two never read as one object being
-  scaled up. Conventional ground bursts get a proportionate one; an airburst gets none, having
-  nothing in contact with the ground to scour (`Core/GroundDust`)
+- **Base surge** — a ground burst raises a wide, low collar of dirt that rolls outward from the
+  foot of the column, arriving a beat after it and creeping outward for the rest of the shot.
+  Built to the phenomenon rather than to taste: Crossroads Baker's — the one every photograph
+  shows — ran out two and a half miles and topped out around a thousand feet under a column
+  kilometres high, so it is a **doughnut, low and very wide**, with its middle left open so the
+  stem still stands visibly inside it. At 150 kt that is a ring 434 m across and 143 m tall,
+  three times wider than it is high. *(The first version was built to a Workshop request — "it
+  should grow until it subsumes the mushroom cloud" — as though that were physics. It is not: a
+  surge that reaches the canopy is a second cloud, and it hid the thing the player came to
+  watch.)* On dry land the effect is weaker than over water anyway, since soil makes no droplet
+  cloud; a conventional ground burst gets a proportionate one, and an airburst none
+  (`Core/GroundDust`)
 - **Everything drifts downwind** — the cloud and the surge are carried on the game's own wind
   (`WeatherManager.m_windDirection`, converted the way FogEffect does it, so the mod's smoke goes
   the same way the game's fog does). The drift builds in rather than starting at speed — a column

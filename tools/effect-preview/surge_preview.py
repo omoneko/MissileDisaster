@@ -21,14 +21,15 @@ import numpy as np
 
 # Core/GroundDust
 GROWTH_EXPONENT = 0.35
-RADIUS_PER_CAP = 1.3
-HEIGHT_PER_CLOUD_TOP = 0.62
+RADIUS_PER_CAP = 1.55
+HEIGHT_PER_CLOUD_TOP = 0.09
 BIRTH_RADIUS_PER_CAP = 0.12
 GROWTH_PER_RISE = 2.6
 HOLD_FRACTION, FADE_FRACTION = 0.35, 0.8
 PUFF_SIZE_MIN, PUFF_SIZE_MAX = 0.20, 0.40
 PUFF_COUNT = 340
-SHELL_DEPTH = 0.42
+DELAY_PER_RISE = 0.35
+INNER_HOLE = 0.62
 
 # Core/CloudDrift
 DRIFT_TOP_SPEED = 5.5
@@ -57,9 +58,13 @@ def nuclear_dims(kt):
         span = c - k
         return k + span * (1.0 - math.exp(-(v - k) / span))
 
-    top_real, cap_real = s(real_top, 12000.0, 30000.0), s(real_cap, 8000.0, 26000.0)
+    # Exact, not approximate: CloudTopMin 800, knee 12000, ceiling 30000, then CloudScale 0.06
+    # x CloudHeightScale 2, then a second soft ceiling at knee 2800 / ScreenTopAltitude 4000.
+    # Getting these wrong is how the surge came out twice as tall here as it did in the game.
+    top_real = max(s(real_top, 12000.0, 30000.0), 800.0)
+    cap_real = s(real_cap, 8000.0, 26000.0)
     cap = cap_real * cloud_scale * 1.3
-    top = s(top_real * cloud_scale, 900.0, 2000.0)
+    top = s(top_real * cloud_scale * 2.0, 2800.0, 4000.0)
     rise = max(soft(600.0 * (kt / 1000.0) ** 0.25 / 38.0, 5.0, 10.0, 16.0), 5.0)
     return cap, top, rise
 
@@ -80,38 +85,47 @@ def hash01(index, seed, salt):
     return float(int(h) & 0xFFFFFF) / float(0x1000000)
 
 
+def delay_seconds(rise):
+    return rise * DELAY_PER_RISE
+
+
 def growth_seconds(rise):
     return max(rise * GROWTH_PER_RISE, 2.0)
 
 
 def total_seconds(rise):
-    return growth_seconds(rise) * (1.0 + HOLD_FRACTION + FADE_FRACTION)
+    return delay_seconds(rise) + growth_seconds(rise) * (1.0 + HOLD_FRACTION + FADE_FRACTION)
+
+
+def since(t, rise):
+    return max(t - delay_seconds(rise), 0.0)
 
 
 def radius_at(t, cap, rise):
     g = growth_seconds(rise)
-    u = min(max(t / g, 0.0), 1.0)
+    u = min(max(since(t, rise) / g, 0.0), 1.0)
     birth, final = cap * BIRTH_RADIUS_PER_CAP, cap * RADIUS_PER_CAP
     return birth + (final - birth) * u ** GROWTH_EXPONENT
 
 
 def height_at(t, top, rise):
     g = growth_seconds(rise)
-    u = min(max(t / g, 0.0), 1.0)
+    u = min(max(since(t, rise) / g, 0.0), 1.0)
     return top * HEIGHT_PER_CLOUD_TOP * u ** (GROWTH_EXPONENT * 1.45)
 
 
 def alpha_at(t, rise):
     g = growth_seconds(rise)
-    if t < 0:
+    s2 = since(t, rise)
+    if s2 <= 0:
         return 0.0
     fade_in = g * 0.08
-    if t < fade_in:
-        return t / fade_in
+    if s2 < fade_in:
+        return s2 / fade_in
     steady = g * (1.0 + HOLD_FRACTION)
-    if t <= steady:
+    if s2 <= steady:
         return 1.0
-    u = (t - steady) / (g * FADE_FRACTION)
+    u = (s2 - steady) / (g * FADE_FRACTION)
     return 0.0 if u >= 1 else 1.0 - u
 
 
@@ -129,11 +143,10 @@ def surge_puffs(t, cap, top, rise, seed=7):
     out = []
     for i in range(PUFF_COUNT):
         az = hash01(i, seed, 1) * 2 * math.pi
-        polar = (math.pi * 0.5) * hash01(i, seed, 2) ** 1.6
-        shell = 1.0 - SHELL_DEPTH * hash01(i, seed, 3)
-        horiz = r * shell * math.cos(polar)
+        band = math.sqrt(hash01(i, seed, 2))
+        horiz = r * (INNER_HOLE + (1 - INNER_HOLE) * band)
         x, z = horiz * math.cos(az), horiz * math.sin(az)
-        y = h * shell * math.sin(polar)
+        y = h * hash01(i, seed, 3) ** 1.8
         churn = t * 0.35 + hash01(i, seed, 4) * 2 * math.pi
         x += r * 0.03 * math.sin(churn)
         y = max(y + h * 0.05 * math.sin(churn * 1.3), 0.0)
@@ -207,16 +220,25 @@ def run(label, cap, top, rise, out):
     total = total_seconds(rise)
     print(f"\n{label}: cap {cap:.0f} m, cloud top {top:.0f} m, cloud rise {rise:.1f} s")
     print(f"  surge grows for {g:.1f} s ({g/rise:.1f}x the cloud's rise), gone at {total:.1f} s")
-    frame_w, frame_h = cap * RADIUS_PER_CAP * 2.6, top * 1.05
+    # Framed on the surge. The frame used to be the whole cloud, and once the collar
+    # came down to its real height that left it four pixels tall in the corner - and
+    # the opacity sample was measuring empty sky above it.
+    final_h = top * HEIGHT_PER_CLOUD_TOP
+    frame_w, frame_h = cap * RADIUS_PER_CAP * 2.6, final_h * 3.2
     panels = []
-    for frac in (0.03, 0.15, 0.5, 1.0, 1.6):
-        t = g * frac
+    for frac in (0.0, 0.15, 0.5, 1.0, 1.6):
+        t = delay_seconds(rise) + g * frac
         img, r, h = draw_side(t, cap, top, rise, frame_w, frame_h)
         panels.append(img)
         # How solid the dome actually draws, measured in its body rather than assumed - the
         # same discipline cloud_preview.py enforces on the mushroom.
-        band = img[int(440 * 0.72):int(440 * 0.88), int(440 * 0.42):int(440 * 0.58)]
-        solidity = float(band.mean()) / 133.0
+        # Sampled inside the collar's own body - out at 0.8 of its radius and halfway up it -
+        # rather than at a fixed screen position, which stopped being inside it.
+        ground = 440 - 8
+        sy = int(ground - (h * 0.5) / (frame_h / 440))
+        sx = int(220 + (r * 0.8) / (frame_w / 440))
+        band = img[max(sy - 8, 0):sy + 8, max(sx - 8, 0):min(sx + 8, 440)]
+        solidity = float(band.mean()) / 133.0 if band.size else 0.0
         print(f"    t={t:5.1f}s  dome {r:6.0f} m wide x {h:5.0f} m tall  "
               f"({r/cap:4.2f}x cap, {h/top:4.2f}x cloud top)  alpha {alpha_at(t, rise):.2f}  "
               f"drift {drift(t, rise, 1.0):5.0f} m  body {solidity:.2f}")

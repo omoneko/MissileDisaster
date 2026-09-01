@@ -17,12 +17,22 @@ namespace MissileDisaster.Core
     /// mushroom that raised it. Pure, with no UnityEngine dependency.
     ///
     /// <para>
-    /// This is a real phenomenon rather than an invention. A surface or shallow burst throws far
-    /// more soil than it can lift, and what it cannot lift rolls: a dense, fast, ground-hugging
-    /// cloud that spreads from the base of the stem, climbs as it goes, and outlives the column.
-    /// It is the reason photographs of ground shots show the mushroom standing in a bowl of
-    /// dirty cloud rather than on clean ground - and the reason the mod's ground bursts have
-    /// looked thin, because it was simply missing.
+    /// A real phenomenon, and worth being accurate about, because the first version of this was
+    /// not. The base surge is chiefly a WATER effect: Crossroads Baker's - the one every
+    /// photograph shows - was a dense cloud of droplets thrown off the collapsing column. It
+    /// began to form about ten seconds after the burst, rolled outward at over a mile a minute,
+    /// reached two and a half miles, and topped out at about a thousand feet against a column
+    /// measured in kilometres. It is a doughnut: low, very wide, and rolling. On dry land the
+    /// effect is weaker still, because soil does not make the droplet cloud water does.
+    /// </para>
+    ///
+    /// <para>
+    /// The first version had it at 0.62 of the cloud's height, growing until it swallowed the
+    /// mushroom. That came from a Workshop request - "it should slowly grow bigger until it
+    /// subsumes the mushroom cloud" - implemented as though it were physics. It is not, and it
+    /// hid the thing the player came to watch. It is now built to the figures above: a wide, low,
+    /// rolling collar that arrives a beat after the column, with its middle left open so the stem
+    /// still stands visibly inside it.
     /// </para>
     ///
     /// <para>
@@ -40,20 +50,38 @@ namespace MissileDisaster.Core
         /// <summary>How the dome grows: fast out of the gate, then a long creep. Below one, and lower than the shock front's 0.4, because the surge is heavy and slows harder.</summary>
         public const float GrowthExponent = 0.35f;
 
-        /// <summary>How wide the dome finishes, against the cloud's cap. Wider than the cap, which is what "it subsumes the mushroom" means from the ground.</summary>
-        public const float RadiusPerCap = 1.3f;
+        /// <summary>How wide it finishes, against the cloud's cap. Wide is the surge's whole character - Baker's ran to two and a half miles - and it is where the height went.</summary>
+        public const float RadiusPerCap = 1.55f;
 
         /// <summary>
-        /// How tall it finishes, against the cloud's top. The cap's base sits at 0.58 of the top,
-        /// so this puts the dome's crown just into the underside of the canopy: it swallows the
-        /// stem and starts on the cap, which is what "it subsumes the mushroom" looks like from a
-        /// camera angle anyone plays at. Taking it much higher hides the mushroom altogether,
-        /// which loses the thing the effect exists for.
+        /// How tall it finishes, against the cloud's top. Low, and that is the measured figure
+        /// rather than a compromise: Baker's surge reached about 1,000 ft under a column
+        /// kilometres high, so roughly a sixth of it. A surge that reaches the cap is not a
+        /// surge, it is a second cloud - and it hides the mushroom, which is what sent this back.
+        ///
+        /// The figure is against the DRAWN cloud top, which this mod stretches to twice scale
+        /// (CloudHeightScale) - so 0.09 of it, not Baker's 0.15 of a real column. At 150 kt that
+        /// is a collar 143 m tall inside a ring 450 m across: about three times wider than tall,
+        /// which is the shape, where 0.16 gave 254 m and read as a second cloud.
         /// </summary>
-        public const float HeightPerCloudTop = 0.62f;
+        public const float HeightPerCloudTop = 0.09f;
 
         /// <summary>Where it starts: a ring already outside the fireball at the moment it is first drawn.</summary>
         public const float BirthRadiusPerCap = 0.12f;
+
+        /// <summary>
+        /// It arrives after the column, not with it. Baker's began to form ten to twelve seconds
+        /// in, once the plume was already collapsing - so the surge reads as something the
+        /// explosion went on to cause, rather than as part of the same puff of smoke.
+        /// </summary>
+        public const float DelayPerRise = 0.35f;
+
+        /// <summary>
+        /// How much of the middle is left open. The surge is a doughnut rolling outward, not a
+        /// filled dome, and leaving the centre clear is both the real shape and what lets the
+        /// stem go on showing through it.
+        /// </summary>
+        public const float InnerHole = 0.62f;
 
         /// <summary>How long it keeps growing, against the cloud's rise. Slower than the mushroom, which is the whole point - the two must not move as one object.</summary>
         public const float GrowthPerRise = 2.6f;
@@ -79,10 +107,13 @@ namespace MissileDisaster.Core
 
         public const int PuffCount = 340;
 
-        /// <summary>How thick the shell is - puffs sit between this fraction of the radius and the surface, so the dome has a body rather than being a soap bubble.</summary>
-        public const float ShellDepth = 0.42f;
+        /// <summary>How long the surge waits before it begins to form, in seconds.</summary>
+        public static float DelaySeconds(float cloudRiseSeconds)
+        {
+            return cloudRiseSeconds * DelayPerRise;
+        }
 
-        /// <summary>How long the whole surge lasts, in seconds, for a cloud that rises in this many.</summary>
+        /// <summary>How long the surge spends growing, in seconds, for a cloud that rises in this many.</summary>
         public static float GrowthSeconds(float cloudRiseSeconds)
         {
             float t = cloudRiseSeconds * GrowthPerRise;
@@ -92,14 +123,21 @@ namespace MissileDisaster.Core
         public static float TotalSeconds(float cloudRiseSeconds)
         {
             float g = GrowthSeconds(cloudRiseSeconds);
-            return g * (1f + HoldFraction + FadeFraction);
+            return DelaySeconds(cloudRiseSeconds) + g * (1f + HoldFraction + FadeFraction);
+        }
+
+        /// <summary>Seconds since the surge itself began, which is later than the burst.</summary>
+        private static float Since(float t, float cloudRiseSeconds)
+        {
+            float s = t - DelaySeconds(cloudRiseSeconds);
+            return s < 0f ? 0f : s;
         }
 
         /// <summary>How far out the dome has reached, in metres, t seconds in.</summary>
         public static float RadiusAt(float t, float capRadius, float cloudRiseSeconds)
         {
             float growth = GrowthSeconds(cloudRiseSeconds);
-            float u = growth <= 0f ? 1f : t / growth;
+            float u = growth <= 0f ? 1f : Since(t, cloudRiseSeconds) / growth;
             if (u < 0f) u = 0f;
             if (u > 1f) u = 1f;
             float birth = capRadius * BirthRadiusPerCap;
@@ -111,7 +149,7 @@ namespace MissileDisaster.Core
         public static float HeightAt(float t, float cloudTop, float cloudRiseSeconds)
         {
             float growth = GrowthSeconds(cloudRiseSeconds);
-            float u = growth <= 0f ? 1f : t / growth;
+            float u = growth <= 0f ? 1f : Since(t, cloudRiseSeconds) / growth;
             if (u < 0f) u = 0f;
             if (u > 1f) u = 1f;
             // A shade slower than the spread, so the dome starts as a skirt and thickens into a
@@ -123,14 +161,15 @@ namespace MissileDisaster.Core
         public static float AlphaAt(float t, float cloudRiseSeconds)
         {
             float growth = GrowthSeconds(cloudRiseSeconds);
-            if (t < 0f) return 0f;
+            float since = Since(t, cloudRiseSeconds);
+            if (since <= 0f) return 0f;
             float fadeIn = growth * 0.08f;
-            if (t < fadeIn && fadeIn > 0f) return t / fadeIn;
+            if (since < fadeIn && fadeIn > 0f) return since / fadeIn;
             float steady = growth * (1f + HoldFraction);
-            if (t <= steady) return 1f;
+            if (since <= steady) return 1f;
             float fade = growth * FadeFraction;
             if (fade <= 0f) return 0f;
-            float u = (t - steady) / fade;
+            float u = (since - steady) / fade;
             return u >= 1f ? 0f : 1f - u;
         }
 
@@ -146,16 +185,15 @@ namespace MissileDisaster.Core
             float height = HeightAt(t, cloudTop, cloudRiseSeconds);
 
             float azimuth = Hash01(index, seed, 1) * (float)(2.0 * Math.PI);
-            // The polar angle is biased towards the ground, so the dome is heaviest where a real
-            // surge is heaviest - down at the skirt, rolling outward.
-            float polar = (float)(Math.PI * 0.5) * (float)Math.Pow(Hash01(index, seed, 2), 1.6);
-            // A shell with a body: puffs fill the outer part of the dome rather than its surface.
-            float shell = 1f - ShellDepth * Hash01(index, seed, 3);
-
-            float horizontal = radius * shell * (float)Math.Cos(polar);
+            // A doughnut: the puffs fill the outer annulus and leave the middle open, so the stem
+            // goes on standing visibly inside it. sqrt spreads them evenly by area in that band.
+            float band = (float)Math.Sqrt(Hash01(index, seed, 2));
+            float horizontal = radius * (InnerHole + (1f - InnerHole) * band);
             p.X = horizontal * (float)Math.Cos(azimuth);
             p.Z = horizontal * (float)Math.Sin(azimuth);
-            p.Y = height * shell * (float)Math.Sin(polar);
+            // Heaviest along the ground and thinning upward: a collar rolling outward, not a
+            // shell standing up.
+            p.Y = height * (float)Math.Pow(Hash01(index, seed, 3), 1.8);
 
             // A slow churn, so the wall boils as it rolls instead of being a static shape that
             // scales up. It is deliberately much slower than the cap's own roll.
@@ -171,7 +209,7 @@ namespace MissileDisaster.Core
             p.Size = radius * (PuffSizeMin + (PuffSizeMax - PuffSizeMin) * Hash01(index, seed, 5));
             p.Fade = AlphaAt(t, cloudRiseSeconds);
             // Dirtiest at the bottom, where it is scouring the ground; paler up at the crown.
-            p.Dust = 1f - 0.35f * (float)Math.Sin(polar);
+            p.Dust = 1f - 0.35f * (height > 0f ? p.Y / height : 0f);
             return p;
         }
 
