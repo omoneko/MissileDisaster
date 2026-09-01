@@ -370,3 +370,18 @@ namespace MissileDisaster.Game.Models
         public static UnityEngine.GameObject CreateInstance(string name) { return null; }
     }
 }
+
+// The slice of the game's own assemblies the effect code binds to. Stand-ins only: see the
+// header of CompileCheck.csproj for what this does and does not prove.
+namespace ColossalFramework
+{
+    public class Singleton<T> where T : class
+    {
+        public static T instance { get { return null; } }
+    }
+}
+
+public class WeatherManager
+{
+    public float m_windDirection;
+}

@@ -76,6 +76,16 @@ namespace MissileDisaster.Game.Effects
                 CreateGroundDust(groundZero, d.StemRadius, d.RiseSeconds);
                 MushroomCloudPuffsFx.Create("ConventionalMushroomCloud", groundZero, d, airburst);
 
+                // The base surge: the dome of dirt that rolls out from the foot of the column
+                // and grows until it swallows the mushroom. A ground burst only - an airburst
+                // has nothing in contact with the ground to scour. See Core.GroundDust.
+                if (!airburst)
+                {
+                    GroundDustFx.Create("ConventionalBaseSurge", groundZero,
+                        d.CapRadius, d.CloudTop, d.RiseSeconds);
+                }
+
+
                 ModConfig.Log(string.Format(
                     "conventional cloud: {0:F0} m fireball, column {1:F0} m tall, "
                     + "cap {2:F0} m across, up for {3:F0} s",

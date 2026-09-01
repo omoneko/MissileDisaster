@@ -56,7 +56,12 @@ namespace MissileDisaster.Core
         /// count with the radius now, so the smaller ones are proportionate rather than a
         /// full-sized wall on a short leash.
         /// </summary>
-        public const float DustSurgeMinRadius = 110f;
+        // Lowered again, from 110 m, on a Workshop report that conventional explosions have no
+        // ground smoke worth the name. 110 m sounded modest and still excluded every ordinary
+        // bomb: a 1 t charge destroys 72 m and a 1.5 t one 82 m, so neither raised a wall. At
+        // 55 m every conventional warhead from about 500 kg up gets one, sized to its own
+        // radius, and only the individual cluster bomblets - 18 m - still go without.
+        public const float DustSurgeMinRadius = 55f;
         // The other end is a soft ceiling rather than a clamp: every strategic yield shared the
         // old 14 s, so a 50 Mt front - which really takes about 48 s to cross its 26 km - was
         // drawn crossing the ground three times faster than a 1 Mt one instead of taking longer

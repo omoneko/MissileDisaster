@@ -32,17 +32,19 @@ namespace MissileDisaster.Core
     public static class WaterSplash
     {
         /// <summary>The disturbance spreads wider than the fireball that drove it.</summary>
-        public const float RadiusPerFireball = 3f;
+        public const float RadiusPerFireball = 5f;
 
         /// <summary>
         /// How deep the surface is pressed, against the fireball radius. Well under 1: the cavity
         /// a burst opens is much wider than it is deep, which is why the wave spreads rather than
         /// standing up as a column.
         /// </summary>
-        public const float DepthPerFireball = 0.3f;
+        public const float DepthPerFireball = 0.6f;
 
         /// <summary>Below one wave cell nothing registers in the simulation at all.</summary>
-        public const float MinRadius = 16f;
+        // Raised with the rest of the splash on a Workshop report that even small warheads
+        // should move a lot of water. A 16 m ring off a bomb that craters 24 m read as a ripple.
+        public const float MinRadius = 30f;
 
         /// <summary>
         /// Ceilings. A strategic warhead's fireball is kilometres across and would otherwise ask

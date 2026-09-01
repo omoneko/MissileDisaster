@@ -231,9 +231,10 @@ public class NuclearCloudDisplayTests
         NuclearCloudDimensions d = NuclearCloudDisplay.For(150f);
         Assert.InRange(d.RiseSeconds, 5f, 12f);
         // The dissolve at the end is deliberately the longest phase - vanishing faster than it
-        // formed is what read as a deletion - so the whole shot runs a little over half a
-        // minute now, most of it the cloud shredding away.
-        Assert.InRange(d.RiseSeconds + d.HoldSeconds + d.FadeSeconds, 25f, 40f);
+        // formed is what read as a deletion. It was lengthened again on a Workshop report that
+        // the smoke still goes too quickly, and the extra time all went to the hold and the
+        // fade: the rise is what the earlier playtest called a wait, and it is untouched.
+        Assert.InRange(d.RiseSeconds + d.HoldSeconds + d.FadeSeconds, 45f, 70f);
         Assert.True(d.FadeSeconds > d.RiseSeconds, "it takes longer to shred than it took to rise");
     }
 
@@ -242,9 +243,10 @@ public class NuclearCloudDisplayTests
     {
         Assert.True(NuclearCloudDisplay.For(50000f).RiseSeconds > NuclearCloudDisplay.For(15f).RiseSeconds,
             "Tsar Bomba climbs for longer than Little Boy");
-        // But even Tsar Bomba's whole shot stays under a minute.
+        // But even Tsar Bomba's whole shot stays inside a minute and a half - long enough to
+        // watch it drift apart, short enough that the city is not held hostage to it.
         NuclearCloudDimensions tsar = NuclearCloudDisplay.For(50000f);
-        Assert.True(tsar.RiseSeconds + tsar.HoldSeconds + tsar.FadeSeconds < 60f);
+        Assert.True(tsar.RiseSeconds + tsar.HoldSeconds + tsar.FadeSeconds < 90f);
     }
 
     [Fact]

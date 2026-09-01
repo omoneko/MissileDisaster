@@ -81,6 +81,16 @@ namespace MissileDisaster.Game.Effects
                 // The mushroom itself. The same call the conventional column goes through -
                 // see ConventionalMushroomFx - only at nuclear dimensions.
                 MushroomCloudPuffsFx.Create("NuclearMushroomCloud", groundZero, d, airburst);
+
+                // The base surge: the dome of dirt that rolls out from the foot of the column
+                // and grows until it swallows the mushroom. A ground burst only - an airburst
+                // has nothing in contact with the ground to scour. See Core.GroundDust.
+                if (!airburst)
+                {
+                    GroundDustFx.Create("NuclearBaseSurge", groundZero,
+                        d.CapRadius, d.CloudTop, d.RiseSeconds);
+                }
+
             }
             catch (Exception e)
             {

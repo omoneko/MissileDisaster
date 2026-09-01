@@ -104,17 +104,22 @@ public class ShockWaveTests
     }
 
     [Fact]
-    public void One_ordinary_bomb_raises_no_dust_surge()
+    public void An_ordinary_bomb_does_raise_a_dust_surge_now_but_a_bomblet_does_not()
     {
-        // The rolling wall of earth must not appear behind a single bomb, where it reads as a
-        // dust storm arriving from nowhere.
-        foreach (WarheadType type in new[]
-                 { WarheadType.Conventional, WarheadType.Cluster, WarheadType.WhitePhosphorus })
-        {
-            var spec = WarheadSpec.For(type).Scaled(ConventionalYields.Multiplier(2000));
-            Assert.True(ExplosionScale.BlastRadius(spec) < ShockWave.DustSurgeMinRadius,
-                type + " at 2 t would raise a dust surge");
-        }
+        // The threshold used to exclude every conventional warhead - a 2 t charge included -
+        // on the argument that a rolling wall of earth behind one bomb reads as a dust storm
+        // arriving from nowhere. The Workshop's verdict was the opposite: conventional
+        // explosions had no ground smoke worth the name. The wall is sized to its own radius,
+        // so a small one is a puff of dirt rather than a full-height wall on a short leash.
+        var bomb = WarheadSpec.For(WarheadType.Conventional).Scaled(ConventionalYields.Multiplier(2000));
+        Assert.True(ExplosionScale.BlastRadius(bomb) >= ShockWave.DustSurgeMinRadius,
+            "a 2 t bomb raises one");
+
+        // A single cluster bomblet still does not: fourteen of those each dragging a wall of
+        // earth behind it is the case the threshold was really protecting against.
+        var bomblet = WarheadSpec.For(WarheadType.Cluster);
+        Assert.True(ExplosionScale.BlastRadius(bomblet) < ShockWave.DustSurgeMinRadius,
+            "a cluster bomblet does not");
     }
 
     [Fact]

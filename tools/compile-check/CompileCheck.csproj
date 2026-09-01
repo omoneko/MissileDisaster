@@ -27,6 +27,8 @@
     <Compile Include="..\..\src\MissileDisaster\Core\**\*.cs" LinkBase="Core" />
     <Compile Include="..\..\src\MissileDisaster\Game\Effects\NuclearMushroomFx.cs" LinkBase="Effects" />
     <Compile Include="..\..\src\MissileDisaster\Game\Effects\MushroomCloudPuffsFx.cs" LinkBase="Effects" />
+    <Compile Include="..\..\src\MissileDisaster\Game\Effects\GroundDustFx.cs" LinkBase="Effects" />
+    <Compile Include="..\..\src\MissileDisaster\Game\Effects\WindField.cs" LinkBase="Effects" />
     <Compile Include="..\..\src\MissileDisaster\Game\Effects\ParticleBuilder.cs" LinkBase="Effects" />
     <Compile Include="..\..\src\MissileDisaster\Game\Effects\SimulationTimed.cs" LinkBase="Effects" />
     <Compile Include="..\..\src\MissileDisaster\Game\Effects\DebrisMeshes.cs" LinkBase="Effects" />

@@ -74,6 +74,19 @@ radioactive fallout that you can clean up with a dedicated decontamination facil
   **concentric wall of dust** — a tsunami of earth the front tears off the ground, starting a
   beat after the blast passes, piling up and climbing as it spreads, and outlasting the front
   itself
+- **Base surge** — a ground burst raises a dome of dirt from the foot of the column that expands
+  outward and upward at once, leaps out in its first seconds and then creeps, and grows until it
+  is wider than the cap and reaching into its underside — the mushroom ends up standing in a bowl
+  of its own dust rather than on clean ground, which is what photographs of surface shots show.
+  It runs on its own clock, 2.6× the cloud's rise, so the two never read as one object being
+  scaled up. Conventional ground bursts get a proportionate one; an airburst gets none, having
+  nothing in contact with the ground to scour (`Core/GroundDust`)
+- **Everything drifts downwind** — the cloud and the surge are carried on the game's own wind
+  (`WeatherManager.m_windDirection`, converted the way FogEffect does it, so the mod's smoke goes
+  the same way the game's fog does). The drift builds in rather than starting at speed — a column
+  driven up by its own buoyancy wins against the wind while it is rising and loses once it
+  stabilises — and the top drifts further than the base, which is the shear that leans a real
+  cloud over instead of sliding it sideways as a rigid shape (`Core/CloudDrift`)
 - **Blast debris** — the rubble of whatever stood at ground zero is **swept outward as one
   expanding ring**, travelling with the dust rather than scattering: every piece goes straight out
   from ground zero, low, skipping along the ground and tumbling over the axis it is rolling on,

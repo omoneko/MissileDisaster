@@ -70,14 +70,24 @@ namespace MissileDisaster.Core
         /// shoved metres to tens of metres, never launched hundreds.
         /// </para>
         ///
-        /// So the strength is linear in the blast radius, which is linear in the impulse. The
-        /// floor is set just above <see cref="Gate"/> so that the smallest charge still shoves
-        /// the cars right next to it rather than doing nothing at all - the failure mode this
-        /// mod's effects keep finding.
+        /// So the strength is linear in the blast radius, which is linear in the impulse.
+        ///
+        /// <para>
+        /// The floor was then 26, a hair over the <see cref="Gate"/>, and that was a misreading of
+        /// what the gate does. CarAI tests the lift AFTER the falloff, so a floor that close to it
+        /// means only the innermost sliver of the reach ever moves: at 1500 kg, just the cars
+        /// within 12.6 m of a blast 82 m across, thrown 15 m. Reported from the Workshop as "you
+        /// cannot even really notice this with small warheads", and the measurement agreed. The
+        /// floor is now set so about 60% of the reach is actually blown at the small end.
+        /// </para>
+        ///
+        /// That makes the small end a declared exaggeration rather than a physical figure - a
+        /// 1.5 t bomb really would only shove a car a few metres - in the same spirit as the
+        /// craters, which are 2.4x life size on purpose. The alternative is a feature nobody sees.
         /// </summary>
-        public const float LiftMin = 26f;
-        public const float LiftKnee = 78f;
-        public const float LiftCeiling = 110f;
+        public const float LiftMin = 48f;
+        public const float LiftKnee = 88f;
+        public const float LiftCeiling = 120f;
         /// <summary>The destruction radius at which the lift reaches LiftKnee: a 150 kt groundburst.</summary>
         public const float LiftReferenceRadius = 3720f;
 

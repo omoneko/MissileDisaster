@@ -44,6 +44,7 @@ namespace MissileDisaster.Game.Effects
         private ParticleSystem _ps;
         private ParticleSystem.Particle[] _buffer;
         private PuffSpec[] _specs;
+        private Vector3 _wind;
         private float _t;
 
         /// <summary>
@@ -84,6 +85,7 @@ namespace MissileDisaster.Game.Effects
         private void Start()
         {
             _ps = GetComponent<ParticleSystem>();
+            _wind = WindField.Direction();
             _specs = new PuffSpec[CloudPuffs.TotalCount];
             _buffer = new ParticleSystem.Particle[CloudPuffs.TotalCount];
             for (int i = 0; i < _specs.Length; i++)
@@ -121,7 +123,12 @@ namespace MissileDisaster.Game.Effects
                 float baseAlpha = _specs[i].Cap ? CapAlpha : _specs[i].Fire ? FireAlpha : ColumnAlpha;
                 float alpha = baseAlpha * anim.Alpha * pt.Fade;
 
-                _buffer[i].position = new Vector3(pt.X, pt.Y, pt.Z); // local space; the transform sits at ground zero
+                // Carried downwind, the crown further than the base: the wind is stronger up
+                // there, and that shear is what leans a real cloud over rather than sliding it
+                // sideways as one rigid shape. See Core.CloudDrift.
+                float drift = CloudDrift.Offset(_t, Dims.RiseSeconds,
+                    Dims.CloudTop > 0f ? Mathf.Clamp01(pt.Y / Dims.CloudTop) : 0f);
+                _buffer[i].position = new Vector3(pt.X + _wind.x * drift, pt.Y, pt.Z + _wind.z * drift); // local space; the transform sits at ground zero
                 _buffer[i].startSize = pt.Size;
                 _buffer[i].rotation = _specs[i].Spin * _t + _specs[i].Azimuth * Mathf.Rad2Deg;
                 _buffer[i].startColor = new Color32(

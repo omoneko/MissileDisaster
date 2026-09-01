@@ -23,15 +23,31 @@ public class BlastWindTests
     }
 
     [Fact]
-    public void A_conventional_charge_shoves_the_nearest_cars_rather_than_launching_them()
+    public void A_conventional_charge_throws_cars_a_street_rather_than_a_district()
     {
-        // At the overpressure that wrecks a house, cars are rolled and shoved metres to tens of
-        // metres. They are not thrown across the district, whatever the film says. This is the
-        // test that would have caught the 310 m version.
+        // A declared exaggeration, bounded. Physically a 1.5 t bomb only shoves a car a few
+        // metres, but at that scale nobody could see the effect at all - which is what the
+        // Workshop reported. So the small end is lifted to something visible and held there.
+        // The bound is what matters: the first version of this threw a car 310 m off a 1 t
+        // charge, and the whole point of the test is that it can never do that again.
         foreach (float destruction in new[] { Cluster, OneTonne, Thermobaric })
         {
             float longest = BlastWind.LongestThrow(destruction);
-            Assert.InRange(longest, 3f, 25f);
+            Assert.InRange(longest, 25f, 70f);
+        }
+    }
+
+    [Fact]
+    public void Most_of_the_reach_actually_moves_something()
+    {
+        // The bug this replaced: CarAI gates on the lift AFTER the falloff, so a lift floor set
+        // just over the gate meant only the innermost quarter of the reach ever moved, and a
+        // 1500 kg warhead blew cars within 12.6 m of it and no further.
+        foreach (float destruction in new[] { OneTonne, 82.4f, Thermobaric, Strategic })
+        {
+            float reach = BlastWind.Reach(destruction);
+            Assert.True(BlastWind.Blows(reach * 0.5f, destruction),
+                $"a car halfway out is still blown by a {destruction:F0} m blast");
         }
     }
 
@@ -52,8 +68,8 @@ public class BlastWindTests
     public void A_strategic_warhead_throws_them_properly()
     {
         float longest = BlastWind.LongestThrow(Strategic);
-        Assert.InRange(longest, 40f, 140f);
-        Assert.True(longest > BlastWind.LongestThrow(OneTonne) * 3f,
+        Assert.InRange(longest, 90f, 220f);
+        Assert.True(longest > BlastWind.LongestThrow(OneTonne) * 2f,
             "and far further than a bomb does");
     }
 

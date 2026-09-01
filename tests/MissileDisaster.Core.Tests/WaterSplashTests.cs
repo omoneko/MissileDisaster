@@ -32,11 +32,15 @@ public class WaterSplashTests
     }
 
     [Fact]
-    public void A_1500_kg_conventional_burst_makes_a_splash_a_boat_would_notice_and_no_more()
+    public void A_1500_kg_conventional_burst_moves_a_lot_of_water()
     {
+        // Raised on a Workshop report that even small warheads should displace far more. The
+        // ring used to be 52 m across off a bomb that craters 27 m, which read as a ripple.
         float fireball = ConventionalFireball(1500);   // about 17 m
-        Assert.InRange(WaterSplash.Radius(fireball), 45f, 60f);
-        Assert.InRange(WaterSplash.Depth(fireball), 3f, 8f);
+        Assert.InRange(WaterSplash.Radius(fireball), 75f, 100f);
+        Assert.InRange(WaterSplash.Depth(fireball), 8f, 14f);
+        Assert.True(WaterSplash.Radius(fireball) > WaterSplash.Depth(fireball) * 2f,
+            "a crater in water, not a well");
     }
 
     [Fact]

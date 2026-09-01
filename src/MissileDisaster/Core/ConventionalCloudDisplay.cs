@@ -107,15 +107,19 @@ namespace MissileDisaster.Core
         // It stands briefly and shreds. Held far shorter than the nuclear cloud's on purpose:
         // this is a moment in a strike, not the event itself, and a bomb's smoke is torn apart by
         // the wind almost as soon as it stops rising.
-        public const float HoldFactor = 0.9f;
-        public const float HoldSecondsMin = 1.5f;
-        public const float HoldSecondsMax = 5f;
+        // Lengthened on a Workshop report that the smoke vanishes too quickly. The rise is
+        // untouched - how fast the cloud goes UP was tuned against a playtest that found a
+        // slow one a wait rather than a spectacle - so all of this buys time at the end,
+        // where the complaint actually was: it stands longer and thins out far more slowly.
+        public const float HoldFactor = 1.4f;
+        public const float HoldSecondsMin = 2.5f;
+        public const float HoldSecondsMax = 9f;
 
         // Longer than the rise, like the nuclear one: a column that takes two seconds to form and
         // vanishes in a blink reads as a deletion rather than as smoke dispersing.
-        public const float FadeFactor = 1.6f;
-        public const float FadeSecondsMin = 3f;
-        public const float FadeSecondsMax = 8f;
+        public const float FadeFactor = 2.6f;
+        public const float FadeSecondsMin = 5f;
+        public const float FadeSecondsMax = 14f;
 
         /// <summary>
         /// The condensation cloud - the thin white shell that flashes into being just behind the

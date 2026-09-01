@@ -225,12 +225,16 @@ namespace MissileDisaster.Core
         // is deliberately longer than the rise: a cloud that takes eight seconds to form and
         // vanishes in a blink reads as a deletion, and a real one takes far longer to shred
         // than to rise. The thinning is staggered per puff on top of this - see CloudPuffs.
-        public const float HoldFactor = 1.2f;
-        public const float HoldSecondsMin = 8f;
-        public const float HoldSecondsMax = 16f;
-        public const float FadeFactor = 1.7f;
-        public const float FadeSecondsMin = 12f;
-        public const float FadeSecondsMax = 20f;
+        // Lengthened on a Workshop report that the smoke vanishes too quickly. The rise is
+        // untouched - how fast the cloud goes UP was tuned against a playtest that found a
+        // slow one a wait rather than a spectacle - so all of this buys time at the end,
+        // where the complaint actually was: it stands longer and thins out far more slowly.
+        public const float HoldFactor = 1.9f;
+        public const float HoldSecondsMin = 13f;
+        public const float HoldSecondsMax = 26f;
+        public const float FadeFactor = 2.8f;
+        public const float FadeSecondsMin = 20f;
+        public const float FadeSecondsMax = 33f;
 
         // How far out the burning city feeds smoke into the cloud, against the cap. The real
         // burn radius is kilometres - the whole map at strategic yields - so the drawn field is
