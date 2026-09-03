@@ -49,7 +49,9 @@ namespace MissileDisaster.Game
         public static string Options_RandomEnable =
             "Enable random strikes - missiles WILL hit your city on their own and destroy " +
             "buildings, like a natural disaster. Leave this off to only launch missiles yourself.";
-        public static string Options_RandomFrequency = "Strike frequency (x natural disaster rate)";
+        public static string Options_RandomFrequency = "Strike frequency";
+        public static string Options_RandomFrequencyTip =
+            "Multiplier on the game's own natural-disaster rate.";
         public static string Options_AttackPattern = "Attack pattern";
         public static string Pattern_Single = "Single";
         public static string Pattern_Mirv = "MIRV";

@@ -14,7 +14,8 @@ Options_ResetPanel = 発射パネルを開く / 見える位置に戻す
 
 Options_RandomGroup = ミサイルのランダム着弾 (破壊的 - 既定はオフ)
 Options_RandomEnable = ランダム着弾を有効にする - 自然災害と同じように、ミサイルが勝手に街に着弾して建物を破壊します。自分で発射するだけにしたい場合はオフのままにしてください。
-Options_RandomFrequency = 着弾頻度 (自然災害の発生率に対する倍率)
+Options_RandomFrequency = 着弾頻度
+Options_RandomFrequencyTip = ゲームの自然災害の発生率に対する倍率。
 Options_AttackPattern = 攻撃パターン
 Pattern_Single = 単発
 Pattern_Mirv = MIRV (多弾頭)

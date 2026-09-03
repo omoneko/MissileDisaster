@@ -128,7 +128,7 @@ namespace MissileDisaster.Game
                     ModSettings.IsRandomEnabled, b => ModSettings.RandomEnabled.value = b ? 1 : 0);
                 // The frequency is a multiplier of the natural disaster rate, 0.25 to 3.0,
                 // stored internally as a percentage from 25 to 300.
-                rnd.AddSlider(MissileStrings.Options_RandomFrequency, 0.25f, 3f, 0.25f,
+                OptionsSlider.Add(rnd, MissileStrings.Options_RandomFrequency, MissileStrings.Options_RandomFrequencyTip, 0.25f, 3f, 0.25f,
                     (float)ModSettings.StrikeFrequency,
                     v => ModSettings.StrikeFrequencyPct.value = (int)Math.Round(v * 100.0));
                 rnd.AddDropdown(MissileStrings.Options_AttackPattern, MissileStrings.PatternLabels(),
