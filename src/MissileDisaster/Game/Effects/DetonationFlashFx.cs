@@ -62,15 +62,11 @@ namespace MissileDisaster.Game.Effects
         // wherever the camera is - so the flash is both: a local blaze and a brief wash of
         // daylight over the whole map. Destroying the object restores the night with it, which
         // is why this is a light rather than a change to RenderSettings.
-        private const float DirectionalMin = 2.5f;
-        private const float DirectionalMax = 9f;
-        private const float DirectionalPerKilotonRoot = 1.4f;
+        // The figures live in Core.FlashBrightness, where a test can reach them.
 
         // Unity intensity for the point light. Vanilla LightEffects sit near 1-3; a nuclear
         // detonation should be in a different league.
-        private const float IntensityMin = 20f;
-        private const float IntensityMax = 90f;
-        private const float IntensityPerKilotonRoot = 14f;    // times cbrt(kt), then clamped
+        // The figures live in Core.FlashBrightness, where a test can reach them.
 
         // A conventional warhead flashes too - it has to, now that the mod draws its own fireball
         // instead of the vanilla effect that used to carry a LightEffect - but it lights its
@@ -78,9 +74,7 @@ namespace MissileDisaster.Game.Effects
         // Raised from 0.5 per metre: at a 1 t charge's fireball that solved to 7.5, against the
         // 20 a nuclear flash starts at, and the old cap of 25 needed a 37 t charge to reach, so
         // it was a ceiling nothing could touch. A bomb at night should light the block.
-        private const float ConventionalIntensityPerMetre = 0.9f;
-        private const float ConventionalIntensityMin = 5f;
-        private const float ConventionalIntensityMax = 40f;
+        // The figures live in Core.FlashBrightness, where a test can reach them.
 
         // How far past the fireball the visible glow reaches. A nuclear flash is seen from the
         // next county, so its glow dwarfs the fireball that made it; a bomb's barely leaves it.
@@ -122,8 +116,7 @@ namespace MissileDisaster.Game.Effects
         /// </summary>
         public static void PlayConventional(Vector3 burstPoint, float fireballRadius)
         {
-            float peak = Mathf.Clamp(fireballRadius * ConventionalIntensityPerMetre,
-                ConventionalIntensityMin, ConventionalIntensityMax);
+            float peak = FlashBrightness.Conventional(fireballRadius);
             Spawn("MissileDisaster_Flash", burstPoint, fireballRadius, peak, 0f,
                 ConventionalFadeSeconds, ConventionalGlowFactor,
                 fireballRadius.ToString("0") + " m fireball");
@@ -191,12 +184,7 @@ namespace MissileDisaster.Game.Effects
         /// </summary>
         public static float DirectionalIntensity(int yieldKilotons)
         {
-            if (yieldKilotons <= 0) return DirectionalMin;
-            float root = (float)System.Math.Pow(yieldKilotons, 1.0 / 3.0);
-            float i = DirectionalPerKilotonRoot * root;
-            if (i < DirectionalMin) return DirectionalMin;
-            if (i > DirectionalMax) return DirectionalMax;
-            return i;
+            return FlashBrightness.Daylight(yieldKilotons);
         }
 
         /// <summary>
@@ -206,12 +194,7 @@ namespace MissileDisaster.Game.Effects
         /// </summary>
         public static float PeakIntensity(int yieldKilotons)
         {
-            if (yieldKilotons <= 0) return IntensityMin;
-            float root = (float)System.Math.Pow(yieldKilotons, 1.0 / 3.0);
-            float i = IntensityPerKilotonRoot * root;
-            if (i < IntensityMin) return IntensityMin;
-            if (i > IntensityMax) return IntensityMax;
-            return i;
+            return FlashBrightness.Nuclear(yieldKilotons);
         }
 
         /// <summary>
