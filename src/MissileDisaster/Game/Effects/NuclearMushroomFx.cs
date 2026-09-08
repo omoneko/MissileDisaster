@@ -82,6 +82,13 @@ namespace MissileDisaster.Game.Effects
                 // see ConventionalMushroomFx - only at nuclear dimensions.
                 MushroomCloudPuffsFx.Create("NuclearMushroomCloud", groundZero, d, airburst);
 
+                // The anvil, for a cloud that reaches the tropopause and can climb no further.
+                // Keyed to the REAL height against the real ceiling, not to the drawn height
+                // against the mod's screen ceiling - see Core.AnvilCap for why that matters.
+                AnvilCapFx.Create("NuclearAnvil", groundZero, d,
+                    NuclearCloud.CloudTop(kilotons > 0f ? kilotons : NuclearYields.StandardKilotons),
+                    airburst);
+
                 // The base surge: the dome of dirt that rolls out from the foot of the column
                 // and grows until it swallows the mushroom. A ground burst only - an airburst
                 // has nothing in contact with the ground to scour. See Core.GroundDust.

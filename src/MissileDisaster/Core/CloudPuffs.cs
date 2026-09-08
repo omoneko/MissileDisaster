@@ -75,7 +75,10 @@ namespace MissileDisaster.Core
         // The cap's torus, as fractions of the drawn cap radius and depth. Outer reach is
         // RingRadius + RingCross = 1.0 exactly, so the envelope honours the figure.
         public const float RingRadius = 0.55f;   // of cap radius: where the ring's core sits
-        public const float RingCross = 0.45f;    // of cap radius: the cross-section's radial reach
+        // Widened from 0.45 on a report that the cap does not spread far enough sideways -
+        // that the outward part of the puffs' up-and-over cycle is too weak. It is the
+        // cross-section's radial reach, so it is exactly that outward vector.
+        public const float RingCross = 0.62f;    // of cap radius: the cross-section's radial reach
         public const float RingCentreHeight = 0.5f; // of cap depth above the cap base
 
         // The column profile: wider at the dust skirt, a waist partway up, swelling again at

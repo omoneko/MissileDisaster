@@ -53,7 +53,18 @@ namespace MissileDisaster.Game.Effects
         // column over its life: measured in tools/effect-preview/cloud_preview.py, which draws
         // this alongside the puffs for exactly this reason. At a tenth of this it never left the
         // rooftops and the gap it exists to close was still there.
-        private const float DustRiseFactor = 2.8f;
+        /// <summary>
+        /// How high the afterwind dust is drawn, against the base of the cap.
+        ///
+        /// It used to climb at a fixed 2.8 x the stem radius per second for its whole life, which
+        /// is not a height at all - it is a speed with nothing to stop it. At 1.5 t that carried
+        /// the dust 195 m up through a cloud only 155 m tall, and at 150 kt 1890 m through a
+        /// 1589 m one: in both cases a straight column of smoke overtaking the mushroom and
+        /// carrying on past it, which is exactly what was reported. The speed is now solved from
+        /// where the dust is meant to end up - the underside of the cap - so it arrives there and
+        /// stops instead of setting off and never arriving.
+        /// </summary>
+        private const float DustTopOfCapBase = 0.9f;
         private static readonly Color DustLight = new Color(0.55f, 0.49f, 0.40f, 0.75f);
         private static readonly Color DustDark = new Color(0.32f, 0.28f, 0.23f, 0.75f);
 
@@ -73,7 +84,7 @@ namespace MissileDisaster.Game.Effects
                     fireballRadius * ConventionalCloudDisplay.CondensationRadiusFactor);
 
                 NuclearCloudDimensions d = ConventionalCloudDisplay.For(fireballRadius);
-                CreateGroundDust(groundZero, d.StemRadius, d.RiseSeconds);
+                CreateGroundDust(groundZero, d.StemRadius, d.RiseSeconds, d.CapBase);
                 MushroomCloudPuffsFx.Create("ConventionalMushroomCloud", groundZero, d, airburst);
 
                 // The base surge: the dome of dirt that rolls out from the foot of the column
@@ -103,7 +114,8 @@ namespace MissileDisaster.Game.Effects
         /// It is drawn with the opaque-cored cloud material rather than the thin smoke one: this
         /// has to be the solid base the column stands on, not a haze around it.
         /// </summary>
-        private static void CreateGroundDust(Vector3 groundZero, float stemRadius, float rise)
+        private static void CreateGroundDust(Vector3 groundZero, float stemRadius, float rise,
+            float capBase)
         {
             float life = rise * DustLifeFraction;
             var go = ParticleBuilder.NewSystem("ConventionalGroundDust", groundZero, ParticleAssets.Cloud);
@@ -119,7 +131,9 @@ namespace MissileDisaster.Game.Effects
 
             ParticleBuilder.Stream(ps, DustParticles * 0.95f / life);
             ParticleBuilder.ConeUp(ps, stemRadius * DustConeFraction, DustConeAngle);
-            ParticleBuilder.Rise(ps, stemRadius * DustRiseFactor);   // drawn up into the base of the column
+            // Solved from the destination, not dialled in: it reaches the underside of the cap
+            // over its own life and no further.
+            ParticleBuilder.Rise(ps, life > 0f ? capBase * DustTopOfCapBase / life : 0f);
             ParticleBuilder.Fade(ps,
                 new GradientAlphaKey(0.7f, 0f), new GradientAlphaKey(0.8f, 0.4f),
                 new GradientAlphaKey(0f, 1f));

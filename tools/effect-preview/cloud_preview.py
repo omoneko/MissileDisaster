@@ -118,6 +118,52 @@ def animation_at(t, rise, hold, fade):
     return h, w, alpha
 
 
+class Anvil:
+    """Core/AnvilCap - the wide thin two-layer sheet a cloud spreads into at the tropopause."""
+    TROPOPAUSE, FULL_SPREAD = 11000.0, 30000.0
+    R_MIN, R_MAX = 1.25, 2.30
+    THICKNESS, LAYER_GAP, LOWER_FRACTION, BOWL_RISE = 0.055, 0.10, 0.72, 0.09
+    COUNT, UPPER_SHARE = 260, 0.62
+    SIZE_MIN, SIZE_MAX = 0.07, 0.15
+
+    @classmethod
+    def real_top(cls, kt):
+        l = math.log10(kt); l2 = l * l
+        return 3000.0 * 10 ** (0.006941 * l2 * l2 - 0.06216 * l2 * l + 0.1526 * l2 + 0.1878 * l)
+
+    @classmethod
+    def forms(cls, real_top):
+        return real_top > cls.TROPOPAUSE
+
+    @classmethod
+    def radius(cls, cap_radius, real_top):
+        if not cls.forms(real_top):
+            return 0.0
+        u = min((real_top - cls.TROPOPAUSE) / (cls.FULL_SPREAD - cls.TROPOPAUSE), 1.0)
+        return cap_radius * (cls.R_MIN + (cls.R_MAX - cls.R_MIN) * u)
+
+    @classmethod
+    def points(cls, seed, cap_radius, drawn_top, real_top, wf, hf):
+        radius = cls.radius(cap_radius, real_top) * wf
+        out = []
+        if radius <= 0:
+            return out
+        for i in range(cls.COUNT):
+            upper = i < int(cls.COUNT * cls.UPPER_SHARE)
+            sheet = radius if upper else radius * cls.LOWER_FRACTION
+            az = hash01(i, seed, 1) * 2 * math.pi
+            rho = math.sqrt(hash01(i, seed, 2))
+            dist = sheet * rho
+            top = drawn_top * hf
+            layer_y = top if upper else top - sheet * cls.LAYER_GAP
+            y = (layer_y + sheet * cls.BOWL_RISE * rho * rho
+                 + sheet * cls.THICKNESS * (hash01(i, seed, 3) - 0.5) * 2)
+            out.append((dist * math.cos(az), y, dist * math.sin(az),
+                        sheet * (cls.SIZE_MIN + (cls.SIZE_MAX - cls.SIZE_MIN) * hash01(i, seed, 4)),
+                        1.0 - 0.55 * rho * rho))
+        return out
+
+
 class Puffs:
     """CloudPuffs, vectorised over all puffs."""
     ROLL_HOLD, ROLL_FADE = 0.35, 0.1
@@ -419,6 +465,26 @@ def render(P, d, t, elev_deg, path):
         img[y0:y1, x0:x1] = img[y0:y1, x0:x1] * (1 - ta[..., None]) + col * ta[..., None]
         cover[y0:y1, x0:x1] = cover[y0:y1, x0:x1] * (1 - ta) + ta
 
+    # The anvil sheet, on top of the cloud. Only for yields that reach the tropopause, which is
+    # the whole point of the trigger - see Core/AnvilCap.
+    for ax, ay, az, asz, afade in Anvil.points(P["seed"], d.cap_radius, d.cloud_top,
+                                               P.get("real_top", 0.0),
+                                               anim[1], anim[0]):
+        aa = afade * anim[2] * 0.80
+        if aa <= 0.003: continue
+        cx = int(W / 2 + ax * px)
+        cy = int(horizon - (ay * math.cos(elev) - az * math.sin(elev)) * px)
+        r = max(int(asz * 0.5 * px), 2)
+        x0, x1 = max(cx - r, 0), min(cx + r + 1, W)
+        y0, y1 = max(cy - r, 0), min(cy + r + 1, H)
+        if x0 >= x1 or y0 >= y1: continue
+        gy, gx = np.mgrid[y0:y1, x0:x1]
+        dd = np.sqrt((gx - cx) ** 2 + (gy - cy) ** 2) / r
+        ta = puff_alpha_profile(dd, np.arctan2(gy - cy, gx - cx), P) * aa
+        col = VAPOUR * 0.55 + np.array([0.72, 0.68, 0.62]) * 0.45
+        img[y0:y1, x0:x1] = img[y0:y1, x0:x1] * (1 - ta[..., None]) + col * ta[..., None]
+        cover[y0:y1, x0:x1] = cover[y0:y1, x0:x1] * (1 - ta) + ta
+
     # opacity inside the cap body, the number that has to be near 1.0
     hf, wf, _ = anim
     capR = d.cap_radius * wf
@@ -456,7 +522,7 @@ PROFILES = {
                   column_edge_speed=0.55, column_edge_reach=0.82,
                   column_wobble=0.26, column_wobble_fast=0.12,
                   column_lobes=3.0, column_lobe_depth=0.18, column_lobe_twist=2.1,
-                  cap_lobes=5.0, cap_lobe_depth=0.20, cap_lobe_rise=0.10, cap_top_flare=0.42),
+                  cap_lobes=5.0, cap_lobe_depth=0.20, cap_lobe_rise=0.10, cap_top_flare=0.42, real_top=Anvil.real_top(150.0)),
 }
 
 
