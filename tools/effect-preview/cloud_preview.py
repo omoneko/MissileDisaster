@@ -59,8 +59,8 @@ class Display150kt:
         self.stem_radius = cap_real * cloud_scale * stem_frac
         self.rise = soft(600.0 * (150.0 / 1000.0) ** 0.25 / 38.0, 10.0, 16.0)  # RiseCompression
         self.rise = max(self.rise, 5.0)
-        self.hold = min(max(self.rise * 1.2, 8.0), 16.0)
-        self.fade = min(max(self.rise * 1.7, 12.0), 20.0)
+        self.hold = min(max(self.rise * 1.9, 13.0), 26.0)
+        self.fade = min(max(self.rise * 2.8, 20.0), 33.0)
         self.fire_field = self.cap_radius * 2.5
 
 
@@ -85,9 +85,9 @@ class ConventionalDims:
         self.cap_radius = fb * 2.0                    # CapRadiusFactor
         self.stem_radius = fb * 0.7                   # StemRadiusFactor
         self.fire_field = self.cap_radius * 1.2       # FireFieldFactor
-        self.rise = soft(0.7 * math.sqrt(fb), 1.5, 4.0, 6.0)   # RiseSecondsPerRootMetre
-        self.hold = min(max(self.rise * 0.9, 1.5), 5.0)
-        self.fade = min(max(self.rise * 1.6, 3.0), 8.0)
+        self.rise = soft(1.4 * math.sqrt(fb), 3.0, 8.0, 12.0)  # RiseSecondsPerRootMetre
+        self.hold = min(max(self.rise * 0.8, 2.5), 9.0)
+        self.fade = min(max(self.rise * 1.5, 5.0), 14.0)
         # The frame has to follow the cloud: the nuclear floor of 900 m would draw this as a
         # smudge four pixels tall.
         self.frame_metres = max(self.cloud_top * 1.5, self.fire_field * 2.3)
@@ -164,6 +164,9 @@ class Puffs:
         dist[c] = np.maximum(ring - cross[c] * np.cos(theta[c]), 0.0)
         y[c] = cap_base + cap_depth * 0.5 + cap_depth * 0.5 * self.rho[c] * np.sin(theta[c])
         # The cauliflower heads, shared across the strike so the canopy stops being a torus.
+        # The crown spreads and the underside tucks in - CloudPuffs.CapTopFlare.
+        in_cap = np.clip((y[c] - cap_base) / max(cap_depth, 1e-6), 0.0, 1.0)
+        dist[c] *= 1 + P["cap_top_flare"] * (in_cap - 0.5) * 2
         dist[c] *= 1 + P["cap_lobe_depth"] * np.sin(P["cap_lobes"] * az[c] + self.phase)
         y[c] += cap_depth * P["cap_lobe_rise"] * np.sin(P["cap_lobes"] * az[c] + self.phase + 1.3)
         size[c] = capR * (P["cap_size0"] + P["cap_size1"] * self.size01[c] ** P["size_bias"])
@@ -453,7 +456,7 @@ PROFILES = {
                   column_edge_speed=0.55, column_edge_reach=0.82,
                   column_wobble=0.26, column_wobble_fast=0.12,
                   column_lobes=3.0, column_lobe_depth=0.18, column_lobe_twist=2.1,
-                  cap_lobes=5.0, cap_lobe_depth=0.20, cap_lobe_rise=0.10),
+                  cap_lobes=5.0, cap_lobe_depth=0.20, cap_lobe_rise=0.10, cap_top_flare=0.42),
 }
 
 

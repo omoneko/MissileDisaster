@@ -135,6 +135,16 @@ namespace MissileDisaster.Core
         public const float ColumnLobeDepth = 0.18f;
         public const float ColumnLobeTwist = 2.1f;  // how much the bulges spiral as they climb
 
+        /// <summary>
+        /// How much wider the canopy is at its crown than at its underside. A real cap is not
+        /// a torus: the top spreads out along the tropopause it has hit and the underside is
+        /// tucked in around the stem, which is what gives the silhouette its overhang.
+        /// Reported from the Workshop as the nuclear cap wanting a much more pronounced
+        /// mushroom shape than the conventional one - and this is the difference, since a
+        /// bomb's column has no tropopause to spread against and keeps its rounded head.
+        /// </summary>
+        public const float CapTopFlare = 0.42f;
+
         public const float CapLobes = 5f;           // cauliflower heads around the canopy
         public const float CapLobeDepth = 0.20f;
         public const float CapLobeRise = 0.10f;     // of the cap depth: the lobes ride up and down too
@@ -281,6 +291,13 @@ namespace MissileDisaster.Core
                 // The cauliflower heads. Without these the canopy is a torus - every puff boiling
                 // around a perfectly circular ring - and no amount of per-puff motion hides that
                 // the envelope is a surface of revolution.
+                // The crown spreads and the underside tucks in: a puff's width is scaled by
+                // where it sits in the cap's depth. Applied before the lobes so the
+                // cauliflower rides on the flared shape rather than fighting it.
+                float inCap = capDepth > 0f ? (y - capBase) / capDepth : 0.5f;
+                if (inCap < 0f) inCap = 0f; else if (inCap > 1f) inCap = 1f;
+                dist *= 1f + CapTopFlare * (inCap - 0.5f) * 2f;
+
                 float capLobe = (float)Math.Sin(CapLobes * azimuth + p.Phase);
                 dist *= 1f + CapLobeDepth * capLobe;
                 y += capDepth * CapLobeRise * (float)Math.Sin(CapLobes * azimuth + p.Phase + 1.3f);

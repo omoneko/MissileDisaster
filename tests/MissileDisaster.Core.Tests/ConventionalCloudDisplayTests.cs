@@ -120,11 +120,15 @@ public class ConventionalCloudDisplayTests
     public void It_is_over_in_seconds_rather_than_in_half_a_minute()
     {
         // A moment in a strike, not the event itself. The nuclear cloud is deliberately far
-        // longer - a 150 kt shot runs about 25 s.
+        // longer - a 150 kt shot runs about 56 s.
+        //
+        // The upper bound moved from 19 s when the stem was slowed by half: the rise is part of
+        // the total, so a slower climb costs seconds even with the hold and fade pulled back to
+        // absorb most of it. 16-23 s across the range.
         foreach (float fb in new[] { 3f, 9.4f, Baseline, 40f, 100f })
         {
             float show = ConventionalCloudDisplay.ShowSeconds(ConventionalCloudDisplay.For(fb));
-            Assert.InRange(show, 5f, 19f);
+            Assert.InRange(show, 5f, 25f);
         }
 
         Assert.True(

@@ -99,10 +99,16 @@ namespace MissileDisaster.Core
         // Raised from 0.55 alongside CloudAnimation.RiseEasePower: the column was reported as
         // standing up too quickly, and a softer growth curve over a slightly longer rise is what
         // answers that. The nuclear cloud got the same treatment through RiseCompression.
-        public const float RiseSecondsPerRootMetre = 0.7f;
-        public const float RiseSecondsMin = 1.5f;
-        public const float RiseSecondsKnee = 4f;
-        public const float RiseSecondsCeiling = 6f;
+        // Doubled on a Workshop report that the conventional stem climbs too fast and ought
+        // to be slower than a nuclear one. In metres per second it already was - 53 m/s at
+        // 1.5 t against 162 m/s at 150 kt - but that is not what the eye is judging: a bomb's
+        // column is watched from a few hundred metres away and a nuclear one from kilometres,
+        // so the small one crosses far more of the screen per second. Halving its speed
+        // settles it either way round: 27 m/s at 1.5 t.
+        public const float RiseSecondsPerRootMetre = 1.4f;
+        public const float RiseSecondsMin = 3f;
+        public const float RiseSecondsKnee = 8f;
+        public const float RiseSecondsCeiling = 12f;
 
         // It stands briefly and shreds. Held far shorter than the nuclear cloud's on purpose:
         // this is a moment in a strike, not the event itself, and a bomb's smoke is torn apart by
@@ -111,13 +117,13 @@ namespace MissileDisaster.Core
         // untouched - how fast the cloud goes UP was tuned against a playtest that found a
         // slow one a wait rather than a spectacle - so all of this buys time at the end,
         // where the complaint actually was: it stands longer and thins out far more slowly.
-        public const float HoldFactor = 1.4f;
+        public const float HoldFactor = 0.8f;
         public const float HoldSecondsMin = 2.5f;
         public const float HoldSecondsMax = 9f;
 
         // Longer than the rise, like the nuclear one: a column that takes two seconds to form and
         // vanishes in a blink reads as a deletion rather than as smoke dispersing.
-        public const float FadeFactor = 2.6f;
+        public const float FadeFactor = 1.5f;
         public const float FadeSecondsMin = 5f;
         public const float FadeSecondsMax = 14f;
 

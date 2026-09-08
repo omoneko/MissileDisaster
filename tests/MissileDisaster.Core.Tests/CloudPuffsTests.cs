@@ -56,9 +56,13 @@ public class CloudPuffsTests
                 // The fire smoke lives out in the burn field; everything else inside the cap,
                 // plus the cauliflower lobes, which are the whole point of the envelope not
                 // being a circle any more.
+                // The cap's crown is flared out beyond its nominal radius as well as lobed, so
+                // the envelope has to allow for both or it fails on the very shape it is meant
+                // to be describing.
                 float envelope = s.Fire
                     ? d.FireFieldRadius
-                    : d.CapRadius * anim.WidthFraction * (1f + CloudPuffs.CapLobeDepth);
+                    : d.CapRadius * anim.WidthFraction
+                        * (1f + CloudPuffs.CapLobeDepth) * (1f + CloudPuffs.CapTopFlare);
                 Assert.True(dist <= envelope * 1.01f + 1f,
                     $"puff {i} at t={t}: {dist} m out against an envelope of {envelope}");
                 // The lobes ride up as well as out, so the canopy's crown is above the figure.
@@ -122,6 +126,32 @@ public class CloudPuffsTests
         Assert.True(minY < columnTop * 0.25f, "the puff spends time low in the column");
         Assert.True(maxY > columnTop * 0.7f, "and climbs most of the way up it");
         Assert.True(minFade < 0.05f, "and is invisible at the moment it recycles");
+    }
+
+    [Fact]
+    public void The_cap_is_wider_at_its_crown_than_at_its_underside()
+    {
+        // What makes it read as a mushroom rather than a torus: the top spreads along the
+        // tropopause it has hit and the underside tucks in around the stem. Reported from the
+        // Workshop as the nuclear cap wanting a far more pronounced shape than the conventional
+        // one - and this is the difference, since a bomb's column has nothing to spread against.
+        NuclearCloudDimensions d = Dims();
+        CloudAnimationState anim = FullyGrown(d);
+        float topWidest = 0f, bottomWidest = 0f;
+        for (int i = 0; i < CloudPuffs.CapCount; i++)
+        {
+            PuffSpec s = CloudPuffs.Spec(i, 7);
+            PuffPoint p = CloudPuffs.At(s, d.RiseSeconds + 1f, d, anim);
+            float dist = (float)System.Math.Sqrt(p.X * p.X + p.Z * p.Z);
+            float capBase = d.CapBase * anim.HeightFraction;
+            float capDepth = d.CapDepth * anim.HeightFraction;
+            float inCap = (p.Y - capBase) / capDepth;
+            if (inCap > 0.75f && dist > topWidest) topWidest = dist;
+            if (inCap < 0.25f && dist > bottomWidest) bottomWidest = dist;
+        }
+        Assert.True(topWidest > bottomWidest * 1.2f,
+            $"the crown overhangs: {topWidest:F0} m at the top against {bottomWidest:F0} m at the base");
+        Assert.True(CloudPuffs.CapTopFlare > 0f);
     }
 
     [Fact]
