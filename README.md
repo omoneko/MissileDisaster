@@ -143,6 +143,18 @@ radioactive fallout that you can clean up with a dedicated decontamination facil
 - **Explosions & sound** — the fireball is sized from the yield (a 100 kg charge and a 20 t one no
   longer look alike), nuclear mushroom cloud, launch/impact/intercept SFX with 3D falloff
 
+## Unified UI
+
+If **Unified UI** is installed, the launch button registers itself there and the mod adds
+nothing else to the screen — no icon in the disasters row and no fallback button. That is the
+whole point of UUI, and putting a second button beside it is the clutter it was installed to
+avoid. Without UUI nothing changes.
+
+It is bound by reflection against `UnifiedUI.Helpers.UUIHelpers`, so there is **no dependency**:
+if UUI is absent the lookup simply fails and the vanilla-panel button is used. See
+`Game/UI/UnifiedUiButton.cs` for the API, which was read out of UnifiedUILib's IL rather than
+guessed.
+
 ## Required companion assets (important)
 
 The mod detects buildings **by name**. To use missile defense and decontamination you must

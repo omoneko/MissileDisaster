@@ -16,6 +16,13 @@ namespace MissileDisaster.Game.UI
     /// button in the top-right corner.
     /// Clicking it opens and closes MissilePanel. CreateButton and DestroyButton are called on
     /// level load and unload.
+    ///
+    /// <para>
+    /// When the player has Unified UI, the button goes there instead and none of the above runs:
+    /// UUI exists so that every mod's button lives in one place, and adding a second one next to
+    /// it is the clutter it was installed to avoid. Asked for on the Workshop. If UUI is not
+    /// installed, nothing changes.
+    /// </para>
     /// </summary>
     public static class MissileDisasterButton
     {
@@ -33,7 +40,33 @@ namespace MissileDisaster.Game.UI
             _rowFound = false;
             _fallback = false;
             _waitFrames = 0;
+
+            // Unified UI first. If it takes the button, this class draws nothing at all.
+            if (UnifiedUiButton.IsAvailable
+                && UnifiedUiButton.Register(MissileStrings.UuiButtonName,
+                    MissileStrings.UuiButtonTooltip, MissileIcon.Build(IconSize), OnUuiToggle))
+            {
+                return;
+            }
+
             EnsureAttached();
+        }
+
+        /// <summary>The launch icon Unified UI is given, in pixels. Its own buttons are 32.</summary>
+        private const int IconSize = 32;
+
+        /// <summary>Unified UI pressed the button in or let it out.</summary>
+        private static void OnUuiToggle(bool pressed)
+        {
+            try
+            {
+                if (pressed) MissilePanel.ShowAndStartTargeting();
+                else MissilePanel.Hide();
+            }
+            catch (System.Exception e)
+            {
+                ModConfig.LogError("MissileDisasterButton.OnUuiToggle error: " + e);
+            }
         }
 
         /// <summary>
@@ -46,6 +79,15 @@ namespace MissileDisaster.Game.UI
         /// </summary>
         public static void EnsureAttached()
         {
+            if (UnifiedUiButton.Registered)
+            {
+                // Unified UI owns the button. Keep it lit while the panel is open: the panel can
+                // be closed by its own close box or by another tool taking over, and a button
+                // left pressed after its panel has gone is worse than no button at all.
+                UnifiedUiButton.SetPressed(MissilePanel.IsVisible);
+                return;
+            }
+
             if (_rowFound && _button != null) return; // already in the row; a rebuild clears this and it retries
 
             UIButton fallbackButton = _fallback ? _button : null;
@@ -225,6 +267,7 @@ namespace MissileDisaster.Game.UI
 
         public static void DestroyButton()
         {
+            UnifiedUiButton.Release();
             try
             {
                 if (_button != null)

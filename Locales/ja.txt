@@ -52,3 +52,5 @@ Burst_Air = 空中爆発
 Burst_Ground = 地上爆発
 
 Button_Tooltip = Missile Disaster - 発射パネルを開く
+UuiButtonName = ミサイル災害
+UuiButtonTooltip = ミサイルを発射

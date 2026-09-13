@@ -66,6 +66,10 @@ namespace MissileDisaster.Game
         public static string Warhead_Thermobaric = "Thermobaric";
         public static string Warhead_Nuclear = "Nuclear";
 
+        // --- Unified UI ------------------------------------------------------------------------
+        public static string UuiButtonName = "Missile Disaster";
+        public static string UuiButtonTooltip = "Launch a missile";
+
         // --- Black rain ------------------------------------------------------------------------
         public static string Options_BlackRainGroup = "Black rain";
         public static string Options_BlackRain = "Black rain after a nuclear detonation";

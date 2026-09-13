@@ -46,3 +46,5 @@ Panel_ChargeHint = Enter charge in kg TNT (press Enter)
 Burst_Air = Air Burst
 Burst_Ground = Ground Burst
 Button_Tooltip = Missile Disaster - open the launch panel
+UuiButtonName = Missile Disaster
+UuiButtonTooltip = Launch a missile

@@ -83,6 +83,12 @@ namespace MissileDisaster.Game.UI
         }
 
         /// <summary>Called from the button in the disasters tab: hides the panel if it is showing and shows it if it is not.</summary>
+        /// <summary>Whether the launch panel is open. Unified UI's button reads this to stay in step with panels closed by other means.</summary>
+        public static bool IsVisible
+        {
+            get { return _panel != null && _panel.isVisible; }
+        }
+
         public static void Toggle()
         {
             EnsureCreated();
